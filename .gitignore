@@ -1,0 +1,10 @@
+
+*.zip*
+*.tar*
+*.rds*
+*.Rdata*
+*.pdf*
+*.xls*
+*.doc*
+
+/The\ value\ of*
