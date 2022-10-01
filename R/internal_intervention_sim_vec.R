@@ -33,8 +33,8 @@ library(foreach)
 
 
 
-##             Treat      Post-int   Treat-post-int   Past Perf.  Growth  Age/sex/marr.   noise
-## y[t] = b0 + b1*x1[t] + b2*x2[t] + b3*x1[t]*x2[t] + b4*y[t-1] + b5*t  + [covariates]  + u[t] ##TODO: covariates
+##             Treat      Post-int   Treat-post-int   Past Perf.  Growth  noise   covariates (age/type/level)
+## y[t] = b0 + b1*x1[t] + b2*x2[t] + b3*x1[t]*x2[t] + b4*y[t-1] + b5*t  + u[t]  + b6*c1[t] + b7*c2[t] + b8*c3[t]
 ## x1 = rule[[? f(y[t-1])]]
 
 
@@ -47,8 +47,8 @@ library(foreach)
 ## MAIN VARIABLE FUNCTIONS
 ##--------------------------------
 ## outcome
-yFunc <- function(b0, b1, b2, b3, b4, b5, x1, x2, y.tm1, t, u) {
-  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*y.tm1 + b5*t + u
+yFunc <- function(b0,b1,b2,b3,b4,b5,b6,b7,b8, x1, x2, y.tm1, t, u, c1, c2, c3) {
+  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*y.tm1 + b5*t + u + b6*c1 + b7*c2 + b8*c3
 }
 
 
@@ -61,6 +61,7 @@ yFunc <- function(b0, b1, b2, b3, b4, b5, x1, x2, y.tm1, t, u) {
 ## 
 x1Func <- function(x3.treat.post.int, y.tm1, v, ## lengths must match
                    g0=0.001, g1=0.001, 
+                   c1=1, c2=0, c3=1,
                    treat.rule='below.median', 
                    treat.threshold=0.1, ## above x proportion --> select intervention
                    records=c(), ## dataframe with past records used for 'self' or 'all' treat.rule
@@ -272,6 +273,10 @@ runInternalInterventionSim <- function(
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
     b4 = 1/3, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
+    ## Covariates
+    b6 = 1, ## Age [1,2,3,...]
+    b7 = 0, ## type [0,1]
+    b8 = 1, ## level [0,1,2]
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
     w0 = 1.3, ## constant
     w1 = 0.3, ## linear
@@ -363,6 +368,18 @@ runInternalInterventionSim <- function(
       ## focal actor past performance
       y.tm1 <- if (t==1) { rep(ystart, n) } else { df$y[idx.tm1] }
       
+      
+      
+      ## --------------- Covariates -------------------------
+      ## Age
+      c1 <- rpois(n, lambda = .8) + 1
+      
+      ## Type  
+      c2 <- sample(0:1,n,replace = T,prob = c(.5,.5))
+      
+      ## value
+      c3 <- rnorm(n, 0, 1)
+      
       ##------------------------------------------------------
       ## Get past performance records for treat.rule == 'past'
       ##------------------------------------------------------
@@ -401,6 +418,7 @@ runInternalInterventionSim <- function(
       ## TREATMENT SELF SELECTION DUMMY
       x1 <- x1Func(x3.tm1, y.tm1, v,
                    g0, g1, 
+                   c1, c2, c3,
                    treat.rule = 'below.median', 
                    treat.threshold = treat.threshold, #0.5 for 'worst'; 0.1 for 'past' (?)
                    records=perf.records
@@ -411,6 +429,8 @@ runInternalInterventionSim <- function(
       
       # ## Treatment Effect
       # x3 <- x1 * x2
+
+      
       
       ## DYNAMIC TREATMENT EFFECT
       ## periods after intervention
@@ -432,7 +452,7 @@ runInternalInterventionSim <- function(
                    w1=w1, w2=w2, w2.shift=w2.shift)
       
       ## PERFORMANCE
-      y <- yFunc(b0, b1, b2, b3, b4, b5, x1, x2, y.tm1, t, u)
+      y <- yFunc(b0, b1, b2, b3, b4, b5, b6, b7, b8, x1, x2, y.tm1, t, u, c1, c2, c3)
 
       
       ##--------------------------------------
