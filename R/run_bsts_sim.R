@@ -116,7 +116,7 @@ for (i in 1:length(simlist)) {
   cat(sprintf('\nScenario label: %s\n\n', key))
   # cat(str(simlist[[key]]))
     
-  sim <- runSimInternalInterventionEffectComparison(
+  simlist[[key]]$sim <- runSimInternalInterventionEffectComparison(
     n = n, ## NUMBER OF FIRMS
     npds = npds, ## NUMBER OF PERIODS
     intpd = intpd, ## intervention after first section
@@ -139,8 +139,6 @@ for (i in 1:length(simlist)) {
     plot.show=TRUE,
     plot.save=TRUE
   )
-  ## Add results output to simulation configuration list 
-  simlist[[key]]$sim <- sim
   
 }
 
@@ -161,7 +159,7 @@ for (i in 1:length(simlist)) {
   dfx.t0.summary <- rbind(dfx.t0.summary,  dfx.sim.i)
 }
 
-p3 <- ggplot(dfx.t0.summary, aes(x=t0, y=med, color=group)) +
+pall <- ggplot(dfx.t0.summary, aes(x=t0, y=med, color=group)) +
   geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
   geom_line(size=1.2) +
   # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
@@ -170,10 +168,10 @@ p3 <- ggplot(dfx.t0.summary, aes(x=t0, y=med, color=group)) +
   xlim(c(-intpd+2, npds-intpd-2)) +
   facet_grid( scenario ~ effect.type ) +
   theme_bw() + theme(legend.position='top') 
-print(p3)
-p3.file <- sprintf('internal_intervention_staggered_DiD_COMBINED_%s.png',sim.id)
-ggsave(filename=file.path(dir_plot, p3.file), plot=p3,
-       width=10,heigh=10,dpi=plot.dpi,units='in')
+print(pall)
+pall.file <- sprintf('internal_intervention_staggered_DiD_COMBINED_%s.png',sim.id)
+ggsave(filename=file.path(dir_plot, pall.file), plot=pall,
+       width=10,heigh=10,dpi=300,units='in')
 
 
 

@@ -858,6 +858,9 @@ runSimInternalInterventionEffectComparison <- function(
   return(list(
     df=df,
     df.t0=df.t0,
+    df.summary=df.summary,
+    df.t0.summary=df.t0.summary,
+    df.att=df.att,
     df.plot=df.plot,
     plot.allseries=p1,
     plot.group=p2,
