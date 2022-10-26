@@ -32,7 +32,7 @@ source(file.path(dir_r,'internal_intervention_sim_vec.R'))  ## vectorized -- in 
 #   intpd = round( npds / 5 ), ## intervention after first fifth
 #   ystart = 0,
 #   effect.types = c('constant','quadratic','geometric'), ## treatment effect shapes
-#   treat.rule = 'below.median',
+#   treat.rule = 'below.benchmark',
 #   treat.threshold = 0.05, ## treatment threshold (either probability or quantile of performance below which low performer(s) self-select into treatment)
 #   benchmark.type = 'self', ## 'all', 'self'
 #   seed = 54321,  ## pseudo-random number generator seed for replication
@@ -77,8 +77,8 @@ source(file.path(dir_r,'internal_intervention_sim_vec.R'))  ## vectorized -- in 
 #######################################################
 ## SIMULATION RUNS
 #######################################################
-n <- 100    ## Number of firms
-npds <- 80 ## Number of periods
+n <- 150    ## Number of firms
+npds <- 80  ## Number of periods
 intpd <- round( npds / 4 )
 
 ## dynamic treatment effect types (shapes)
@@ -94,7 +94,7 @@ simlist <- list(
     b4=0, b5=.02
   ),
   `3.mi.perf.lo.gro`=list(
-    b4=.6, b5=.02
+    b4=3/4, b5=.02
   )
 )
 ## --- TEST ---
@@ -109,35 +109,38 @@ simlist <- list(
 ## Run Simulation List
 sim.id <- round(as.numeric(Sys.time()))
 for (i in 1:length(simlist)) {
+  
   key <- names(simlist)[i]
   sim <- simlist[[key]]
   
   cat(sprintf('\nScenario label: %s\n\n', key))
-  cat(str(simlist[[key]]))
-  
-  simlist[[key]]$sim <- runInternalInterventionSim(
+  # cat(str(simlist[[key]]))
+    
+  sim <- runSimInternalInterventionEffectComparison(
     n = n, ## NUMBER OF FIRMS
     npds = npds, ## NUMBER OF PERIODS
     intpd = intpd, ## intervention after first section
     ystart = 0,
     effect.types = effect.types,
     # benchmark.type = 'self', ## 'all', 'self'
-    treat.rule = 'below.median',
-    treat.threshold = 0.015,
+    treat.rule = 'below.benchmark',
+    treat.threshold = 0.02,  # 0.015
     sim.id = sim.id, ## defaults to timestamp
     ##
     b4 = sim$b4, ## past performance
     b5 = sim$b5, ## growth (linear function of time t)
     ## Dynamic treatment effect function parameters
-    w0 = 1.2,  ## constant
-    w1 = 0.1,  ## linear
-    w2 = -0.006,  ## quadratic
+    w0 = 1.7,  ## constant
+    w1 = 0.18,  ## linear
+    w2 = -0.005,  ## quadratic
     ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
-    w2.shift = -round(.5*intpd),  ## optimal value here is likely a function of the combination of treatment effect function parameters
+    w2.shift = -round(.2*intpd),  ## optimal value here is likely a function of the combination of treatment effect function parameters
     ## Plotting
     plot.show=TRUE,
     plot.save=TRUE
   )
+  ## Add results output to simulation configuration list 
+  simlist[[key]]$sim <- sim
   
 }
 
