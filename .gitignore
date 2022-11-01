@@ -7,4 +7,6 @@
 *.xls*
 *.doc*
 
+*cconma_purchase_data.csv*
+
 /The\ value\ of*
