@@ -15,6 +15,7 @@ library(bsts)
 library(CausalImpact)
 library(lubridate)
 library(dplyr)
+library(ggplot2)
 
 work_dir <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
 setwd(work_dir)
@@ -40,64 +41,84 @@ dat$follower_reg_week  <- week(dat$follower_reg_date)
 dat$follower_reg_month <- month(dat$follower_reg_date)
 dat$follower_reg_year  <- year(dat$follower_reg_date)
 
-## Make category of ages
-idx.age <- which(dat$age < 150 & dat$age > 0)
-summary(dat$age[idx.age])
-sd(dat$age[idx.age])
-hist(dat$age[idx.age]); abline(v=10*(1:10), col='red')
-## Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-## 6.0    42.0    48.0    47.9    53.0   101.0 
-##
+## Remove unreasonable age
+dat <- dat[which(dat$age > 10 & dat$age < 110),]
+
+# ## Make category of ages
+# idx.age <- which(dat$age < 120 & dat$age > 0)
+# summary(dat$age[idx.age])
+# sd(dat$age[idx.age])
+# hist(dat$age[idx.age]); abline(v=10*(1:10), col='red')
+# ## Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# ## 6.0    42.0    48.0    47.9    53.0   101.0 
+
+
 ## Use decade ("50s" as age category)
 dat$age_cat <- sprintf('%ss', 10 * floor(dat$age / 10) )
 
 
+# # dat$cohort_pd_week_num <- NA
+# # dat$cohort_pd_week_t0 <- NA
+# dat$order_pd_week_num <- NA
+# dat$order_pd_week_t0 <- NA
+# dat$cohort_pd_week <- NA
 # dat$cohort_pd_week_num <- NA
-# dat$cohort_pd_week_t0 <- NA
-dat$order_pd_week_num <- NA
-dat$order_pd_week_t0 <- NA
-dat$cohort_pd_week <- NA
-dat$cohort_pd_week_num <- NA
-dat$match_id_pd_week <- NA
+# dat$match_id_pd_week <- NA
 
-dat$order_pd_month_num <- NA
-dat$order_pd_month_t0 <- NA
-dat$cohort_pd_month <- NA
-dat$cohort_pd_month_num <- NA
-dat$match_id_pd_month <- NA
+dat$order_pd_num <- NA
+dat$order_pd_t0 <- NA
+dat$cohort_pd <- NA
+dat$cohort_pd_num <- NA
+dat$match_id <- NA
+
+
 
 
 dat$order_week <- week(dat$order_date)
 dat$order_month <- month(dat$order_date)
 dat$order_year <- year(dat$order_date)
 
-dat$order_pd_week  <- apply(data.frame(yr=dat$order_year,w=dat$order_week),1,function(x)sprintf('%s_%02d',x[1],x[2]))
-dat$order_pd_month <- apply(data.frame(yr=dat$order_year,w=dat$order_month),1,function(x)sprintf('%s_%02d',x[1],x[2]))
-
-
-dat$cohort_pd_week  <- apply(data.frame(yr=dat$follower_reg_year,w=dat$follower_reg_week),1,function(x){
-  if(any(is.na(x))) {
-    return(NA)
-  } else {
-    return(sprintf('%s_%02d',x[1],x[2]))
-  }
-})
-dat$cohort_pd_month <- apply(data.frame(yr=dat$follower_reg_year,w=dat$follower_reg_month),1,function(x){
-  if(any(is.na(x))) {
-    return(NA)
-  } else {
-    return(sprintf('%s_%02d',x[1],x[2]))
-  }
-})
-
-
+##======================================================
 ## Cohort and order period columns by choice of period length (month, week, ...)
 pd_type <- 'month'
-order_pd_num_col <- sprintf('order_pd_%s_num', pd_type)
-order_pd_col <- sprintf('order_pd_%s', pd_type)
-order_pd_t0_col <- sprintf('order_pd_%s_t0', pd_type)
-cohort_pd_col <- sprintf('cohort_pd_%s', pd_type)
-cohort_pd_num_col <- sprintf('cohort_pd_%s_num', pd_type)
+##------------------------------------------------------
+
+dat$pd_type <- pd_type
+
+if (pd_type == 'month') {
+  
+  dat$order_pd <- apply(data.frame(yr=dat$order_year,w=dat$order_month),1,function(x)sprintf('%s_%02d',x[1],x[2]))
+  dat$cohort_pd <- apply(data.frame(yr=dat$follower_reg_year,w=dat$follower_reg_month),1,function(x){
+    if(any(is.na(x))) {
+      return(NA)
+    } else {
+      return(sprintf('%s_%02d',x[1],x[2]))
+    }
+  })
+  
+} else if (pd_type == 'week') {
+  
+  dat$order_pd <- apply(data.frame(yr=dat$order_year,w=dat$order_week),1,function(x)sprintf('%s_%02d',x[1],x[2]))
+  dat$cohort_pd <- apply(data.frame(yr=dat$follower_reg_year,w=dat$follower_reg_week),1,function(x){
+    if(any(is.na(x))) {
+      return(NA)
+    } else {
+      return(sprintf('%s_%02d',x[1],x[2]))
+    }
+  })
+  
+}
+
+
+
+
+# ## Cohort and order period columns by choice of period length (month, week, ...)
+# pd_type <- 'month'
+# order_pd_num_col <- sprintf('order_pd_%s_num', pd_type)
+# order_pd_col <- sprintf('order_pd_%s', pd_type)
+# order_pd_t0_col <- sprintf('order_pd_%s_t0', pd_type)
+# cohort_pd_col <- sprintf('cohort_pd_%s', pd_type)
+# cohort_pd_num_col <- sprintf('cohort_pd_%s_num', pd_type)
 
 
 
@@ -121,7 +142,7 @@ df <- dat[ which(dat$group=='treatment'), ]
 
 
 ## PERIOD COHORTS
-pds.cohort <- sort(unique(df[[cohort_pd_col]]), decreasing = F)
+pds.cohort <- sort(unique(df$cohort_pd), decreasing = F)
 npds.cohort <- length(pds.cohort)
 
 # for (t in 1:npds.cohort) {
@@ -146,7 +167,7 @@ for (t in 1:npds.cohort)
   pd <- pds.cohort[t]
   
   ## indices of orders in this pd (week t)
-  idx <- which(df[[cohort_pd_col]] == pd)
+  idx <- which(df$cohort_pd == pd)
   # ## members who made orders in this pd (week t)
   # mem.t <- sort(unique(df$mem_no[idx]))
   ## orders by members who made orders in this pd (ie, orders in this period)
@@ -161,8 +182,9 @@ for (t in 1:npds.cohort)
   # ## Clock time
   # df$order_pd_week_num[idx] <- t 
   # ## Event time (for dynamic effect, event study study)
-  # df$order_pd_week_t0[idx] <- t - df$cohort_pd_week_num[idx] + 1 
+  # df$order_pd_week_t0[idx] <- t - df$cohort_pd_week_num[idx] + 1
   
+
   ## IF NEW MEMBERS 
   if (length(new)>0)
   {
@@ -192,7 +214,7 @@ for (t in 1:npds.cohort)
       age_cat <- unique(xj$age_cat)
       sex <- unique(xj$sex)
       ## row indices of control orders data for members with matched observed attributes (married,age,sex) in this pd t
-      id.co <- which(co$married == married & co$age_cat == age_cat & co$sex == sex & co[[order_pd_col]] == pd)
+      id.co <- which(co$married == married & co$age_cat == age_cat & co$sex == sex & co$order_pd == pd)
       
       ## Control members who are potential matches for treated subject j
       mem.co <- sort(unique(co$mem_no[id.co]))
@@ -229,18 +251,31 @@ for (t in 1:npds.cohort)
 
 ## Combined output dataframe with order data for matched treatment and control subjects
 # out <- data.frame()
+
+##----------------------
 ## MATCHED SAMPLE 
-ms <- dat[which(dat$mem_no %in% c(cohorts$treatment,cohorts$control)),]
+##----------------------
+ms <- dat[which(dat$mem_no %in% c(cohorts$treatment,cohorts$control)), ]
 
 
 
 
 
-## Add to cohort period label to control group (which don't have cohort groups initially bc no follower_reg_date)
+## Add to cohort period label to control group 
+##  (which don't have cohort groups initially bc no follower_reg_date)
 for (i in 1:nrow(cohorts)) {
   cat(sprintf('i=%s ',i))
   ctrl_mem <- cohorts$control[i]
-  ms[which(ms$mem_no==ctrl_mem), cohort_pd_col] <- cohorts$pd[i]
+  trt_mem <- cohorts$treatment[i]
+  ms$cohort_pd[which(ms$mem_no==ctrl_mem)] <- cohorts$pd
+  ms$match_id[which(ms$mem_no %in% c(trt_mem,ctrl_mem))] <- cohorts$pd_match_id[i]
+}
+
+## Add cohort_pd_num for all treatment and control subjects 
+## (after having adding control cohort period in cohort loop above)
+for (t in 1:npds.cohort) {
+  pd <- pds.cohort[t]
+  ms$cohort_pd_num[which(ms$cohort_pd == pd)] <- t
 }
 
 
@@ -265,7 +300,7 @@ for (i in 1:nrow(cohorts)) {
 
 
 # pds <- sort(unique(dat$order_pd_week),decreasing = F)
-pds <- sort(unique(ms[[order_pd_col]]),decreasing = F)
+pds <- sort(unique(ms$order_pd),decreasing = F)
 npds <- length(pds)
 
 
@@ -276,7 +311,7 @@ for (t in 1:npds) {
   pd <- pds[t]
   
   ## indices of orders in this pd (t)
-  idx <- which(ms[[order_pd_col]] == pd)
+  idx <- which(ms$order_pd == pd)
   # ## members who made orders in this pd (t)
   # mem.t <- sort(unique(dat$mem_no[idx]))
   # ## orders by members who made orders in this pd (ie, orders in this period)
@@ -289,9 +324,9 @@ for (t in 1:npds) {
   # df$cohort_pd_week_num[idx] <- t
   # df$cohort_pd_week_t0[idx] <- t - 
   ## Clock time
-  ms[idx, order_pd_num_col] <- t 
+  ms$order_pd_num[idx] <- t 
   ## Event time (for dynamic effect, event study study)
-  ms[idx, order_pd_t0_col] <- t - ms[idx, cohort_pd_num_col] + 1 
+  ms$order_pd_t0[idx] <- t - ms$cohort_pd_num[idx] + 1 
   
 }
 
@@ -305,6 +340,18 @@ saveRDS(list(matchsamp=ms, cohorts=cohorts),
 
 
 
+# ## SET GROUP = 0 if untreated (control)
+# ms$cohort_pd_num[which(ms$group == 'control')] <- 0
+# ##
+# msatt <- att_gt(yname = 'order_sum', ## "Y",
+#                   tname = 'order_pd_num',
+#                   idname = 'mem_no',
+#                   gname = 'cohort_pd_num',
+#                   xformla = ~age, #+ factor(married) + factor(sex), ##age_mean + married_y_prop + sex_f_prop,
+#                   data = ms,
+#                 control_group = 'notyettreated'
+# )
+
 
 
 
@@ -312,24 +359,38 @@ saveRDS(list(matchsamp=ms, cohorts=cohorts),
 ## MONTHLY PERIOD
 ##-----------------------------------------------
 ## Summarize period panel dataframe for period: MONTH
-matchdata <- matchsamp %>%   
-  group_by(order_pd_month_num, group) %>%
+matchdata <- ms %>%   
+  group_by(order_pd_num, cohort_pd_num, group, age_cat, sex, married) %>%    ## order_pd_t0
   summarise(
-    order_pd_month_t0 = unique(order_pd_month_t0, na.rm=T)[1],
     n_in_pd = n(),
-    order_pd_month_cnt_mean = mean(order_cnt, na.rm=T),
-    order_pd_month_cnt_max = max(order_cnt, na.rm=T),
-    order_pd_month_cnt_min = min(order_cnt, na.rm=T),
-    order_pd_month_cnt_sd = sd(order_cnt, na.rm=T),
-    order_pd_month_sum_mean = mean(order_sum, na.rm=T),
-    order_pd_month_sum_max = max(order_sum, na.rm=T),
-    order_pd_month_sum_min = min(order_sum, na.rm=T),
-    order_pd_month_sum_sd = sd(order_sum, na.rm=T)
+    id_covar = paste(c(unique(age_cat),unique(sex),unique(married)),collapse = '_'),
+    order_cnt_percap_mean = sum(order_cnt,na.rm=T)/n(),
+    order_sum_percap_mean = sum(order_sum,na.rm=T)/n(),
+    ##
+    order_cnt_mean = mean(order_cnt, na.rm=T),
+    order_cnt_max = max(order_cnt, na.rm=T),
+    order_cnt_min = min(order_cnt, na.rm=T),
+    order_cnt_sd = sd(order_cnt, na.rm=T),
+    order_cnt_tot = sum(order_cnt, na.rm=T),
+    order_sum_mean = mean(order_sum, na.rm=T),
+    order_sum_max = max(order_sum, na.rm=T),
+    order_sum_min = min(order_sum, na.rm=T),
+    order_sum_sd = sd(order_sum, na.rm=T),
+    order_sum_tot = sum(order_sum, na.rm=T),
+    age_mean = mean(age, na.rm=T),
+    age_cat_mode = mode(age_cat),
+    married_y_prop = sum(married=='Y',na.rm=T)/n(),
+    sex_f_prop = sum(sex=='F',na.rm=T)/n()
   ) %>%
   filter(
-    # n > 1,
-    # mass > 50
+    order_pd_num >  quantile(ms$order_pd_num, .025),
+    order_pd_num <= quantile(ms$order_pd_num, .975)
   )
+
+## PLOT
+p0 <- ggplot(data=matchdata, aes(x=order_pd_num, y=order_sum_percap_mean, colour=group)) + geom_line() + 
+  facet_wrap( . ~ cohort_pd_num) + theme_bw() ## +  geom_vline(xintercept=0, lty=2)
+p0
 
 # matchdata <- out %>%   
 #   group_by(order_pd_week_num, group) %>%
@@ -361,10 +422,48 @@ matchdata <- matchsamp %>%
 #   
 # } ## // end t loop (over weekly periods)
 
+## SET GROUP = 0 if untreated (control)
+matchdata$cohort_pd_num[which(matchdata$group == 'control')] <- 0
+matchdata$id_covar_factor <- as.factor(matchdata$id_covar)
+matchdata$id_covar_num <- as.numeric(matchdata$id_covar_factor)
+
+ccattgt <- att_gt(yname = "order_sum_percap_mean", ## "Y",
+                  tname = "order_pd_num",
+                  idname = "id_covar_num",
+                  gname = "cohort_pd_num",
+                  xformla = ~age_mean + married_y_prop + sex_f_prop,
+                  data = matchdata #,
+                  # panel = F
+                  
+)
 
 
 
-ccattgt <- att_gt(yname = "order_cnt", ## "Y",
+
+
+
+agg.simple <- aggte(ccattgt, type='simple')
+summary(agg.simple)
+
+## DYNAMIC EFFECTS AND EVENT STUDIES
+agg.es <- aggte(ccattgt, type = "dynamic")
+summary(agg.es)
+ggdid(agg.es)
+
+# ## Group-Specific Effects
+# agg.gs <- aggte(example_attgt, type = "group")
+# summary(agg.gs)
+# ggdid(agg.gs)
+
+
+# ## Calendar Time Effects
+# agg.ct <- aggte(example_attgt, type = "calendar")
+# summary(agg.ct)
+# ggdid(agg.ct)
+
+
+
+ccattgt <- att_gt(yname = "Y", ## "Y",
                   tname = "period",
                   idname = "id",
                   gname = "G",
