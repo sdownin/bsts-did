@@ -142,7 +142,7 @@ x2Func <- function(t, intpd, n) {
 } 
 
 ## Treatment effect
-b3Func <- function(t.post.intpd, x2, ## must be same length vectors
+b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
                    type='quadratic', 
                    w0=1.3, w1=.3, w2=-.012, w2.shift=0,
                    non.negative=TRUE) {
@@ -163,7 +163,7 @@ b3Func <- function(t.post.intpd, x2, ## must be same length vectors
   b3 <- rep(0, n)
   
   ## if pre-treatment period (x==0) then treatment effect is defined as 0
-  idx <- which( x2 == 1 )
+  idx <- which( x1 * x2  == 1 )
   n.idx <- length(idx)
   
   if (length(n.idx) > 0)
@@ -269,8 +269,8 @@ runSimSingleIntervention <- function(
   
   sim.count <- ntypes * npds  ## n
   
-  cat(sprintf('\nRunning Internal Intervention Simulation for %s iterations:\n  %s periods, %s effect types\n',
-              sim.count, npds, ntypes))
+  cat(sprintf('\nRunning Internal Intervention Simulation for %s iterations:\n  %s periods,  effect type = \n',
+              sim.count, npds, effect.type))
   
   ## Initialize progress bar
   counter <- 0
@@ -419,7 +419,7 @@ runSimSingleIntervention <- function(
     # cat('t.post.intpd: ', t.post.intpd)
     ##
     # shift.t.post.intpd <- t.post.intpd - intpd
-    b3 <- b3Func(t.post.intpd, x2, type=effect.type,
+    b3 <- b3Func(t.post.intpd, x1, x2, type=effect.type,
                  w0=ifelse(effect.type=='geometric', w0*7, w0),
                  w1=w1, w2=w2, w2.shift=w2.shift)
     
@@ -491,6 +491,7 @@ runSimSingleIntervention <- function(
   # min.idx <- if(length(a.ctrl)<length(actor.eff.tr)) {a.ctrl} else {actor.eff.tr}##min(c(length(actor.eff.tr),length(a.ctrl)))
   # matches <- data.frame(treat=actor.eff.tr, control=NA, stringsAsFactors = F) 
   df$match_id <- NA
+  df$match_pd <- NA
   for (i in 1:length(actor.eff.tr)) {
     # cat(sprintf('%s ',i))
     actor <- actor.eff.tr[i]
@@ -510,6 +511,7 @@ runSimSingleIntervention <- function(
     
     idx.match <- which(df$actor %in% c(actor,a.ctrl))
     df$match_id[ idx.match ] <- match_id   # &  df$effect.type==effect.type
+    df$match_pd[ idx.match ] <- pd.tr
     
     # batch <- df[which(df$actor==idx & df$effect.type==effect.type), ]
     # grp <- 'treatment' #unique(batch$group) ## should only be one element as all rows should be from same subject in 1 group
@@ -648,7 +650,7 @@ runSimSingleInterventionEffectComparison <- function(
     w0 = 1.3, ## constant
     w1 = 0.3, ## linear
     w2 = -0.12, ## quadratic
-    w2.shift = -10, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    w2.shift = -12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
     ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
     g0 = .1,
     g1 = .1,
@@ -703,6 +705,17 @@ runSimSingleInterventionEffectComparison <- function(
   #   # plot.group.staggered=p3,
   #   id=SIMID
   # ))
+  
+  df.summary <- NA
+  df.t0.summary <- NA
+  df.att <- NA
+  df.plot <- NA
+  plot.allseries <- NA
+  plot.group <- NA
+  plot.group.staggered <- NA
+  p1 <- NA
+  p2 <- NA
+  p3 <- NA
   
   ##=============================================
   ## PLOTS

@@ -1,0 +1,416 @@
+"","RP_ENTITY_ID","ENTITY_NAME","cnt"
+"1","388CE0","i-CABLE Communications Ltd.",10778
+"2","43BCDD","Imperial Oil Ltd.",10766
+"3","F19C62","Susquehanna Financial Group LLLP",10747
+"4","2593CE","Korea Development Bank",10742
+"5","203475","Delhaize Group S.A.",10728
+"6","65B36F","Petro-Canada",10727
+"7","160B14","Apax Partners LLP",10719
+"8","7507A6","Euronext N.V.",10695
+"9","BDD12C","Whirlpool Corp.",10694
+"10","01329F","FUJIFILM Holdings Corp.",10688
+"11","5516B5","Mitsubishi UFJ Securities Co. Ltd.",10686
+"12","305625","Fletcher Building Ltd.",10681
+"13","E0B27B","Roth Capital Partners LLC",10673
+"14","2FE28F","TransCanada Corp.",10672
+"15","FA1502","Cargill  Inc.",10659
+"16","E2D3F3","Cameco Corp.",10650
+"17","982980","7-Eleven Inc.",10644
+"18","CB10F8","Hennes & Mauritz AB",10644
+"19","E26FC3","CSX Corp.",10644
+"20","3A30EA","Daishin Securities Co. Ltd.",10638
+"21","26D23F","Vodafone K.K.",10634
+"22","5D763B","Prada S.p.A.",10615
+"23","E4D24D","Dun & Bradstreet Corp.",10578
+"24","7D9FAB","Union Fenosa S.A.",10573
+"25","869261","Alleanza Assicurazioni S.p.A.",10565
+"26","143C52","Dollar Tree Inc.",10564
+"27","1163CC","Millennium Management LLC",10558
+"28","60E604","Collins Stewart Hawkpoint Ltd.",10557
+"29","408CFB","China National Aviation Co. Ltd.",10541
+"30","968966","Pitney Bowes Inc.",10526
+"31","7CCD06","New Century Financial Corp.",10520
+"32","43A060","ComScore Inc.",10513
+"33","828469","Contact Energy Ltd.",10510
+"34","A1BC70","ICOS Corp.",10501
+"35","7BDD8B","Cable & Wireless Optus Ltd.",10497
+"36","1ACA7D","Napster Inc.",10493
+"37","6D5749","D.A. Davidson & Co.",10479
+"38","BFDF5E","Cerberus Capital Management L.P.",10469
+"39","934CC3","NetApp Inc.",10468
+"40","ACF77B","Paccar Inc.",10454
+"41","87B81A","CDW Corp.",10447
+"42","06EF42","D.R. Horton Inc.",10432
+"43","E57F94","Investec PLC",10421
+"44","D8E667","Misys Group Ltd.",10416
+"45","A3940D","Hong Kong & China Gas Co. Ltd.",10412
+"46","539A78","Molex Inc.",10402
+"47","A7A10A","HDFC Bank Ltd.",10393
+"48","1CB9D3","MBIA Inc.",10384
+"49","6FAE84","Syngenta AG",10382
+"50","178C6C","Fraser & Neave Ltd.",10382
+"51","C28A0F","Sal. Oppenheim jr. & Cie. AG & Co. KGaA",10374
+"52","7B3608","Singapore Technologies Engineering Ltd.",10370
+"53","170A6F","Pier 1 Imports Inc.",10365
+"54","53301E","Bharat Heavy Electricals Ltd.",10361
+"55","D3741A","ModusLink Global Solutions Inc.",10361
+"56","BBF166","Tele Norte Leste Participacoes S/A",10352
+"57","16822A","Lonmin PLC",10339
+"58","D74613","Snam S.p.A.",10337
+"59","7AC86E","DTE Energy Co.",10322
+"60","BD5983","AWB Ltd.",10322
+"61","8A9B90","Georgia-Pacific Corp.",10297
+"62","C35C7D","Goodrich Corp.",10293
+"63","5F3957","IG Group Holdings PLC",10283
+"64","18958F","PTT Exploration & Production PCL",10282
+"65","29C246","Engelhard Corp.",10281
+"66","8D8742","Ricoh Co. Ltd.",10264
+"67","DB5DA5","Sun Life Financial Inc.",10257
+"68","5C7601","Lincoln National Corp.",10255
+"69","1F1B1A","WILLIAM HILL PLC",10247
+"70","E0AD75","Antofagasta PLC",10245
+"71","E0339F","Textron Inc.",10244
+"72","11470C","Rohm Co. Ltd.",10232
+"73","0AB992","Industrial & Commercial Bank of China Ltd.",10231
+"74","9803B7","Johnson Controls Inc.",10224
+"75","5F0350","Harris Interactive Inc.",10218
+"76","7B6193","Philippine Stock Exchange Inc.",10217
+"77","E3ECD0","Interfax Information Services Group",10189
+"78","E206B0","The Travelers Companies Inc.",10188
+"79","9CAC83","James Hardie Industries PLC",10176
+"80","C3D62D","Okasan Securities Group Inc.",10159
+"81","843395","Zürcher Kantonalbank",10145
+"82","2E3537","PanAmSat Holding Corp.",10139
+"83","DF8855","Amcor Ltd.",10127
+"84","7F561F","Hanson PLC",10126
+"85","C8BC65","Cosco Shipping Ports Ltd.",10123
+"86","2873A5","Yahoo Japan Corp.",10108
+"87","2DBC3B","Transocean Ltd.",10102
+"88","B531E2","JX Holdings Inc.",10099
+"89","531EF1","Check Point Software Technologies Ltd.",10094
+"90","B71396","Lafarge North America Inc.",10086
+"91","55E851","Denway Motors Ltd.",10086
+"92","3E149C","Danone S.A.",10080
+"93","83EE8C","SK Holdings Co. Ltd.",10080
+"94","E16376","Societe d'Edition de Canal Plus SA",10075
+"95","D7FE6B","De Beers S.A.",10058
+"96","4B2684","Empower Technologies Corp.",10055
+"97","84162B","Sigma-Aldrich Corp.",10024
+"98","F0E267","CIMIC Group Ltd.",9954
+"99","5F0B57","SeeBeyond Technology Corp.",9932
+"100","F6C872","Neiman Marcus Inc.",9930
+"101","76BA6C","Friends Provident PLC",9915
+"102","14AA8D","Next PLC",9914
+"103","0CE7F6","Foot Locker Inc.",9896
+"104","766047","Hartford Financial Services Group Inc.",9892
+"105","08D469","Ascential PLC",9878
+"106","45DCCB","TOM Group Ltd.",9875
+"107","CF6A5A","Alaska Air Group Inc.",9858
+"108","339F49","Equant N.V.",9854
+"109","EA9518","Blockbuster Inc.",9852
+"110","4BF765","Scottish & Newcastle PLC",9839
+"111","D12DD1","Lion Nathan Ltd.",9832
+"112","F50039","Sovereign Bancorp Inc.",9822
+"113","A6968A","NTL Inc.",9818
+"114","AD3C93","AFLAC Inc.",9799
+"115","A28C54","Vinci S.A.",9792
+"116","1D3A00","Chico's FAS Inc.",9791
+"117","BC6055","BMC Software Inc.",9789
+"118","CD06A2","First Horizon National Corp.",9787
+"119","AA6595","Allergan Inc.",9780
+"120","76596B","BOC Hong Kong (Holdings) Ltd.",9771
+"121","574582","Sinopec Shanghai Petrochemical Co. Ltd.",9761
+"122","0F0DDA","TDK Corp.",9751
+"123","746C91","QBE Insurance Group Ltd.",9743
+"124","DC2B00","Dollar General Corp.",9710
+"125","603179","Belgacom S.A.",9695
+"126","E82BF7","Onex Corp. (Canada)",9693
+"127","0BD751","M.I.M. Holdings Ltd.",9678
+"128","E14AF1","Petrobras Argentina S.A.",9675
+"129","5E07F9","Ranbaxy Laboratories Ltd.",9673
+"130","ADA4B9","Barrick Gold Inc.",9672
+"131","4CD369","Technicolor S.A.",9669
+"132","22C58E","Maxim Integrated Products Inc.",9669
+"133","91DAE9","JMP Securities LLC",9666
+"134","3ED502","Carlsberg A/S",9662
+"135","CA806F","Clariant AG",9656
+"136","751A74","Royal Caribbean Cruises Ltd.",9643
+"137","867FD6","Japan Tobacco Inc.",9636
+"138","4DC907","China Resources Beer (Holdings) Co. Ltd.",9630
+"139","0A0BEE","Kunlun Energy Co. Ltd.",9628
+"140","324285","Affiliated Computer Services Inc.",9620
+"141","C70520","CSL Ltd.",9587
+"142","0EBA3B","Baoshan Iron & Steel Co. Ltd.",9575
+"143","4EB77D","Reckitt Benckiser Group PLC",9563
+"144","58E293","Lexmark International Inc.",9563
+"145","C4073B","Eaton Corp. PLC",9554
+"146","329384","Carter Holt Harvey Ltd.",9517
+"147","F748C7","Williams-Sonoma Inc.",9511
+"148","4B192A","Fubon Financial Holding Co. Ltd.",9493
+"149","41588B","AK Steel Holding Corp.",9485
+"150","41AC62","Cypress Semiconductor Corp.",9474
+"151","FF0310","Mazda Motor Corp.",9473
+"152","9355E7","Natixis S.A.",9469
+"153","900356","Simon Property Group Inc.",9457
+"154","BCC55F","Vonage Holdings Corp.",9452
+"155","3660F1","Forest Laboratories Inc.",9443
+"156","DBEE37","Telewest Communications PLC",9440
+"157","5CBE99","Kia Motors Corp.",9433
+"158","719477","Clorox Co.",9430
+"159","78072F","Sumitomo Trust & Banking Co. Ltd.",9430
+"160","BB0814","SAFECO Corp.",9417
+"161","E46161","HUTCHISON TELECOMMUNICATIONS INTERNATIONAL LTD.",9401
+"162","39DF69","Tiscali S.p.A.",9398
+"163","789A7D","Ameren Corp.",9395
+"164","244B2B","Krung Thai Bank PCL",9395
+"165","A01664","Take-Two Interactive Software Inc.",9394
+"166","3C3427","Mitsubishi Estate Co. Ltd.",9389
+"167","7F523C","Power Assets Holdings Ltd.",9388
+"168","E5F309","KeySpan Corp.",9371
+"169","13387A","Corporate Express N.V.",9352
+"170","6AEA3A","Hyundai Securities Co. Ltd.",9347
+"171","E30B75","RHB Bank Bhd",9346
+"172","C55A68","Cosmo Securities Co. Ltd.",9339
+"173","F233DF","VERSATEL AG",9331
+"174","63E639","Brilliance China Automotive Holdings Ltd.",9317
+"175","C659EB","C.H. Robinson Worldwide Inc.",9310
+"176","305A1A","Gemplus International S.A.",9305
+"177","7D5FD6","PulteGroup Inc.",9295
+"178","801515","Burberry Group PLC",9295
+"179","FA96B7","Degussa AG",9288
+"180","E4DCB7","Ensco PLC",9274
+"181","7825A7","Kasikornbank PCL",9269
+"182","EA2D75","OMRON Corp.",9268
+"183","D1921E","ACC Ltd.",9261
+"184","92D230","Revlon Inc.",9238
+"185","40F24C","TDC A/S",9231
+"186","ED29C6","Hero Honda Motors Ltd.",9230
+"187","0B1CC6","Sotheby's",9221
+"188","AFF7B4","Unum Group",9221
+"189","DA2337","Agere Systems Inc.",9215
+"190","55DE4F","Hindustan Unilever Ltd.",9213
+"191","14BB21","YRC Worldwide Inc.",9207
+"192","35BE65","Genesys S.A.",9165
+"193","455B08","Burlington Northern Santa Fe Corp.",9164
+"194","D1B2E3","Chubb Corp.",9163
+"195","81EAD4","U.S. Cellular Corp.",9162
+"196","3573DB","China Airlines Ltd.",9134
+"197","535779","Standard Life Bank PLC",9106
+"198","0E128A","Supervalu Inc.",9095
+"199","268E06","Bunzl PLC",9094
+"200","837628","Nexen Inc.",9087
+"201","B38078","BURSA MALAYSIA BHD",9080
+"202","E124EB","Danaher Corp.",9074
+"203","62BF3E","Morrison Supermarkets PLC",9074
+"204","ADD366","OJSC Rosneft Oil Co.",9073
+"205","4F11BC","GKN PLC",9070
+"206","9F03CF","Hershey Co.",9057
+"207","9C3136","Valeo S.A.",9031
+"208","26CC63","Jabil Circuit Inc.",9027
+"209","9BBFA5","Darden Restaurants Inc.",9023
+"210","A7102F","Henry Schein Inc.",9021
+"211","155733","Esprit Holdings Ltd.",9016
+"212","4B2EC0","Smithfield Foods Inc.",9010
+"213","00067A","Humana Inc.",9001
+"214","721662","CDC Corp. Cl A",8960
+"215","59C6CB","Origin Energy Ltd.",8959
+"216","6FDA48","Mills Corp.",8937
+"217","8A6C15","Grupo Ferrovial S.A.",8936
+"218","CFA9AD","Gucci Group N.V.",8926
+"219","C01E66","Martin Currie Ltd.",8924
+"220","11425F","Diagnostic Products Corp.",8916
+"221","B8A913","BearingPoint Inc.",8913
+"222","3F4497","Masco Corp.",8912
+"223","9DB5D7","Talbots Inc.",8906
+"224","8A4575","Fanuc Ltd.",8900
+"225","927CB9","Maxtor Corp.",8885
+"226","680729","SkyePharma PLC",8875
+"227","E02CF9","Ariba Inc.",8865
+"228","85A2FF","SBM Offshore N.V.",8851
+"229","E60E69","Medco Health Solutions Inc.",8851
+"230","2945AF","Intouch Holdings PCL",8848
+"231","B25172","Allegheny Energy Inc.",8846
+"232","25BFA9","King Pharmaceuticals Inc.",8830
+"233","D850B7","Thai Airways International PLC",8825
+"234","940C3D","Baker Hughes Inc.",8813
+"235","A20989","Beam Inc.",8806
+"236","6DA1EE","National Semiconductor Corp.",8802
+"237","2EC172","NCR Corp.",8798
+"238","429FA3","Four Seasons Hotels Inc.",8789
+"239","E5A85E","John Keells Holdings PLC",8788
+"240","E02049","WR Hambrecht & Co.",8783
+"241","820800","Wavecom S.A.",8782
+"242","26A764","Tommy Hilfiger Corp.",8771
+"243","12B137","Ciba Holding AG",8767
+"244","F1D7E1","Jardine Cycle & Carriage Ltd.",8762
+"245","C1C633","Dassault Systemes S.A.",8757
+"246","F13C0C","IMS Health Inc.",8747
+"247","5D49C7","Canadian National Railway Co.",8745
+"248","D9593D","Constellation Energy Group Inc.",8742
+"249","BFAEB4","Cintas Corp.",8742
+"250","A65489","Kirin Holdings Co. Ltd.",8739
+"251","D1E81C","CGI Group Inc.",8732
+"252","480A02","Atlantia S.p.A.",8730
+"253","51371F","Mittal Steel Co. N.V.",8723
+"254","039E10","Hovnanian Enterprises Inc.",8718
+"255","0F4DB4","Permira LLP",8717
+"256","AF2572","Housing Development Finance Corp. Ltd.",8706
+"257","9D2790","Sysco Corp.",8695
+"258","5D8FB1","Telecom Italia Media S.p.A.",8693
+"259","DC2A10","Borders Group Inc.",8692
+"260","2DD58E","Indian Oil Corp. Ltd.",8689
+"261","AE5474","Nordion Inc.",8679
+"262","A247F5","Fair Isaac Corp.",8675
+"263","1A8691","Golden Star Resources Ltd.",8672
+"264","285175","Praxair Inc.",8669
+"265","4CB724","PaineWebber Group Inc.",8666
+"266","69C9D6","Winn-Dixie Stores Inc.",8649
+"267","39ED23","Merriman Inc.",8649
+"268","BB5271","Akamai Technologies Inc.",8634
+"269","41D76C","PacifiCare Health Systems Inc.",8615
+"270","525C7F","Jones Apparel Group Inc.",8615
+"271","215817","NetRatings Inc.",8605
+"272","1A98DB","NOVA Chemicals Corp.",8598
+"273","7693B0","SK Securities Co. Ltd.",8594
+"274","099559","Weyerhaeuser Co. Ltd.",8586
+"275","3BC4D8","Massey Energy Co.",8581
+"276","7EC821","Barr Pharmaceuticals Inc.",8575
+"277","DEC5F7","T-Online International AG",8569
+"278","8A4E60","TIBCO Software Inc.",8557
+"279","ACC87B","Cosco Corp. (Singapore) Ltd.",8540
+"280","28221E","Agrium Inc.",8539
+"281","CA4027","Woori Investment & Securities Co. Ltd.",8510
+"282","D125D6","AmSouth Bancorporation",8508
+"283","4CFBDB","Genting Hong Kong Ltd.",8505
+"284","33D6AE","Woori Bank",8500
+"285","2A9078","Kansai Electric Power Co. Inc.",8496
+"286","39DC8F","Pacific Sunwear of California Inc.",8491
+"287","EF8334","Point72 Asset Management LP",8485
+"288","E99564","Telekom Austria AG",8479
+"289","09AEEF","TransAlta Corp.",8474
+"290","B81894","Torstar Corp.",8473
+"291","D9B7A5","Banco Bradesco S.A.",8449
+"292","F5C8AB","Expeditors International of Washington Inc.",8426
+"293","33649B","Logitech International S.A.",8424
+"294","A59868","Business Objects S.A.",8421
+"295","00389F","Vontobel Holding AG",8419
+"296","F7FA4A","Dimension Data Holdings PLC",8413
+"297","0853E0","New Delhi Television Ltd.",8403
+"298","CAE929","TheStreet Inc.",8385
+"299","A9F2CA","Univision Communications Inc.",8383
+"300","DE27F9","Chubb Ltd.",8369
+"301","66CB62","Chesapeake Energy Corp.",8356
+"302","FD39EB","NRG Energy Inc.",8341
+"303","2BF36E","Dentsply Sirona Inc.",8339
+"304","0A48B6","Dixons Carphone PLC",8339
+"305","5D9C9E","PEMEX",8338
+"306","4E4E75","Patterson Cos. Inc.",8337
+"307","CDE118","Domtar Corp.",8334
+"308","25D68B","Manila Electric Co.",8331
+"309","18F1D4","BBX Capital Corp.",8328
+"310","B32585","Symbol Technologies Inc.",8325
+"311","2D643C","Norfolk Southern Corp.",8313
+"312","DA44AF","Dow Jones & Co. Inc.",8313
+"313","3C050F","Pioneer Corp.",8281
+"314","328FFD","Areva S.A.",8268
+"315","7840D6","Sasol Ltd.",8252
+"316","055551","Kate Spade & Co.",8243
+"317","616E3B","Waste Management Inc.",8240
+"318","822996","MOBILEONE LTD.",8240
+"319","CC339B","Gentex Corp.",8237
+"320","07CA6A","Brunswick Corp.",8235
+"321","601979","Nidec Corp.",8235
+"322","5BC929","Toll Holdings Ltd.",8231
+"323","7D85A9","AmerisourceBergen Corp.",8228
+"324","A6C151","Kuwait Petroleum Corp.",8225
+"325","93FC4D","UTStarcom Inc.",8223
+"326","50D5B6","SCOR Holding (Switzerland) AG",8220
+"327","AA5C8E","Kinder Morgan Inc.",8210
+"328","BA9110","Fresenius SE & Co. KGaA",8209
+"329","70E789","Celgene Corp.",8208
+"330","5FA841","Siam Commercial Bank PCL",8200
+"331","B4B822","GenOn Energy Inc.",8194
+"332","6208E4","Patrick Corp. Ltd.",8186
+"333","964A22","Applied Biosystems Inc.",8183
+"334","6DAACF","Genting Malaysia Bhd",8180
+"335","92D3A0","Fastenal Co.",8177
+"336","E68C3D","Analog Devices Inc.",8159
+"337","EA2BE4","Polycom Inc.",8148
+"338","56E3CB","Lagardere S.C.A.",8144
+"339","CE80D1","GlaxoSmithKline Pharmaceuticals Ltd.",8140
+"340","387DAF","SAS AB",8136
+"341","692DA6","Canadian Pacific Railway Ltd.",8134
+"342","C48861","Shaw Communications Inc.",8129
+"343","17F6AD","Advanced Semiconductor Engineering Inc.",8127
+"344","A29A46","Ferro Corp.",8126
+"345","C0200F","ManpowerGroup Inc.",8119
+"346","3C3616","DRB-HICOM Bhd",8114
+"347","DD422F","Hyundai Engineering & Construction Co. Ltd.",8114
+"348","66ECFD","Automatic Data Processing Inc.",8107
+"349","2B6B97","Atmel Corp.",8105
+"350","2FD2F9","Conexant Systems Inc.",8105
+"351","AEAC21","Cadre Services Inc.",8104
+"352","DB30C3","ProLogis Inc.",8096
+"353","F59EA0","Insurance Australia Group Ltd.",8087
+"354","A15D55","Grupo Mexico S.A.B. de C.V.",8071
+"355","196FFE","NuStar Energy L.P.",8055
+"356","2037DC","HLTH Corp.",8049
+"357","D3B951","Lincare Holdings Inc.",8047
+"358","65A0E8","XL Group Ltd.",8033
+"359","61D090","Great Elm Capital Group Inc.",8027
+"360","753D38","Rinker Group Ltd.",8026
+"361","A095EB","Ping An Insurance (Group) Co. of China Ltd.",8021
+"362","A28BBB","Oil Search Ltd.",8013
+"363","E974B6","Safeway PLC",7999
+"364","84D6B2","Intersil Corp.",7989
+"365","47B000","OSI Pharmaceuticals Inc.",7975
+"366","736E9C","Japan Exchange Group Inc.",7973
+"367","0FC989","THQ Inc.",7967
+"368","FF00C9","Reebok International Ltd.",7960
+"369","67A069","Reliance Communications Ltd.",7953
+"370","AA09AD","Diebold Inc.",7932
+"371","C673BF","Navistar International Corp.",7932
+"372","749E29","DoubleClick Inc.",7921
+"373","FD5C77","Tiffany & Co.",7921
+"374","34E891","Open Text Corp.",7903
+"375","48149A","TRW Inc.",7897
+"376","516559","Tokio Marine Holdings Inc.",7896
+"377","C3BCD5","Newell Brands Inc.",7872
+"378","4A2900","Geeknet Inc.",7860
+"379","8C369C","Hellenic Telecommunications Organization S.A.",7857
+"380","A01163","Black & Decker Corp.",7839
+"381","6ED519","NiSource Inc.",7838
+"382","C32632","Nedbank Group Ltd.",7831
+"383","B9D1A5","Wal-Mart de Mexico S.A.B. de C.V.",7829
+"384","528DA2","EDP-Energias de Portugal S.A.",7829
+"385","B3435D","Takefuji Corp.",7822
+"386","4D371E","Zions Bancorp.",7818
+"387","B2C98C","OZ Minerals Ltd.",7814
+"388","423AD5","Tata Consultancy Services Ltd.",7803
+"389","F33B3C","International Game Technology PLC",7800
+"390","BDE867","E.W. Scripps Co.",7799
+"391","E61E5B","Coca-Cola European Partners PLC",7798
+"392","EA2BE8","Venture Corp. Ltd.",7798
+"393","35AE32","Blucora Inc.",7797
+"394","0D952B","PJSC MMC Norilsk Nickel",7784
+"395","6C8511","Air China Ltd.",7783
+"396","FFB613","Hongkong Land Holdings Ltd.",7782
+"397","16B183","Apache Corp.",7780
+"398","C5C977","Sons of Gwalia Ltd.",7765
+"399","59887E","Siam Cement PCL",7762
+"400","9C2AA7","Ingram Micro Inc.",7757
+"401","C08122","CareerBuilder Inc.",7745
+"402","A3ACBC","Warehouse Group Ltd.",7724
+"403","400885","Tsingtao Brewery Co. Ltd.",7721
+"404","5A9A82","PPL Corp.",7719
+"405","6B5379","Parker Hannifin Corp.",7719
+"406","A3ABB5","Acer Inc.",7711
+"407","837392","Rank Group PLC",7707
+"408","CB25E2","Shimizu Corp.",7707
+"409","FD0CA4","GATX Corp.",7695
+"410","FFBF74","Potash Corporation of Saskatchewan Inc.",7695
+"411","979F2F","McDATA Corp.",7689
+"412","D51FB2","Soitec S.A.",7684
+"413","D01549","Fresenius Medical Care AG & Co. KGaA",7684
+"414","9453BA","Atlas Copco AB",7677
+"415","56277A","Zimmer Biomet Holdings Inc.",7676
