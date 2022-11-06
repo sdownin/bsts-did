@@ -6,7 +6,7 @@
 *.pdf*
 *.xls*
 *.doc*
-
+*.Rhist*
 *cconma_purchase_data.csv*
 
 /The\ value\ of*
