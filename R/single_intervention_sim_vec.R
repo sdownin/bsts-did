@@ -43,13 +43,27 @@ library(foreach)
 ## staggered over time ?
 
 
+##
+## Produce seasonality component for simulation 
+##   based on nseasons argument
+##
+getSinBySeasons <- function(period.values, nseasons, freq=1,
+                            noise.mean=0, noise.sd=0, vert.scale=1) {
+  freq.scale <- freq * 2*pi / nseasons
+  season.effect <- vert.scale * sin( period.values * freq.scale )
+  noise <- rnorm(length(period.values), noise.mean, noise.sd)
+  return(season.effect + noise)
+}
+
+
 ##================================
 ## MAIN VARIABLE FUNCTIONS
 ##--------------------------------
 ## outcome
-yFunc <- function(b0,b1,b2,b3,b4,b5,b6,b7,b8, x1, x2, y.tm1, t, u, c1, c2, c3) {
-  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*y.tm1 + b5*t + u + b6*c1 + b7*c2 + b8*c3
+yFunc <- function(b0,b1,b2,b3,b4,b5,b6,b7,b8,b9, x1, x2, season.val, t, u, c1, c2, c3, y.tm1) {
+  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*season.val + b5*t + u + b6*c1 + b7*c2 + b8*c3 + b9*y.tm1
 }
+
 
 
 ## Self-select into treatment as function of past performance
@@ -144,7 +158,7 @@ x2Func <- function(t, intpd, n) {
 ## Treatment effect
 b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
                    type='quadratic', 
-                   w0=1.3, w1=.3, w2=-.012, w2.shift=0,
+                   w0=1.0, w1=.3, w2=-.012, w2.shift=0,
                    non.negative=TRUE) {
   
   n <- length(t.post.intpd) ## t.post.intpd, x2 <-- must be same length vectors
@@ -214,32 +228,40 @@ b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
 ##=================================
 runSimSingleIntervention <- function(
     n = 100, ## NUMBER OF actors  
-    npds = 80, ## NUMBER OF PERIODS
+    npds = 100, ## NUMBER OF PERIODS
+    intpd = 60,
     ystart = 0,
     effect.type = 'constant',  ## c('constant','quadratic','geometric'), ## treatment effect shapes
     treat.rule = 'below.benchmark',
     treat.prob = 0.5, ## probability of self-selecting into treatment, if below treat.threshold 
     treat.threshold = 0.8, ## threshold of treatment criterion, below which actor self-selects into treatment with probability = treat.prob
     benchmark.type = 'self', ## 'all', 'self'
-    seed = 54321,  ## pseudo-random number generator seed for replication
+    rand.seed = 54321,  ## pseudo-random number generator seed for replication
     ##
     sim.id = NA, ## Index or timestamp of simulation for  saving, etc.
+    ##
+    noise.level = 0.01,
     ## # PEFORMANCE [Y] FUNCTION PARAMETERS
     b0 = .001, ## intercept
     b1 = .001, ## treatment dummy
     b2 = .001, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
-    b4 = 1/3, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
+    b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates
     b6 = 1, ## Age [1,2,3,...]
     b7 = 0, ## type [0,1]
     b8 = 1, ## level [0,1,2]
+    ## Autocorrelation
+    b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
-    w0 = 1.3, ## constant
+    w0 = 1.2, ## constant
     w1 = 0.3, ## linear
     w2 = -0.12, ## quadratic
-    w2.shift = -10, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    w2.shift = -12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    ## SEASONALITY 
+    nseasons = NA, ##  NA omits seasonality; integer values incluce seasonality with nseasons
+    season.frequency = 1, ## number of completed sin waves within 1 cycle of nseasons
     ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
     g0 = .1,
     g1 = .1,
@@ -250,8 +272,8 @@ runSimSingleIntervention <- function(
     plot.save = TRUE,
     plot.show = TRUE,
     plot.wide.w=10,
-    plot.wide.h=5,
-    plot.tall.w=5,
+    plot.wide.h=7,
+    plot.tall.w=7,
     plot.tall.h=10,
     plot.sq.w=9,
     plot.sq.h=9,
@@ -259,18 +281,20 @@ runSimSingleIntervention <- function(
     ...
   ) {
   
+  # print('DEBUG runSimSingleIntervention()::')
+  # # print(as.list(match.call()))
+  # print(c(as.list(environment()), list(...)))
+  
   ## --- BEGIN SIM ---
   
-  intpd <- round( npds / 4 ) ## intervention after first quarter of time window
-
   SIMID <- ifelse(is.na(sim.id), round(10*as.numeric(Sys.time())), sim.id)
   
   ntypes <- 1 ## length(effect.types)
   
   sim.count <- ntypes * npds  ## n
   
-  cat(sprintf('\nRunning Internal Intervention Simulation for %s iterations:\n  %s periods,  effect type = \n',
-              sim.count, npds, effect.type))
+  cat(sprintf('\nRunning Internal Intervention Simulation for %s iterations:\n  %s periods (vec.len.=%s),  effect type = %s\n',
+              sim.count, npds, n, effect.type))
   
   ## Initialize progress bar
   counter <- 0
@@ -280,7 +304,7 @@ runSimSingleIntervention <- function(
                        width = 80,   # Progress bar width. Defaults to getOption("width")
                        char = "=")   # Character used to create the bar
   
-  set.seed(seed)
+  set.seed(rand.seed)
   
   ##================================
   ## MAIN RUN
@@ -315,8 +339,8 @@ runSimSingleIntervention <- function(
       # cat(sprintf(' i = %s \n',i))
     
     ## noise terms
-    v <- rnorm(n=n,mean=0,sd=.5)  ##- .5 ##
-    u <- rnorm(n=n,mean=0,sd=.5) ## 
+    v <- rnorm(n=n,mean=0,sd=noise.level)  ##- .5 ##
+    u <- rnorm(n=n,mean=0,sd=noise.level) ## 
     
     ##----------  Past Period Variables---------------------
     ## indices of last period observations
@@ -330,13 +354,13 @@ runSimSingleIntervention <- function(
     
     ## --------------- Covariates -------------------------
     ## Age
-    c1 <- rpois(n, lambda = .8) + 1
+    c1 <- rpois(n, lambda = noise.level*0.8) + 1
     
     ## Type  
     c2 <- sample(0:1, n, replace = T, prob = c(.5,.5))
     
     ## value
-    c3 <- rnorm(n, 0, 1)
+    c3 <- rnorm(n, 0, noise.level*1.2)
     
     ##------------------------------------------------------
     ## Get past performance records for treat.rule == 'past'
@@ -420,11 +444,39 @@ runSimSingleIntervention <- function(
     ##
     # shift.t.post.intpd <- t.post.intpd - intpd
     b3 <- b3Func(t.post.intpd, x1, x2, type=effect.type,
-                 w0=ifelse(effect.type=='geometric', w0*7, w0),
+                 w0=ifelse(effect.type=='geometric', w0*6, w0),
                  w1=w1, w2=w2, w2.shift=w2.shift)
     
+    ## Seasonal Component
+    if ( is.null(nseasons) | is.null(season.frequency) | is.na(nseasons) | is.na(season.frequency) ) {
+      season.val <- 0
+    } else {
+      season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
+                                     noise.mean=0, noise.sd=noise.level)
+      season.val <- season.vals[t]
+    }
+    
     ## PERFORMANCE
-    y <- yFunc(b0, b1, b2, b3, b4, b5, b6, b7, b8, x1, x2, y.tm1, t, u, c1, c2, c3)
+    y <- yFunc(b0=b0, 
+               b1=b1, 
+               b2=b2, 
+               b3=b3, 
+               b4=b4, 
+               b5=b5, 
+               b6=b6, 
+               b7=b7, 
+               b8=b8, 
+               b9=b9, 
+               x1=x1, 
+               x2=x2, 
+               season.val=season.val, 
+               t=t, 
+               u=u, 
+               c1=c1,
+               c2=c2, 
+               c3=c3,
+               y.tm1=y.tm1
+              )
 
     
     ##--------------------------------------
@@ -434,6 +486,7 @@ runSimSingleIntervention <- function(
                        t.post.intpd=t.post.intpd,
                        effect.type=rep(effect.type, n),
                        y=y, x1=x1, x2=x2, x3=x1*x2,
+                       season.val=season.val,
                        b1=rep(b1, n), b2=rep(b2, n), b3=b3, 
                        c1=c1, c2=c2, c3=c3,
                        u=u, v=v,
@@ -461,6 +514,12 @@ runSimSingleIntervention <- function(
   df <- unique(df)
   df$actor <- as.numeric(as.character(df$actor)) ## avoid possible factor issue (?)
   
+  ## Which actors are treated 
+  idx.x3.eq1 <- which(df$x3==1)
+  if (length(idx.x3.eq1) == 0) {
+    cat(sprintf('\n\nWARNING: No treated actors. All actors have x3[t]==0 for t=%s\n\n',t))
+  }
+  
   
   ## COHORT GROUP ASSIGNMENT 
   ## ASSIGN DEFAULT GROUP AND COLOR (before updating treated cohort)
@@ -469,7 +528,12 @@ runSimSingleIntervention <- function(
   df$group.color <- ggcolors[1] ## control red color
   ## Assign cohort group (treatment, control)
   ## based on rule: treatment=treated by end; control=not treated by end
-  actor.eff.tr <- sort(unique(df$actor[which(df$x3==1)]))  ## & df$effect.type==effect.type
+  actor.eff.tr <- sort(unique(df$actor[idx.x3.eq1]))  ## & df$effect.type==effect.type
+  
+  if (length(actor.eff.tr)==0) {
+    cat(sprintf('\n\nWARNING: zero actors have x3[t]==1 for t=%s\n\n',t))
+  }
+  
   for (f in actor.eff.tr) {
     # cat(' ',f)
     ## all observation indices for actor f with effect type=effect.type
@@ -492,31 +556,34 @@ runSimSingleIntervention <- function(
   # matches <- data.frame(treat=actor.eff.tr, control=NA, stringsAsFactors = F) 
   df$match_id <- NA
   df$match_pd <- NA
-  for (i in 1:length(actor.eff.tr)) {
-    # cat(sprintf('%s ',i))
-    actor <- actor.eff.tr[i]
-    
-    ## Unmatched controls
-    um.ctrl <- unique(df$actor[which(df$group=='control' & is.na(df$match_id))]) ## & df$effect.type==effect.type
-    if (length(um.ctrl)==0) {
-      cat(sprintf(' skipping i=%s: actor=%s\n',i,actor.eff.tr[i]))
-      next
+  if (length(actor.eff.tr)>0)
+  {
+    for (i in 1:length(actor.eff.tr)) {
+      # cat(sprintf('%s ',i))
+      actor <- actor.eff.tr[i]
+      
+      ## Unmatched controls
+      um.ctrl <- unique(df$actor[which(df$group=='control' & is.na(df$match_id))]) ## & df$effect.type==effect.type
+      if (length(um.ctrl)==0) {
+        cat(sprintf(' skipping i=%s: actor=%s\n',i,actor.eff.tr[i]))
+        next
+      }
+      
+      pd.tr <- min(df$t[which(df$t.post.intpd>0 & df$actor==actor)])  ## & df$effect.type==effect.type
+      
+      a.ctrl <- sample(um.ctrl, size = 1, replace = T)
+      ## MATCH ID:  effect_pd__treated_control
+      match_id <- sprintf('%s_%s__%s_%s',effect.type,pd.tr,actor,a.ctrl) ##paste(c(effect.type,actor,pd.tr), collapse = '_')
+      
+      idx.match <- which(df$actor %in% c(actor,a.ctrl))
+      df$match_id[ idx.match ] <- match_id   # &  df$effect.type==effect.type
+      df$match_pd[ idx.match ] <- pd.tr
+      
+      # batch <- df[which(df$actor==idx & df$effect.type==effect.type), ]
+      # grp <- 'treatment' #unique(batch$group) ## should only be one element as all rows should be from same subject in 1 group
+      
+      # matches <- rbind(matches, data.frame(treat=actor, control=.control))
     }
-    
-    pd.tr <- min(df$t[which(df$t.post.intpd>0 & df$actor==actor)])  ## & df$effect.type==effect.type
-    
-    a.ctrl <- sample(um.ctrl, size = 1, replace = T)
-    ## MATCH ID:  effect_pd__treated_control
-    match_id <- sprintf('%s_%s__%s_%s',effect.type,pd.tr,actor,a.ctrl) ##paste(c(effect.type,actor,pd.tr), collapse = '_')
-    
-    idx.match <- which(df$actor %in% c(actor,a.ctrl))
-    df$match_id[ idx.match ] <- match_id   # &  df$effect.type==effect.type
-    df$match_pd[ idx.match ] <- pd.tr
-    
-    # batch <- df[which(df$actor==idx & df$effect.type==effect.type), ]
-    # grp <- 'treatment' #unique(batch$group) ## should only be one element as all rows should be from same subject in 1 group
-    
-    # matches <- rbind(matches, data.frame(treat=actor, control=.control))
   }
 
   ## close progress bar
@@ -524,38 +591,47 @@ runSimSingleIntervention <- function(
   
   
   
-  ## STAGGERED DID ARRANEMENT:
-  ## Reset each series period as t=0 when intervention selected
-  df.t0 <- df
-  df.t0$t0 <- NA
-  for (i in 1:length(actor.eff.tr)) {
-    actor <- actor.eff.tr[i]
-    actor.match.id <- unique( df$match_id[which(df$actor==actor)] )
-    actor.ctrl <- unique( df$actor[which(df$match_id==actor.match.id & df$actor!=actor)] )
-    ##
-    x3.idx <- which(df.t0$actor==actor  & df.t0$x3 > 0)   ## & df.t0$effect.type==effect.type
-    actor.x3.t <- ifelse(length(x3.idx)>0, min(df.t0$t[x3.idx]), NA)
-    isTreated <- length(actor.x3.t) > 0 & any( ! is.na(actor.x3.t))
-    ## apply staggered timing to both treated actor and corresponding matched control (actor with same match_id)
-    df.t0$t0[which(df.t0$actor==actor)]      <- if (isTreated) { (1:npds) - actor.x3.t + 1 } else { (1:npds) - intpd + 1 }
-    df.t0$t0[which(df.t0$actor==actor.ctrl)] <- if (isTreated) { (1:npds) - actor.x3.t + 1 } else { (1:npds) - intpd + 1 }
-  }
-  # for (f in 1:n) {
-  #   x3.idx <- which(df.t0$actor==f  & df.t0$x3 > 0)   ## & df.t0$effect.type==effect.type
-  #   f.x3.t <- ifelse(length(x3.idx)>0, min(df.t0$t[x3.idx]), NA)
-  #   df.t0$t0[which(df.t0$actor==f)] <- if (length(f.x3.t)==0 | all(is.na(f.x3.t))) {   ## & df.t0$effect.type==effect.type
-  #     (1:npds) - intpd + 1
-  #   } else {
-  #     (1:npds) - f.x3.t + 1 ## t0 = f.x3.t period
-  #   }
+  # ##--------------------------------
+  # ## STAGGERED DID ARRANEMENT:
+  # ##--------------------------------
+  # ## Reset each series period as t=0 when intervention selected
+  # df.t0 <- df
+  # df.t0$t0 <- NA
+  # if (length(actor.eff.tr)>0)
+  # {
+  #   for (i in 1:length(actor.eff.tr)) {
+  #     actor <- actor.eff.tr[i]
+  #     actor.match.id <- unique( df$match_id[which(df$actor==actor)] )
+  #     actor.ctrl <- unique( df$actor[which(df$match_id==actor.match.id & df$actor!=actor)] )
+  #     ##
+  #     x3.idx <- which(df.t0$actor==actor  & df.t0$x3 > 0)   ## & df.t0$effect.type==effect.type
+  #     actor.x3.t <- ifelse(length(x3.idx)>0, min(df.t0$t[x3.idx]), NA)
+  #     isTreated <- length(actor.x3.t) > 0 & any( ! is.na(actor.x3.t))
+  #     ## apply staggered timing to both treated actor and corresponding matched control (actor with same match_id)
+  #     df.t0$t0[which(df.t0$actor==actor)]      <- if (isTreated) { (1:npds) - actor.x3.t + 1 } else { (1:npds) - intpd + 1 }
+  #     df.t0$t0[which(df.t0$actor==actor.ctrl)] <- if (isTreated) { (1:npds) - actor.x3.t + 1 } else { (1:npds) - intpd + 1 }
+  #   } 
   # }
+  # if (length(df.t0$t0)==1 & is.na(df.t0$t0[1])){
+  #   cat(sprintf('\n\nWARNING: df.t0 has zero rows (only default t0=NA)\n\n'))
+  # }
+  # # for (f in 1:n) {
+  # #   x3.idx <- which(df.t0$actor==f  & df.t0$x3 > 0)   ## & df.t0$effect.type==effect.type
+  # #   f.x3.t <- ifelse(length(x3.idx)>0, min(df.t0$t[x3.idx]), NA)
+  # #   df.t0$t0[which(df.t0$actor==f)] <- if (length(f.x3.t)==0 | all(is.na(f.x3.t))) {   ## & df.t0$effect.type==effect.type
+  # #     (1:npds) - intpd + 1
+  # #   } else {
+  # #     (1:npds) - f.x3.t + 1 ## t0 = f.x3.t period
+  # #   }
+  # # }
+  
 
   ##============================
   ## OUTPUT LIST
   ##----------------------------
   return(list(
     df=df,
-    df.t0=df.t0,
+    # df.t0=df.t0,
     # df.summary=df.summary,
     # df.t0.summary=df.t0.summary,
     # df.plot=df.plot,
@@ -570,7 +646,7 @@ runSimSingleIntervention <- function(
 
 
 
-
+# 
 # ##### DEBUG ###########
 # n = 100 ## NUMBER OF actors
 # npds = 80 ## NUMBER OF PERIODS
@@ -582,7 +658,7 @@ runSimSingleIntervention <- function(
 # benchmark.type = 'self' ## 'all', 'self'
 # seed = 54321  ## pseudo-random number generator seed for replication
 # ##
-# sim.id = NA ## Index or timestamp of simulation for  saving etc.
+# sim.id = "DEBUG_SIMID" ## Index or timestamp of simulation for  saving etc.
 # ## # PEFORMANCE [Y] FUNCTION PARAMETERS
 # b0 = .001 ## intercept
 # b1 = .001 ## treatment dummy
@@ -599,6 +675,9 @@ runSimSingleIntervention <- function(
 # w1 = 0.3 ## linear
 # w2 = -0.12 ## quadratic
 # w2.shift = -10 ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+# ## SEASONALITY
+# nseasons = NA ##  NA omits seasonality; integer values incluce seasonality with nseasons
+# season.frequency = 1 ## number of completed sin waves within 1 cycle of nseasons
 # ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
 # g0 = .1
 # g1 = .1
@@ -617,22 +696,68 @@ runSimSingleIntervention <- function(
 # plot.dpi=300
 # ############
 
+
+
+# effect.types = effect.types
+# n = sim$n ## NUMBER OF FIRMS
+# npds = sim$npds## NUMBER OF PERIODS
+# intpd = sim$intpd ## intervention after first section
+# ystart = 0
+# treat.rule = ifelse(is.null(sim$treat.rule), NA, sim$treat.rule)
+# treat.prob =  ifelse(is.null(sim$treat.prob), NA, sim$treat.prob) #0.95,  ## 0.6
+# treat.threshold = ifelse(is.null(sim$treat.threshold), NA, sim$treat.threshold)  # 0.015
+# sim.id = sim.id ## defaults to timestamp
+# ##
+# noise.level = ifelse(is.null(sim$noise.level), 0, sim$noise.level)
+# ##
+# b4 = ifelse(is.null(sim$b4), 0, sim$b4) ## past performance
+# b5 = ifelse(is.null(sim$b5), 0, sim$b5) ## growth (linear function of time t)
+# b9 = ifelse(is.null(sim$b9), 0, sim$b9) ## Autocorrelation
+# ## # PEFORMANCE [Y] FUNCTION PARAMETERS
+# b0 = .001 ## intercept
+# b1 = .001 ## treatment dummy
+# b2 = .001 ## post intervention dummy
+# # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
+# b4 = 0 ## spillover of past performance on current performance (how much of treatment effect persists across periods)
+# b5 = .01 ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
+# ## Covariates
+# b6 = 1 ## Age [1,2,3,...]
+# b7 = 0 ## type [0,1]
+# b8 = 1 ## level [0,1,2]
+# ## Dynamic treatment effect function parameters
+# w0 = 1.7  ## constant
+# w1 = 0.18  ## linear
+# w2 = -0.009 ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
+# ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly
+# w2.shift = -round(.07*sim$npds) ## optimal value here is likely a function of the combination of treatment effect function parameters
+# ##
+# nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons)
+# season.frequency = ifelse(is.null(sim$freq), NA, sim$freq)
+# ## Plotting
+# plot.show = T ## TRUE
+# plot.save = T  ## TRUE
+# rand.seed = 54321
+
+
+
 ###
 ## Internal Intervention Simulation Treatment Effect Comparison
 ## Run Internal Intervention Simulation over Multiple Treatment Effects
 ##  to output results and plots 
 ###
 runSimSingleInterventionEffectComparison <- function(
+    ## Effect types vector
     effect.types,
     ## Simulation base settings
     n = 100, ## NUMBER OF actors  
-    npds = 80, ## NUMBER OF PERIODS
+    npds = 100, ## NUMBER OF PERIODS
+    intpd = 60,
     ystart = 0,
     treat.rule = 'below.benchmark',
     treat.prob = 0.5, ## probability of self-selecting into treatment, if below treat.threshold 
     treat.threshold = 0.8, ## threshold of treatment criterion, below which actor self-selects into treatment with probability = treat.prob
     benchmark.type = 'self', ## 'all', 'self'
-    seed = 54321,  ## pseudo-random number generator seed for replication
+    rand.seed = 54321,  ## pseudo-random number generator seed for replication
     ##
     sim.id = NA, ## Index or timestamp of simulation for  saving, etc.
     ## # PEFORMANCE [Y] FUNCTION PARAMETERS
@@ -640,17 +765,22 @@ runSimSingleInterventionEffectComparison <- function(
     b1 = .001, ## treatment dummy
     b2 = .001, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
-    b4 = 1/3, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
+    b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates
     b6 = 1, ## Age [1,2,3,...]
     b7 = 0, ## type [0,1]
     b8 = 1, ## level [0,1,2]
+    ## Autocorrelation
+    b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
-    w0 = 1.3, ## constant
+    w0 = 1.2, ## constant
     w1 = 0.3, ## linear
     w2 = -0.12, ## quadratic
     w2.shift = -12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    ## SEASONALITY 
+    nseasons = NA, ##  NA omits seasonality; integer values incluce seasonality with nseasons
+    season.frequency = 1, ## number of completed sin waves within 1 cycle of nseasons
     ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
     g0 = .1,
     g1 = .1,
@@ -661,8 +791,8 @@ runSimSingleInterventionEffectComparison <- function(
     plot.save = TRUE,
     plot.show = TRUE,
     plot.wide.w=10,
-    plot.wide.h=5,
-    plot.tall.w=5,
+    plot.wide.h=7,
+    plot.tall.w=7,
     plot.tall.h=10,
     plot.sq.w=9,
     plot.sq.h=9,
@@ -676,23 +806,56 @@ runSimSingleInterventionEffectComparison <- function(
   ## Loop Simulation over effect types list
   ##----------------------------------------
   df <- data.frame()
-  df.t0 <- data.frame()
+  # df.t0 <- data.frame()
   for (k in 1:length(effect.types)) {
+    cat(sprintf(' k=%s ',k))
     effect.type <- effect.types[k]
     ## Main Simulation for one effect type
     out <- runSimSingleIntervention(
-      n, npds, ystart, 
-      effect.type, treat.rule, treat.prob, treat.threshold, 
-      benchmark.type, seed, sim.id=SIMID, 
-      b0, b1, b2,     b4, b5, b6, b7, b8,
-      w0, w1, w2, w2.shift, g0, g1, logit.shift, logit.scale,
-      plot.save, plot.show, plot.wide.w, plot.wide.h, 
-      plot.tall.w, plot.tall.h, plot.sq.w, plot.sq.h, plot.dpi,
-      ...
+      n = n, 
+      npds = npds, 
+      intpd = intpd, 
+      ystart = ystart, 
+      effect.type = effect.type, 
+      treat.rule = treat.rule, 
+      treat.prob = treat.prob,
+      treat.threshold = treat.threshold, 
+      benchmark.type = benchmark.type, 
+      rand.seed = rand.seed, 
+      sim.id=SIMID, 
+      b0=b0, 
+      b1=b1, 
+      b2=b2,     
+      b4=b4, 
+      b5=b5, 
+      b6=b6,
+      b7=b7, 
+      b8=b8, 
+      b9=b9,
+      w0=w0, 
+      w1=w1, 
+      w2=w2, 
+      w2.shift=w2.shift, 
+      nseasons=nseasons, 
+      season.frequency=season.frequency,
+      g0=g0, 
+      g1=g1, 
+      logit.shift=logit.shift, 
+      logit.scale=logit.scale,
+      plot.save=plot.save, 
+      plot.show=plot.show, 
+      plot.wide.w=plot.wide.w, 
+      plot.wide.h=plot.wide.h, 
+      plot.tall.w=plot.tall.w, 
+      plot.tall.h=plot.tall.h, 
+      plot.sq.w=plot.sq.w, 
+      plot.sq.h=plot.sq.h, 
+      plot.dpi=plot.dpi,
+       ...
     )
     ##
     df <- rbind(df, out$df)
-    df.t0 <- rbind(df.t0, out$df.t0)
+    # df.t0 <- rbind(df.t0, out$df.t0)
   }
   
   # ## ** DEBUG **
@@ -707,15 +870,15 @@ runSimSingleInterventionEffectComparison <- function(
   # ))
   
   df.summary <- NA
-  df.t0.summary <- NA
+  # df.t0.summary <- NA
   df.att <- NA
   df.plot <- NA
   plot.allseries <- NA
   plot.group <- NA
-  plot.group.staggered <- NA
+  # plot.group.staggered <- NA
   p1 <- NA
   p2 <- NA
-  p3 <- NA
+  # p3 <- NA
   
   ##=============================================
   ## PLOTS
@@ -746,7 +909,7 @@ runSimSingleInterventionEffectComparison <- function(
     p1 <- ggplot(data=df.plot, mapping=aes(x=t,y=y, color=group, group=actor)) +
       geom_line(size=1.05, alpha=0.3) +
       # geom_point(, color=rgb(0.2, 0.2, 0.8, 0.1))+
-      geom_hline(yintercept=0) + facet_grid( . ~ effect.type) +
+      geom_hline(yintercept=0) + facet_grid( effect.type ~ . ) +
       theme_bw() + theme(legend.position='none') + ggtitle(plot.main) #+
     # guides(color=guide_legend(nrow=3,byrow=TRUE)) #+
     #
@@ -755,7 +918,7 @@ runSimSingleInterventionEffectComparison <- function(
     if(plot.save) {
       p1.file <- sprintf('internal_intervention_all_actor_timeseries_%s_%s.png',SIMID,PLOTID)
       ggsave(filename=file.path(dir_plot, p1.file), plot=p1,
-             width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
+             width=plot.tall.w,heigh=plot.tall.h,dpi=plot.dpi,units='in')
     }
     
     
@@ -775,40 +938,40 @@ runSimSingleInterventionEffectComparison <- function(
       geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
       geom_hline(yintercept=0) + geom_vline(xintercept=intpd, lty=2) +
       ylab('Y') +
-      facet_grid( . ~ effect.type ) +
+      facet_grid( effect.type ~ . ) +
       theme_bw() + theme(legend.position='top') + ggtitle(plot.main)
     if(plot.show) print(p2)
     if(plot.save) {
       p2.file <- sprintf('internal_intervention_group_summary_series_%s_%s.png',SIMID,PLOTID)
       ggsave(filename=file.path(dir_plot, p2.file), plot=p2,
-             width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
+             width=plot.tall.w,heigh=plot.tall.h,dpi=plot.dpi,units='in')
     }
     
     
-    ## ---- 3. STAGGERED DID DESIGN BY GROUPS---------------------
-    df.t0.summary <- ddply(df.t0, .(t0,effect.type,group), summarize,
-                           min=min(y, na.rm=T),
-                           cl=quantile(y, probs=0.025, na.rm=T),
-                           med=median(y, na.rm=T),
-                           cu=quantile(y, probs=0.975, na.rm=T),
-                           max=max(y, na.rm=T))
-    # df.summary.long <- reshape2::melt(df.summary, id.vars=c('t','effect.type'),
-    #                                   variable.name='series', value.name = 'y')
-    p3 <- ggplot(df.t0.summary, aes(x=t0, y=med, color=group)) +
-      geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
-      geom_line(size=1.2) +
-      # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
-      geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
-      ylab('Y') +
-      xlim(c(-intpd+2, npds-intpd-2)) +
-      facet_grid( . ~ effect.type ) +
-      theme_bw() + theme(legend.position='top') + ggtitle(plot.main)
-    if(plot.show) print(p3)
-    if(plot.save) {
-      p3.file <- sprintf('internal_intervention_staggered_DiD_%s_%s.png',SIMID,PLOTID)
-      ggsave(filename=file.path(dir_plot, p3.file), plot=p3,
-             width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
-    }
+    # ## ---- 3. STAGGERED DID DESIGN BY GROUPS---------------------
+    # df.t0.summary <- ddply(df.t0, .(t0,effect.type,group), summarize,
+    #                        min=min(y, na.rm=T),
+    #                        cl=quantile(y, probs=0.025, na.rm=T),
+    #                        med=median(y, na.rm=T),
+    #                        cu=quantile(y, probs=0.975, na.rm=T),
+    #                        max=max(y, na.rm=T))
+    # # df.summary.long <- reshape2::melt(df.summary, id.vars=c('t','effect.type'),
+    # #                                   variable.name='series', value.name = 'y')
+    # p3 <- ggplot(df.t0.summary, aes(x=t0, y=med, color=group)) +
+    #   geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
+    #   geom_line(size=1.2) +
+    #   # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
+    #   geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
+    #   ylab('Y') +
+    #   xlim(c(-intpd+2, npds-intpd-2)) +
+    #   facet_grid( . ~ effect.type ) +
+    #   theme_bw() + theme(legend.position='top') + ggtitle(plot.main)
+    # if(plot.show) print(p3)
+    # if(plot.save) {
+    #   p3.file <- sprintf('internal_intervention_staggered_DiD_%s_%s.png',SIMID,PLOTID)
+    #   ggsave(filename=file.path(dir_plot, p3.file), plot=p3,
+    #          width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
+    # }
     
     ## ---- 4. Median Treatment Effect on Treated -  STAGGERED DID DESIGN ---------------------
     
@@ -842,38 +1005,40 @@ runSimSingleInterventionEffectComparison <- function(
     # df.att$max <- 
     # df.summary.long <- reshape2::melt(df.summary, id.vars=c('t','effect.type'),
     #                                   variable.name='series', value.name = 'y')
-    df.att <- data.frame()
-    t0s <- sort(unique(df.t0.summary$t0)) 
-    for (t in 1:length(t0s)) {
-      t0 <- t0s[t]
-      for (k in 1:length(effect.types)) {
-        batch.t0 <- df[which(df.t0$t0 == t0 & df$effect.type==effect.types[k]), ]
-        batch.t0.treat <- batch.t0[which(batch.t0$group=='treatment'),]
-        batch.t0.ctrl  <- batch.t0[which(batch.t0$group=='control'),]
-        rowdf <- data.frame(t0=t0,effect.type=effect.types[k], 
-                            y.treat=mean(batch.t0.treat$y), 
-                            y.control=mean(batch.t0.ctrl$y), 
-                            y.att=mean(batch.t0.treat$y)-mean(batch.t0.ctrl$y)
-                            )
-        df.att <- rbind(df.att, rowdf)
-      }
-    }
-    ##
-    p4 <- ggplot(df.att, aes(x=t0, y=y.att)) +
-      # geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
-      geom_line(size=1.2) +
-      # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
-      geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
-      ylab('ATT (Mean[Treated - Control] by staggered period)') +
-      xlim(c(-intpd+2, npds-intpd-2)) +
-      facet_grid( . ~ effect.type ) +
-      theme_bw() + theme(legend.position='top') + ggtitle(plot.main)
-    if(plot.show) print(p4)
-    if(plot.save) {
-      p4.file <- sprintf('internal_intervention_staggered_DiD_ATT_%s_%s.png',SIMID,PLOTID)
-      ggsave(filename=file.path(dir_plot, p4.file), plot=p4,
-             width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
-    }
+    ##########
+    # df.att <- data.frame()
+    # t0s <- sort(unique(df.t0.summary$t0)) 
+    # for (t in 1:length(t0s)) {
+    #   t0 <- t0s[t]
+    #   for (k in 1:length(effect.types)) {
+    #     batch.t0 <- df[which(df.t0$t0 == t0 & df$effect.type==effect.types[k]), ]
+    #     batch.t0.treat <- batch.t0[which(batch.t0$group=='treatment'),]
+    #     batch.t0.ctrl  <- batch.t0[which(batch.t0$group=='control'),]
+    #     rowdf <- data.frame(t0=t0,effect.type=effect.types[k], 
+    #                         y.treat=mean(batch.t0.treat$y), 
+    #                         y.control=mean(batch.t0.ctrl$y), 
+    #                         y.att=mean(batch.t0.treat$y)-mean(batch.t0.ctrl$y)#,
+    #                         # y.att=mean(batch.t0.treat$y - batch.t0.ctrl$y)
+    #                         )
+    #     df.att <- rbind(df.att, rowdf)
+    #   }
+    # }
+    # ##
+    # p4 <- ggplot(df.att, aes(x=t0, y=y.att)) +
+    #   # geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
+    #   geom_line(size=1.2) +
+    #   # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
+    #   geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
+    #   ylab('ATT (Mean[Treated - Control] by staggered period)') +
+    #   xlim(c(-intpd+2, npds-intpd-2)) +
+    #   facet_grid( . ~ effect.type ) +
+    #   theme_bw() + theme(legend.position='top') + ggtitle(plot.main)
+    # if(plot.show) print(p4)
+    # if(plot.save) {
+    #   p4.file <- sprintf('internal_intervention_staggered_DiD_ATT_%s_%s.png',SIMID,PLOTID)
+    #   ggsave(filename=file.path(dir_plot, p4.file), plot=p4,
+    #          width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
+    # }
     
     cat('done.\n\n')
   }
@@ -883,17 +1048,16 @@ runSimSingleInterventionEffectComparison <- function(
   ## Return
   ##-----------------
   
-  ## ** DEBUG **
   return(list(
     df=df,
-    df.t0=df.t0,
+    # df.t0=df.t0,
     df.summary=df.summary,
-    df.t0.summary=df.t0.summary,
+    # df.t0.summary=df.t0.summary,
     df.att=df.att,
     df.plot=df.plot,
     plot.allseries=p1,
     plot.group=p2,
-    plot.group.staggered=p3,
+    # plot.group.staggered=p3,
     id=SIMID
   ))
   
@@ -901,7 +1065,7 @@ runSimSingleInterventionEffectComparison <- function(
 }
 
 
-cat('\nLoaded Internal Intervention Simulation - vectorized.\n')
+cat('\nLoaded Single Intervention Simulation - vectorized.\n')
 
 
 

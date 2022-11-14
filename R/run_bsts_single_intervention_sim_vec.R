@@ -8,6 +8,11 @@
 ##
 #####################################################
 library(tidyr)
+library(dplyr)
+library(CausalImpact)
+
+library(tibble)
+library(did)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'   
@@ -79,7 +84,7 @@ source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## vectorized -- in de
 #######################################################
 ## SIMULATION RUNS
 #######################################################
-n <- 200    ## Number of firms
+n <- 100    ## Number of firms
 npds <- 100 ## 100  ## Number of periods
 intpd <- round( npds / 4 )
 
@@ -127,7 +132,7 @@ for (i in 1:length(simlist)) {
     # benchmark.type = 'self', ## 'all', 'self'
     # treat.rule = 'random',
     treat.rule = 'below.benchmark',
-    treat.prob = .95, #0.95,  ## 0.6
+    treat.prob =  .98, #0.95,  ## 0.6
     treat.threshold = 1/3,  # 0.015
     sim.id = sim.id, ## defaults to timestamp
     ##
@@ -157,8 +162,6 @@ saveRDS(simlist, file = file.path(dir_plot, simlist.file))
 ##--------------
 View(simlist$`3.mi.perf.lo.gro`$sim$df)
 
-library(tibble)
-library(did)
 
 # library(dplyr)
 simdf <- simlist$`1.no.perf.no.gro`$sim$df
@@ -198,13 +201,39 @@ ggdid(agg.ca)
 ## Correlation of simulated to inferred
 cor(cbind(simdf$b3[simdf$actor==1][-1], agg.es$att.egt))
 ## MATPLOT of 
-matplot(cbind(simdf$b3[simdf$actor==60][-1], agg.es$att.egt), type='o',pch=1:2)
+tr.actor.1 <- simdf$actor[which(simdf$group=='treatment')[1]]
+matplot(cbind(simdf$b3[simdf$actor==tr.actor.1][-1], agg.es$att.egt), type='o',pch=1:2)
 
 
 cor(cbind(simdf$x1[simdf$t==intpd], simdf$y[simdf$t==(intpd-1)]))
 
 # endog <- data.frame(threshold=c(1/2, 1/3,1/4,1/5,1/6),
 #                     cor=c(-0.2523,-.2030,-.2086,-.2107,-.2214))
+
+
+
+##=========================================
+##
+## Endogeneity 
+##  - Self-selection vs. random
+##
+##-----------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ###=========================================
 ##  Aggregate actor series into 1 total
@@ -293,9 +322,9 @@ for (j in 1:length(groups)) {
 
 # Set up pre- and post-treatment period
 # pre.period <- as.Date(c("2013-01-01","2016-01-25"))
-pre.period <- c(1, intpd-1)
+pre.period <- c(1, intpd-1)  
 # post.period <- as.Date(c("2016-01-26","2018-01-01"))
-post.period <- c(intpd, npds)
+post.period <- c(intpd, npds) 
 
 # # BSTS causal effect analysis using CausalImpact package
 # # CausalImpact option: 
@@ -355,14 +384,16 @@ for (i in 1:length(num.cols)) {
   res.tbl[ , num.cols[i] ] <- round( as.numeric( res.tbl[ , num.cols[i] ] ), 4)
 }
 res.tbl4 <- cbind(res.tbl[,4:5],  res.tbl[,-(4:5)] )
-
-
-matplot(res.tbl4[,c('point.effect','estimate')],type='l',col=c('black','red'),
-        main=sprintf('ATT[DGP] = %.3f;  ATT[DiD] = %.3f;  ATT[BSTS] = %.3f',
-                     mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1]))
-legend('topright',legend=c('BSTS','DiD'),col=c('black','red'),lty=c(1,2)) 
+View(res.tbl4)
 
 plot(impact_amount$model$bsts.model,'coefficients')
+
+matplot(res.tbl4[,c('point.effect','estimate','b3.att')],type='l',lty=c(1,2,4),lwd=c(1,1,2),col=c('black','red','blue'),
+        main=sprintf('ATT[DGP] = %.3f;  ATT[DiD] = %.3f;  ATT[BSTS] = %.3f',
+                     mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1]))
+legend('topright',legend=c('BSTS','DiD','DGP'),col=c('black','red','blue'),lty=c(1,2,4),lwd=c(1,1,2)) 
+
+
 
 # group_by(order_pd_num, cohort_pd_num, group, age_cat, sex, married) %>%    ## order_pd_t0
 # summarise(
@@ -439,6 +470,43 @@ plot(model3, 'comp')
 plot(model2, 'coef')
 plot(model3, 'coef')
 
+
+#####------------------------------
+library(tidyverse, quietly = TRUE)
+library(bsts, quietly = TRUE)    
+data(iclaims)
+.data <- initial.claims
+claims <- .data$iclaimsNSA
+plot(claims, ylab = "")
+
+(model_components <- list())
+
+summary(model_components <- AddLocalLinearTrend(model_components, 
+                                                y = claims))
+summary(model_components <- AddSeasonal(model_components, y = claims, 
+                                        nseasons  = 52))
+fit <- bsts(claims, model_components, niter = 2000)
+
+burnin <- 500 # Throw away first 500 
+tibble(
+  date = as.Date(time(claims)),
+  trend = colMeans(fit$state.contributions[-(1:burnin),"trend",]),
+  seasonality = colMeans(fit$state.contributions[-(1:burnin),"seasonal.52.1",])) %>%
+  gather("component", "value", trend, seasonality) %>%
+  ggplot(aes(x = date, y= value)) + 
+  geom_line() + theme_bw() + 
+  theme(legend.title = element_blank()) + ylab("") + xlab("") +
+  facet_grid(component ~ ., scales="free") + guides(colour=FALSE) +
+  theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+pred <- predict(fit, horizon = 100, burn = burnin, quantiles = c(.05, .95))
+plot(pred)
+
+errors <- bsts.prediction.errors(fit, burn = 1000)
+PlotDynamicDistribution(errors$in.sample)
+
+fit2 <- bsts(iclaimsNSA ~ ., state.specification = model_components, 
+             data = initial.claims, niter = 1000)
 
 # ## 
 # agg.ca <- aggte(ccattgt, type = "calendar")
