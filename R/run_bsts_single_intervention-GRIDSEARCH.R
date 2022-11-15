@@ -483,7 +483,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
     
     if (local.storage) {
       ## Save simulation list as serialized data file
-      simlist.file <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key)
+      simlist.file <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key.strip)
       saveRDS(simlist[[key]], file = file.path(dir_proj, simlist.file))
       
       ## FREE UP MEMORY
