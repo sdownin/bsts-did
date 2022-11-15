@@ -8,5 +8,7 @@
 *.doc*
 *.Rhist*
 *cconma_purchase_data.csv*
+*png*
+
 
 /The\ value\ of*
