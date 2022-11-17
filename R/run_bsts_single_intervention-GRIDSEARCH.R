@@ -11,6 +11,7 @@
 
 rm(list=ls())
 ##
+library(plyr)
 library(dplyr)
 library(tidyr)
 library(CausalImpact)
@@ -18,9 +19,11 @@ library(bsts)
 library(tibble)
 library(did)
 library(sarima)
+library(ggpubr)
 
 ## Directories
-dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'   
+dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
+dir_ext <- 'D:\\BSTS_external'
 dir_plot <- file.path(dir_proj, 'plots')
 dir_r <- file.path(dir_proj,'R')
 
@@ -41,10 +44,11 @@ source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## vectorized -- in de
 
 
 # ## DEBUG ###
-# effect.types=c('constant','quadratic','geometric') 
+# effect.types=c('constant','quadratic','geometric')
 # sim.id=round(10*as.numeric(Sys.time()))
 # plot.show=F
 # plot.save=F
+# save.items.dir=NA
 # ##----------
 
 
@@ -130,15 +134,19 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                     effect.types=c('constant','quadratic','geometric'), 
                                     sim.id=round(10*as.numeric(Sys.time())),
-                                    local.storage=FALSE ## save updated simlist items to seprate RDS files
+                                    save.items.dir=NA ## save updated simlist items to seprate RDS files
                                     ) {
   
-  print("runSimBstsDiDComparison()::SIMLIST INPUT:")
-  print(simlist)
+  # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
+  # print(simlist)
   if (length(simlist) > 0 & length(names(simlist))==0) {
     names(simlist) <- 1:length(simlist)
   }
 
+  ## IF save simlist items is NA, then save images to work_dir
+  ## else save images to save.items.fir
+  save.img.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
+  
   ##===============================
   ##  BSTS State Specification Comparison 
   ##------------------------------
@@ -149,7 +157,12 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
     cat(sprintf('\n%s, %s\n',i, key))
     
     simlist[[key]]$cordf <- data.frame()
-    simlist[[key]]$compare <- list(did=list(), bsts=list(), res.tbl=list())
+    simlist[[key]]$compare <- list(did=list(), bsts=list(), res.tbl=list(), 
+                                   att.err.tbl=list(), 
+                                   att.err.mean.bsts=list(),
+                                   att.err.mean.did=list(),
+                                   att.err.sd.bsts=list(),
+                                   att.err.sd.did=list())
     
     ## simulation output from simulation scenario = simlist[[key]]
     sim <- simlist[[key]]$sim
@@ -170,6 +183,13 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       simdf <- sim$df[sim$df$effect.type == effect.type, ]
   
       simlist[[key]]$compare$bsts[[effect.type]] <- list()
+      simlist[[key]]$compare$res.tbl[[effect.type]] <- list()
+      simlist[[key]]$compare$att.err.tbl[[effect.type]] <- list()
+      simlist[[key]]$compare$att.err.mean.bsts[[effect.type]] <- list()
+      simlist[[key]]$compare$att.err.mean.did[[effect.type]] <- list()
+      simlist[[key]]$compare$att.err.sd.bsts[[effect.type]] <- list()
+      simlist[[key]]$compare$att.err.sd.did[[effect.type]] <- list()
+      
       
       ##------------------------------
       ## DiD
@@ -202,8 +222,10 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       # summary(agg.es)
       # tidy(agg.es)
       ggdid(agg.es)
-      ggsave(filename = sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
-                                prefix,h,key.strip,effect.type,sim.id))
+      ggsave(filename = file.path(save.img.dir,
+                                  sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
+                                          prefix,h,key.strip,effect.type,sim.id))
+      )
       
       
       ##-----------------------------
@@ -399,8 +421,10 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         # png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
         #                         key,effect.type,sim.id))
         plot(impact_amount, c('original','pointwise','cumulative'))
-        ggsave(filename = sprintf('%s_bsts_CausalImpact_plot_ss%s_%s_%s_%s.png',
-                                  prefix,h,key.strip,effect.type,sim.id))
+        ggsave(filename = file.path(save.img.dir,
+                                    sprintf('%s_bsts_CausalImpact_plot_ss%s_%s_%s_%s.png',
+                                            prefix,h,key.strip,effect.type,sim.id))
+        )
         # dev.off()
         
         
@@ -420,46 +444,113 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           diff=NA
         )
         b3diff$diff <- b3diff$treat - b3diff$ctrl
+        
+        ##
+        att.b3 <- mean(b3diff$diff[intpd:npds])
+        att.did <- agg.es$overall.att
+        att.bsts <- impact_amount$summary$AbsEffect[1]
+        
         # simdf %>% 
         #   filter(group=='control' & actor==tr.actors[1]) %>% 
         #   dplyr::mutate(b3.diff=b3.treat-b3.ctrl) %>% 
         #   dplyr::select(b3.diff) 
         
+        ## time df add empty row at top of event time columns
+        time.df <- did.res[ ,c('term','event.time')]
+        time.df <- rbind(time.df,time.df[nrow(time.df),])
+        time.df[nrow(time.df),] <- NA
+        
+        # ## *** FIX MISALIGNED INTERVENTION TIME INDEX BETWEEN DID & BSTS
+        # ##     - add empty row on top of DiD (which indexed treatment at t=0) so now treatment is t=1
+        # ##       which matches BSTS (treatment at t=1)
+        did.res.adj <- did.res[ ,c('estimate','point.conf.low','point.conf.high')]
+        .na.row <- did.res.adj[1, ]
+        .na.row[1:nrow(.na.row), ] <- NA
+        did.res.adj <- rbind(.na.row, did.res.adj)
+        # did.res <- rbind(did.res[-1, ], .na.row, .na.row)
+        # ## ##    - remove first row to pull index t=0 up to t=1
+        # did.res <- did.res[-1, ]
+        
         ## Results comparison table
-        res.tbl <- cbind(bsts.res[ ,c('point.effect','point.effect.lower','point.effect.upper')],
-                         did.res[ ,c('term','event.time','estimate','point.conf.low','point.conf.high')],
-                         b3.treat=b3diff$treat,
-                         b3.ctrl=b3diff$ctrl,
-                         b3.att=b3diff$diff 
+        res.tbl <- cbind(
+          time.df,
+          bsts.res[ ,c('point.effect','point.effect.lower','point.effect.upper')],
+          did.res.adj,
+          b3.treat=b3diff$treat,
+          b3.ctrl=b3diff$ctrl,
+          b3.att=b3diff$diff 
         )
         ## ROUND RESULTS TABLE (round numeric columns)
         # res.tbl <- res.tbl[ ! is.na(res.tbl$estimate), ]
         num.cols <- names(res.tbl)[ ! names(res.tbl) %in% c('term','event.time') ]
-        res.tbl[ , num.cols] <- round( as.numeric(res.tbl[ , num.cols]), 4)
+        # res.tbl[ , num.cols] <- round( as.numeric(res.tbl[ , num.cols]), 4)  ## ** TODO: Find out why this as.numeric stopped working on 'list'
+        res.tbl[ , num.cols] <- round( res.tbl[ , num.cols], 4)
         # for (i in 1:length(num.cols)) {
         #   res.tbl[ , num.cols[i] ] <- round( as.numeric( res.tbl[ , num.cols[i] ] ), 4)
         # }
-        ## MOVE ID COLUMNS TO FRONT
-        .col.idx <- which(names(res.tbl) %in% c('term','event.time'))
-        res.tbl4 <- cbind(res.tbl[, .col.idx],  res.tbl[, -.col.idx] )
-        # View(res.tbl4)
+        # ## MOVE ID COLUMNS TO FRONT
+        # .col.idx <- which(names(res.tbl) %in% c('term','event.time'))
+        # res.tbl4 <- cbind(res.tbl[, .col.idx],  res.tbl[, -.col.idx] )
+        # # View(res.tbl4)
         
         ##PLOT INCLUSION PROBABILITIES
-        png(filename = sprintf('%s_BSTS_inclusion_probs_ss%s_%s_%s_%s.png',
-                               prefix,h,key.strip,effect.type,sim.id))
+        png(filename = file.path(save.img.dir,
+                                 sprintf('%s_BSTS_inclusion_probs_ss%s_%s_%s_%s.png',
+                                         prefix,h,key.strip,effect.type,sim.id)))
         plot(impact_amount$model$bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
         dev.off()
         
         ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
-        png(filename = sprintf('%s_BSTS_dynamic_treatment_effect_comparison_ss%s_%s_%s_%s.png',
-                               prefix,h,key.strip,effect.type,sim.id))
-        res.tbl.filename <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
-                                    key.strip, mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
-        matplot(x = res.tbl4$event.time, y=res.tbl4[,c('point.effect','estimate','b3.att')],
-                type='l',lty=c(1,2,4),lwd=c(1,1,2),col=c('black','red','blue'),
-                main=res.tbl.filename, ylab='ATT',xlab='t')
-        legend('topright',legend=c('BSTS','DiD','DGP'),col=c('black','red','blue'),lty=c(1,2,4),lwd=c(1,1,2)) 
-        dev.off()
+        dyndf <- rbind(
+          data.frame(event.time=res.tbl$event.time, series='1.BSTS', ATT=res.tbl$point.effect),
+          data.frame(event.time=res.tbl$event.time, series='2.DiD', ATT=res.tbl$estimate),
+          data.frame(event.time=res.tbl$event.time, series='3.DGP', ATT=res.tbl$b3.att)
+        )
+        hue2 <- hue_pal()(2)
+        p.err1 <- ggplot(dyndf, aes(x=event.time, y=ATT, color=series,fill=series,linetype=series,shape=series)) + 
+          geom_line(na.rm=T, size=.9) + geom_point(na.rm=T, size=1.9) +
+          theme_bw() + xlab('Event Time') + 
+          ggtitle(sprintf('Mean of Pointwise ATT Estimates: BSTS = %.3f; DiD = %.3f; DGP = %.3f',att.bsts,att.did,att.b3)) + 
+          geom_vline(xintercept=0, linetype='dotted')+
+          scale_color_manual(values=c(hue2[1],hue2[2],'black')) + 
+          scale_shape_manual(values=c(17,19,NA)) +
+          scale_linetype_manual(values=c(2,3,1)) 
+        # png(filename = file.path(save.img.dir,
+        #                          sprintf('%s_BSTS_dynamic_treatment_effect_comparison_ss%s_%s_%s_%s.png',
+        #                                  prefix,h,key.strip,effect.type,sim.id)))
+        # matplot.main <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
+        #                             key.strip, mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
+        # matplot(x = res.tbl$event.time, y=res.tbl[,c('point.effect','estimate','b3.att')],,
+        #         type='o',lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1),
+        #         col=c('red','blue','black'),
+        #         main=matplot.main, ylab='ATT',xlab='t')
+        # legend('topright',legend=c('BSTS','DiD','DGP'),col=c('red','blue','black'),lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1)) 
+        # dev.off()
+        
+        ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
+        errdf <- rbind(
+          data.frame(method='BSTS', error=(res.tbl$point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
+          data.frame(method='DiD', error=(res.tbl$estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
+        )
+        vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
+        p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
+          geom_density(alpha=0.3, na.rm=T) +
+          geom_vline(xintercept=0, linetype='dotted')+
+          geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1) +
+          # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
+          ggtitle(sprintf('Mean Post-Intervention Pointwise ATT Error: BSTS = %.3f; DiD = %.3f',
+                          mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                          mean(errdf$error[errdf$method=='DiD'],na.rm=T))) + 
+          theme_bw() + xlab('Distance of Pointwise ATT Estimate from DGP')
+        # ggsave(filename = file.path(save.img.dir,
+        #                             sprintf('%s_ATT_est_pointwise_error_distributions_ss%s_%s_%s_%s.png',
+        #                                     prefix,h,key.strip,effect.type,sim.id)))
+        
+        ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
+        ggarrange(p.err1, p.err2, ncol=1, nrow=2, common.legend = F)
+        ggsave(filename = file.path(save.img.dir,
+                                    sprintf('%s_ATT_pointwise_error_distribution_compare_ss%s_%s_%s_%s.png',
+                                            prefix,h,key.strip,effect.type,sim.id)))
         
         ##===============================================================
         ## 1-step ahead prediction error
@@ -473,7 +564,13 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         ##
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$cumu.pred.error <-  cumsum(colSums(abs(bsts.pred.er)))
-        simlist[[key]]$compare$res.tbl[[effect.type]] <- res.tbl4
+        ##
+        simlist[[key]]$compare$res.tbl[[effect.type]][[ h ]] <- res.tbl
+        simlist[[key]]$compare$att.err.tbl[[effect.type]][[ h ]] <- errdf
+        simlist[[key]]$compare$att.err.mean.bsts[[effect.type]][[ h ]] <- mean(errdf$error[errdf$method=='BSTS'],na.rm = T)
+        simlist[[key]]$compare$att.err.mean.did[[effect.type]][[ h ]]  <- mean(errdf$error[errdf$method=='DiD'],na.rm = T)
+        simlist[[key]]$compare$att.err.sd.bsts[[effect.type]][[ h ]] <- sd(errdf$error[errdf$method=='BSTS'],na.rm = T)
+        simlist[[key]]$compare$att.err.sd.did[[effect.type]][[ h ]]  <- sd(errdf$error[errdf$method=='DiD'],na.rm = T)
       
       } ## // end h loop over bsts.state components
       
@@ -481,13 +578,13 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
     } ## // end k loop over effect types
     
     
-    if (local.storage) {
+    if ( ! is.na(save.items.dir) ) {
       ## Save simulation list as serialized data file
       simlist.file <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key.strip)
-      saveRDS(simlist[[key]], file = file.path(dir_proj, simlist.file))
-      
+      save.file.path <-  file.path(save.items.dir, simlist.file)
+      saveRDS(simlist[[key]], file = save.file.path)
       ## FREE UP MEMORY
-      simlist[[key]] <- list(file = file.path(dir_proj, simlist.file))
+      simlist[[key]] <- list(file = save.file.path)
     } 
     
     
@@ -793,11 +890,11 @@ npds <- 100
 actor.sizes <- c(100)
 intpds <- round( c(npds*2/3) )   ### round(c(3*npds/4, npds/2, npds/4))
 ##
-noise.levels <- c(0.8, 0.3)
+noise.levels <- c(1.0, 0.5)
 ##
 treat.rules <- c('random', 'below.benchmark')
 ##
-autocors <- c(0, .5)
+autocors <- c(0, .2)
 ##
 bsts.nseasons <- c(12, 7) ## correct, incorrect [for DGP_nseasons = 12]
 seasonalities <- c(FALSE, TRUE)
@@ -868,7 +965,8 @@ for (j in 1:length(intpds)) {
                     b9 = autocor  , ## autocorrelation
                     dgp.nseasons= ifelse(seasonality,  12,  NA), 
                     dgp.freq= ifelse(seasonality,  1,  NA),
-                    bsts.state.specs=state.configs.list, 
+                    # bsts.state.specs=state.configs.list, 
+                    bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
                     rand.seed = 54321
                   )
 
@@ -896,6 +994,8 @@ for (j in 1:length(intpds)) {
 
 # }
 
+# simlist.files <- runSimUpdateCompareBstsDiD(simlist)  ## D:\\BSTS_external
+
 
 ##########################################
 # ##_-------------------------------
@@ -905,11 +1005,11 @@ for (j in 1:length(intpds)) {
 # sim.id <- round(10*as.numeric(Sys.time()))
 
 ## Generate simulated data for each scenario in simlist
-simlist <- runSimUpdateSimlist(simlist, plot.show = T, plot.save = T)
+simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
 
 ## Run BSTS model versions and compare against DiD estimates
 ## local.storage=True write each sim to file; returns list of output file paths
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, local.storage=TRUE)
+simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
 
 
 
@@ -940,6 +1040,16 @@ simlist.files <- runSimUpdateCompareBstsDiD(simlist, local.storage=TRUE)
 # )
 
 
+
+key
+state.configs.list <- list(
+  list(
+    AddSemilocalLinearTrend
+  ),
+  list(
+    AddAutoAr
+  )
+)
 
 
 
