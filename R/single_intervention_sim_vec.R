@@ -1066,7 +1066,7 @@ runSimSingleInterventionEffectComparison <- function(
 }
 
 
-cat('\nLoaded Single Intervention Simulation - vectorized.\n')
+cat('\nLoaded Single Intervention Simulation - vectorized.\n\n')
 
 
 

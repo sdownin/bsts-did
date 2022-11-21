@@ -20,6 +20,9 @@ library(tibble)
 library(did)
 library(sarima)
 library(ggpubr)
+library(Boom)
+library(BoomSpikeSlab)
+library(cowplot)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
@@ -27,20 +30,22 @@ dir_ext <- 'D:\\BSTS_external'
 dir_plot <- file.path(dir_proj, 'plots')
 dir_r <- file.path(dir_proj,'R')
 
+## Set working directory
 setwd(dir_proj)
 
 
 ##==============================
 ##  file prefix for saving images, writing outputs, etc.
 ##-----------------------------
-prefix <- 'single_intervention-statespace-config_'
+prefix <- 'single-interv-st-sp-gs2-conf_'
 
 ##==============================
 ## Load simulation functions
 ##------------------------------
 # source(file.path(dir_r,'internal_intervention_sim.R'))
-source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## vectorized -- in development
-
+source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## Actor index vectorized simulation
+##
+source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding state space components to state.space list
 
 
 # ## DEBUG ###
@@ -49,6 +54,7 @@ source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## vectorized -- in de
 # plot.show=F
 # plot.save=F
 # save.items.dir=NA
+# bsts.niter=1000
 # ##----------
 
 
@@ -134,7 +140,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                     effect.types=c('constant','quadratic','geometric'), 
                                     sim.id=round(10*as.numeric(Sys.time())),
-                                    save.items.dir=NA ## save updated simlist items to seprate RDS files
+                                    save.items.dir=NA, ## save updated simlist items to seprate RDS files
+                                    bsts.niter=2000
                                     ) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
@@ -353,6 +360,9 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## h'th BSTS state space configuration (state component list)
         state.conf <- bsts.state.specs[[ h ]]
+        
+        ## names of 
+        state.comps <- unname(sapply(state.conf, function(x)x$name, simplify = T))
             
         ## Loop over state space components
         nss <- length(state.conf)
@@ -362,9 +372,25 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           for (jj in 1:nss) {
             state.conf.item <- state.conf[[ jj ]]
             if (class(state.conf.item)=='list') {
+              if(state.conf.item$name=='AddSharedLocalLevel') {
+                state.conf$coefficient.prior <- SpikeSlabPrior(
+                   x = predictors,
+                   y = dat$treatment_y_mean, ##**NOTE** USING ALL Y VALS (not just y.pre.treat.NAs.post.treat)
+                   expected.r2 = .5, ## [.5]
+                   prior.df = .01, ##[.01]
+                   expected.model.size = 2, ## [1]
+                   prior.information.weight = .01, ## [.01]
+                   diagonal.shrinkage = 0.5,  ## [.5] setting=0 --> Zellner's G-prior
+                   # optional.coefficient.estimate = NULL,
+                   max.flips = -1,  ## <= 0 means all indicators will be sampled
+                   # prior.inclusion.probabilities = NULL,
+                   sigma.upper.limit = Inf
+                 )
+              } ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
               st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
                                                                 y.pre.treat.NAs.post.treat,  
                                                                 state.conf.item)
+              cat(sprintf('add to state.space: %s\n',state.conf.item$name))
             }
           }
         } else {
@@ -373,11 +399,23 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         }
         # print(st.sp)
         
+        cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
+        
         ## BSTS model
         bsts.model <- bsts(y.pre.treat.NAs.post.treat ~ . ,
                            state.specification = st.sp,
                            data = predictors,
-                           niter = 5000)
+                           niter = bsts.niter)
+        ##
+        plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+        # PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        # PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        # PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        # PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        ##
+        
         # ## BSTS model for Dynamic Regression
         # bsts.model <- bsts(y.pre.treat.NAs.post.treat,
         #                    state.specification = st.sp,
@@ -386,7 +424,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         ## Use BSTS prediction of counterfactual to estimate CausalImpact
         impact_amount <- CausalImpact(bsts.model=bsts.model,
                                       post.period.response = post.period.response,
-                                      alpha=0.05, model.args = list(niter = 5000))
+                                      alpha=0.05, model.args = list(niter = bsts.niter))
         # ##
         # summary(impact_amount)
         # summary(impact_amount$model$bsts.model)
@@ -504,8 +542,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
         errdf <- rbind(
-          data.frame(method='BSTS', error=(res.tbl$point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
-          data.frame(method='DiD', error=(res.tbl$estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
+          data.frame(method='BSTS', error=(res.tbl$point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])),
+          data.frame(method='DiD', error=(res.tbl$estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]))
         )
         vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
         p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
@@ -513,16 +551,46 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           geom_vline(xintercept=0, linetype='dotted')+
           geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1) +
           # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
-          ggtitle(sprintf('Mean Post-Intervention Pointwise ATT Error: BSTS = %.3f; DiD = %.3f',
+          ggtitle(sprintf('Pre-Intervention Pointwise Error:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
                           mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
-                          mean(errdf$error[errdf$method=='DiD'],na.rm=T))) + 
-          theme_bw() + xlab('Distance of Pointwise ATT Estimate from DGP')
+                          mean(errdf$error[errdf$method=='DiD'],na.rm=T),
+                          sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                          sd(errdf$error[errdf$method=='DiD'],na.rm=T)  )
+                  ) + theme_bw() + xlab('Residuals (Distance of Pointwise Estimate from DGP)')
+        # ggsave(filename = file.path(save.img.dir,
+        #                             sprintf('%s_ATT_est_pointwise_error_distributions_ss%s_%s_%s_%s.png',
+        #                                     prefix,h,key.strip,effect.type,sim.id)))
+        
+        
+        ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
+        errdf <- rbind(
+          data.frame(method='BSTS', error=(res.tbl$point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
+          data.frame(method='DiD', error=(res.tbl$estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
+        )
+        vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
+        p.err3 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
+          geom_density(alpha=0.3, na.rm=T) +
+          geom_vline(xintercept=0, linetype='dotted')+
+          geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1) +
+          # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
+          ggtitle(sprintf('Post-Intervention Pointwise ATT Error:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
+                          mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                          mean(errdf$error[errdf$method=='DiD'],na.rm=T),
+                          sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                          sd(errdf$error[errdf$method=='DiD'],na.rm=T))
+                  ) + theme_bw() + xlab('Residuals (Distance of Pointwise ATT Estimate from DGP)')
         # ggsave(filename = file.path(save.img.dir,
         #                             sprintf('%s_ATT_est_pointwise_error_distributions_ss%s_%s_%s_%s.png',
         #                                     prefix,h,key.strip,effect.type,sim.id)))
         
         ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
-        ggarrange(p.err1, p.err2, ncol=1, nrow=2, common.legend = F)
+        # ggarrange(p.err2, p.err3, p.err1, ncol=2, nrow=2, widths = , common.legend = F)
+        ggdraw() +
+          draw_plot(p.err1, x = 0,  y = .5, width = 1, height = 0.5) +
+          draw_plot(p.err2, x = 0,  y = 0, width = .5, height = .5) +
+          draw_plot(p.err3, x = .5, y = 0, width = .5, height = .5) +
+          draw_plot_label(label = c("A", "B", "C"), size = 15,
+                          x = c(0, 0, 0.5), y = c(1, 0.5, 0.5))
         ggsave(filename = file.path(save.img.dir,
                                     sprintf('%s_ATT_pointwise_error_distribution_compare_ss%s_%s_%s_%s.png',
                                             prefix,h,key.strip,effect.type,sim.id)))
@@ -589,39 +657,39 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
 #   return(FALSE)
 # }
 
-##
-## Get list element of specs for an AddTrig() bsts state component
-##  from a list of bsts state components 
-##
-getTrigComp <- function(state.conf.list) {
-  if (length(state.conf.list)==0) {
-    return(list())
-  }
-  if(length(names(state.conf.list))==0) {
-    names(state.conf.list) <- 1:length(state.conf.list)
-  }
-  if (class(state.conf.list)=='list') {
-    hasName <- ifelse(is.null(state.conf.list$name), FALSE, TRUE)
-    isTrig <- ifelse(hasName, state.conf.list$name == 'AddTrig', FALSE)
-    if (hasName & isTrig) {
-      ## this list is the trig component
-      return(state.conf.list)
-    } else {
-      ## list of state components to locate trig component
-      for (i in 1:length(state.conf.list)) {
-        compi <- state.conf.list[[ i ]]
-        if (length(compi)>0) {
-          if (class(compi)=='list') {
-            if (length(names(compi))>0 & 'name' %in% names(compi) & compi$name=='AddTrig') {
-              return(compi)
-            }
-          }
-        }
-      }
-    }
-  }
-  return(list())
-}
+# ##
+# ## Get list element of specs for an AddTrig() bsts state component
+# ##  from a list of bsts state components 
+# ##
+# getTrigComp <- function(state.conf.list) {
+#   if (length(state.conf.list)==0) {
+#     return(list())
+#   }
+#   if(length(names(state.conf.list))==0) {
+#     names(state.conf.list) <- 1:length(state.conf.list)
+#   }
+#   if (class(state.conf.list)=='list') {
+#     hasName <- ifelse(is.null(state.conf.list$name), FALSE, TRUE)
+#     isTrig <- ifelse(hasName, state.conf.list$name == 'AddTrig', FALSE)
+#     if (hasName & isTrig) {
+#       ## this list is the trig component
+#       return(state.conf.list)
+#     } else {
+#       ## list of state components to locate trig component
+#       for (i in 1:length(state.conf.list)) {
+#         compi <- state.conf.list[[ i ]]
+#         if (length(compi)>0) {
+#           if (class(compi)=='list') {
+#             if (length(names(compi))>0 & 'name' %in% names(compi) & compi$name=='AddTrig') {
+#               return(compi)
+#             }
+#           }
+#         }
+#       }
+#     }
+#   }
+#   return(list())
+# }
 
 
 ################################################################################################################
@@ -630,149 +698,6 @@ getTrigComp <- function(state.conf.list) {
 
 
 
-
-# #######################################################
-# ##
-# ## SIMULATION SETUP
-# ##
-# #######################################################
-# n <- 300    ## Number of firms
-# npds <- 100 ## 100  ## Number of periods
-# intpd <- round( npds * 0.6 )   ## 60% pre-intervention training / 40% post-intervention
-# 
-# ## dynamic treatment effect types (shapes)
-# effect.types <- c('quadratic') ## 'constant', 'geometric'
-# 
-# # Specify simulation parameters
-# simlist <- list(
-#   # `0.rand.base`=list(
-#   #   treat.rule='random',  ## random or below.benchmark (endogenous self-selection)
-#   #   treat.prob=0.5,       ## probability of being in treatment group
-#   #   treat.threshold=NA,   ## if treat.rule=below.benchmark, treat.threshold is the quantile below which firms evaluate self-selecting treatment with probability = treat.prob
-#   #   b4=0, ## b4 = seasonal component effect (weight)
-#   #   b5=0,  ## b5 = Linear Trend:  growth rate
-#   #   bsts.st.sp=list()
-#   # ),
-#   ##----------- ONLY TREND ------------
-#   ## Correct Spec
-#   `1a`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=0, b5=.02,
-#     bsts.state.specs=list(AddLocalLevel)
-#   ),
-#   ## Wrong Spec: using student local lienar trend (or other local trend instead of local level)
-#   `1b`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=0, b5=.02,
-#     bsts.state.specs=list(AddStudentLocalLinearTrend)
-#   ),
-#   ## Wrong Spec: using student local lienar trend (or other local trend instead of local level)
-#   `1c`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=0, b5=.02,
-#     bsts.state.specs=list(AddGeneralizedLocalLinearTrend)
-#   ),
-#   ##_-------- Seasonality --------------------
-#   ## True=seasons[12] | Model=none
-#   `2a`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=0,
-#     nseasons=12, season.frequency=1,
-#     bsts.state.specs=list() 
-#   ),
-#   ## True=seasons[12] | Model=AddTrig[12]
-#   `2b`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=0,
-#     nseasons=12, season.frequency=1,
-#     bsts.state.specs=list(
-#       list(name='AddTrig', nseasons=12, freq=1)
-#     ) 
-#   ),
-#   ## True=seasons[12] | Model=AddTrig[7]**incorrect
-#   `2c`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=0,
-#     nseasons=20, season.frequency=1,
-#     bsts.state.specs=list(
-#       list(name='AddTrig', nseasons=7, freq=1)
-#     ) 
-#   ),
-#   ### True=seasons[20] + growth | Model=AddTrig[7]  + LocalLevel
-#   `2d`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=.03,
-#     nseasons=20, season.frequency=1,
-#     bsts.state.specs=list(
-#       AddLocalLevel,
-#       list(name='AddTrig', nseasons=7, freq=1)
-#     ) 
-#   ),
-#   ### True=seasons[20] + growth | Model=AddTrig[7]**incorrect** + locallevel
-#   `2e`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=.03,
-#     nseasons=20, season.frequency=1,
-#     bsts.state.specs=list(
-#       AddStudentLocalLinearTrend,
-#       list(name='AddTrig', nseasons=7, freq=1)
-#     ) 
-#   ),
-#   ##
-#   `3`=list(
-#     treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#     b4=1, b5=.03,
-#     nseasons=20, season.frequency=1,
-#     bsts.state.specs=list(
-#       AddStudentLocalLinearTrend,
-#       list(name='AddTrig', nseasons=7, freq=1)
-#     ),
-#     b8=.1
-#   )#,
-#   ##-------------- AR -------------------------------
-#   ##
-#   ##_--------- BOTH AR & TREND ----------------------
-#   # ## Correct Spec
-#   # `3a.rand.trendAr.ssTrendAr`=list(
-#   #   treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#   #   b4=1, b5=0,
-#   #   nseasons=12, season.frequency=1,
-#   #   bsts.state.specs=list(
-#   #     list(func=AddTrig, nseasons=12, freq=1, type='seasonal')
-#   #   ) 
-#   # ),
-#   # ## ? Possibly Correct Spec ?
-#   # `3b.rand.trendAr.ssGenTrend`=list(
-#   #   treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#   #   b4=1, b5=0,
-#   #   nseasons=12, season.frequency=1,
-#   #   bsts.state.specs=list(
-#   #     list(func=AddTrig, nseasons=12, freq=1, type='seasonal')
-#   #   ) 
-#   # ),
-#   # ## Wrong Spec ?  student local lienar trend
-#   # `3c.rand.trendAr.ssStudentTrend`=list(
-#   #   treat.rule='random', treat.prob=0.5, treat.threshold=NA,
-#   #   b4=1, b5=0,
-#   #   nseasons=12, season.frequency=1,
-#   #   bsts.state.specs=list(
-#   #     list(func=AddTrig, nseasons=12, freq=1, type='seasonal')
-#   #   ) 
-#   # )
-# )
-# 
-# ## --- TEST ---
-# # simlist <- list(
-# #   no.perf.no.gro=list(
-# #       b4=0, ## b4 = past performance spillover (or persistence)
-# #       b5=0  ## b5 = growth rate
-# #     )
-# # )
-# ##-------------
-# 
-# 
-# 
-# 
 # ##================================
 # ##
 # ## MAIN SIMULATION COMPARISON RUN
@@ -788,664 +713,138 @@ getTrigComp <- function(state.conf.list) {
 
 
 
-
-
-##==============================================
-##
-## BSTS STATE SPACE COMPONENTS FUNCTIONS
-##
-##----------------------------------------------
-###
-##  Add a BSTS state space component to state.space list
-##    by applying the arguments in state.conf 
-##    in function indicated by state.conf$name
-###
-updateStateSpaceAddComponentFromConfList <- function(state.space,  y.pre.treat.NAs.post.treat,  state.conf) {
-  
-  if (class(state.conf) != 'list') {
-    cat('\nWARNING: state.conf is not a list. Try wrapping the state component function in a state config list.\n')
-    return()
-  }
-  
-  if (  state.conf$name == 'AddAr') {
-    
-    state.space <- AddAr(state.space, y.pre.treat.NAs.post.treat, 
-                         lags = state.conf$lags, 
-                         sigma.prior = state.conf$sigma.prior, 
-                         initial.state.prior = state.conf$initial.state.prior, 
-                         sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddAutoAr') {
-    
-    state.space <- AddAutoAr(state.space, y.pre.treat.NAs.post.treat, 
-                             lags = state.conf$lags, 
-                             prior = state.conf$prior, 
-                             sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddGeneralizedLocalLinearTrend') {
-    
-    state.space <- AddGeneralizedLocalLinearTrend(state.space, y.pre.treat.NAs.post.treat, 
-                                                  level.sigma.prior = state.conf$level.sigma.prior, 
-                                                  slope.mean.prior = state.conf$slope.mean.prior, 
-                                                  slope.ar1.prior = state.conf$slope.ar1.prior, 
-                                                  slope.sigma.prior = state.conf$slope.sigma.prior, 
-                                                  initial.level.prior = state.conf$initial.level.prior, 
-                                                  initial.slope.prior = state.conf$initial.slope.prior, 
-                                                  sdy = state.conf$sdy, 
-                                                  initial.y = state.conf$initial.y)
-    
-  } else if (state.conf$name == 'AddHierarchicalRegressionHoliday') {
-    
-    state.space <- AddHierarchicalRegressionHoliday(state.space, y.pre.treat.NAs.post.treat, 
-                                                    holiday.list = state.conf$holiday.list, 
-                                                    coefficient.mean.prior = state.conf$coefficient.mean.prior, 
-                                                    coefficient.variance.prior = state.conf$coefficient.variance.prior, 
-                                                    time0 = state.conf$time0, 
-                                                    sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddLocalLevel') {
-    
-    state.space <- AddLocalLevel(state.space, y.pre.treat.NAs.post.treat, 
-                                 sigma.prior = state.conf$sigma.prior, 
-                                 initial.state.prior = state.conf$initial.state.prior, 
-                                 sdy = state.conf$sdy, 
-                                 initial.y = state.conf$initial.y)
-    
-  } else if (state.conf$name == 'AddLocalLinearTrend') {
-    
-    state.space <- AddLocalLinearTrend(state.space, y.pre.treat.NAs.post.treat, 
-                                       level.sigma.prior = state.conf$level.sigma.prior, 
-                                       slope.sigma.prior = state.conf$slope.sigma.prior, 
-                                       initial.level.prior = state.conf$initial.level.prior, 
-                                       initial.slope.prior = state.conf$initial.slope.prior, 
-                                       sdy = state.conf$sdy, 
-                                       initial.y = state.conf$initial.y)
-    
-  } else if (state.conf$name == 'AddMonthlyAnnualCycle') {
-    
-    state.space <- AddMonthlyAnnualCycle(state.space, y.pre.treat.NAs.post.treat, 
-                                         date.of.first.observation = state.conf$date.of.first.observation, 
-                                         sigma.prior = state.conf$sigma.prior, 
-                                         initial.state.prior = state.conf$initial.state.prior, 
-                                         sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddRandomWalkHoliday') {
-    
-    state.space <- AddRandomWalkHoliday(state.specification = ,y = ,
-                                        holiday = state.conf$holiday,
-                                        time0 = state.conf$time0,
-                                        sigma.prior = state.conf$sigma.prior,
-                                        initial.state.prior = state.conf$initial.state.prior,
-                                        sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddRegressionHoliday') {
-    
-    state.space <- AddRegressionHoliday(state.space, y.pre.treat.NAs.post.treat,
-                                        holiday.list = state.conf$holiday.list,
-                                        time0 = state.conf$time0,
-                                        prior = state.conf$prior,
-                                        sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddSeasonal') {
-    
-    state.space <- AddSeasonal(state.space, y.pre.treat.NAs.post.treat,
-                               nseasons = state.conf$nseasons,
-                               season.duration = state.conf$season.duration,
-                               sigma.prior = state.conf$sigma.prior,
-                               initial.state.prior = state.conf$initial.state.prior,
-                               sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddSemilocalLinearTrend') {
-    
-    state.space <- AddSemilocalLinearTrend(state.space, y.pre.treat.NAs.post.treat,
-                                           level.sigma.prior = state.conf$level.sigma.prior,
-                                           slope.mean.prior = state.conf$slope.mean.prior,
-                                           slope.ar1.prior = state.conf$slope.ar1.prior ,
-                                           slope.sigma.prior = state.conf$slope.sigma.prior,
-                                           initial.level.prior = state.conf$initial.level.prior,
-                                           initial.slope.prior = state.conf$initial.slope.prior,
-                                           sdy = state.conf$sdy,
-                                           initial.y = state.conf$initial.y)
-    
-  } else if (state.conf$name == 'AddSharedLocalLevel') {
-    
-    state.space <- AddSharedLocalLevel(state.space, y.pre.treat.NAs.post.treat, 
-                                       nfactors = state.conf$nfactors, 
-                                       coefficient.prior = state.conf$coefficient.prior, 
-                                       initial.state.prior = state.conf$initial.state.prior, 
-                                       timestamps = state.conf$timestamps, 
-                                       series.id = state.conf$series.id, 
-                                       sdy = state.conf$sdy)
-    
-  } else if (state.conf$name == 'AddStaticIntercept') {
-    
-    state.space <- AddStaticIntercept(state.space, y.pre.treat.NAs.post.treat, 
-                                      initial.state.prior = state.conf$initial.state.prior)
-    
-  } else if (state.conf$name == 'AddStudentLocalLinearTrend') {
-    
-    state.space <- AddStudentLocalLinearTrend(state.space, y.pre.treat.NAs.post.treat, 
-                                              save.weights = state.conf$save.weights, 
-                                              level.sigma.prior = state.conf$level.sigma.prior, 
-                                              level.nu.prior = state.conf$level.nu.prior, 
-                                              slope.sigma.prior = state.conf$slope.sigma.prior, 
-                                              slope.nu.prior = state.conf$slope.nu.prior, 
-                                              initial.level.prior = state.conf$initial.level.prior, 
-                                              initial.slope.prior = state.conf$initial.slope.prior, 
-                                              sdy = state.conf$sdy, 
-                                              initial.y = state.conf$initial.y)
-    
-  } else if (state.conf$name == 'AddTrig') {
-    
-    state.space <- AddTrig(state.space, y.pre.treat.NAs.post.treat, 
-                           period = state.conf$period, 
-                           frequencies = state.conf$frequencies,
-                           sigma.prior = state.conf$sigma.prior,
-                           initial.state.prior = state.conf$initial.state.prior,
-                           sdy = state.conf$sdy,
-                           method = 'harmonic')
-    
-  } else {
-     ## PASS
-    cat('\nNo state components added. Returning original state.space\n')
-  }
-  
-  return(state.space)
-  
-}
-
-
-
-##=======================================
-## Get BSTS State Space Component Template
-##---------------------------------------
-getStateSpaceConf <- function(name, ...) {
-  args <- list(...)
-  
-  conf <- if ( name == 'AddAr') {
-    
-    list(
-      name='AddAr',
-      func=AddAr,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      lags = args$lags, 
-      sigma.prior = args$sigma.prior, 
-      initial.state.prior = args$initial.state.prior, 
-      sdy = args$sdy
-    )
-    
-  } else if (name == 'AddAutoAr') {
-    
-    list(
-      name='AddAutoAr',
-      func=AddAutoAr,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      lags = args$lags, 
-      prior = args$prior, 
-      sdy = args$sdy
-    )
-    
-  } else if (name == 'AddHierarchicalRegressionHoliday') {
-    
-    list(
-      name='AddHierarchicalRegressionHoliday',
-      func=AddHierarchicalRegressionHoliday,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      holiday.list = args$holiday.list, 
-      coefficient.mean.prior = args$coefficient.mean.prior, 
-      coefficient.variance.prior = args$coefficient.variance.prior, 
-      time0 = args$time0, 
-      sdy = args$sdy
-    )
-    
-  } else if (name == 'AddLocalLevel') {
-    
-    list(
-      name='AddLocalLevel',
-      func=AddLocalLevel,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      sigma.prior = args$sigma.prior, 
-      initial.state.prior = args$initial.state.prior, 
-      sdy = args$sdy, 
-      initial.y = args$initial.y
-    )
-    
-  } else if (name == 'AddLocalLinearTrend') {
-  
-    list(
-      name='AddLocalLinearTrend',
-      func=AddLocalLinearTrend,
-      # state.space = NULL,
-      # y.pre.treat.NAs.post.treat = NULL,
-      level.sigma.prior = args$level.sigma.prior, 
-      slope.sigma.prior = args$slope.sigma.prior, 
-      initial.level.prior = args$initial.level.prior, 
-      initial.slope.prior = args$initial.slope.prior, 
-      sdy = args$sdy, 
-      initial.y = args$initial.y
-    )
-    
-    
-  } else if (name == 'AddMonthlyAnnualCycle') {
-  
-    list(
-      name ='AddMonthlyAnnualCycle',
-      func =AddMonthlyAnnualCycle, 
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      date.of.first.observation = args$date.of.first.observation, 
-      sigma.prior = args$sigma.prior, 
-      initial.state.prior = args$initial.state.prior, 
-      sdy = args$sdy
-    )
-    
-  } else if (name == 'AddRandomWalkHoliday') {
-  
-    list(
-      name = 'AddRandomWalkHoliday',
-      func = AddRandomWalkHoliday,
-      # state.specification = NULL,
-      # y = NULL,
-      holiday = args$holiday,
-      time0 = args$time0,
-      sigma.prior = args$sigma.prior,
-      initial.state.prior = args$initial.state.prior,
-      sdy = args$sdy
-     )
-    
-  } else if (name == 'AddRegressionHoliday') {
-  
-    list(
-      name = 'AddRegressionHoliday',
-      func = AddRegressionHoliday,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL,
-      holiday.list = args$holiday.list,
-      time0 = args$time0,
-      prior = args$prior,
-      sdy = args$sdy
-     )
-    
-  } else if (name == 'AddSeasonal') {
-  
-    list(
-      name = 'AddSeasonal',
-      func = AddSeasonal,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL,
-      nseasons = args$nseasons,
-      season.duration = args$season.duration,
-      sigma.prior = args$sigma.prior,
-      initial.state.prior = args$initial.state.prior,
-      sdy = args$sdy
-     )
-    
-  } else if (name %in% c('AddSemilocalLinearTrend','AddGeneralizedLocalLinearTrend')) {
-  
-    list(
-      name = 'AddSemilocalLinearTrend',
-      # alias = 'AddGeneralizedLocalLinearTrend',
-      func = AddSemilocalLinearTrend,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL,
-     level.sigma.prior = args$level.sigma.prior,
-     slope.mean.prior = args$slope.mean.prior,
-     slope.ar1.prior = args$slope.ar1.prior ,
-     slope.sigma.prior = args$slope.sigma.prior,
-     initial.level.prior = args$initial.level.prior,
-     initial.slope.prior = args$initial.slope.prior,
-     sdy = args$sdy,
-     initial.y = args$initial.y
-    )
-    
-  } else if (name == 'AddSharedLocalLevel') {
-  
-    list(
-      name = 'AddSharedLocalLevel',
-      func = AddSharedLocalLevel,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      nfactors = args$nfactors, 
-      coefficient.prior = args$coefficient.prior, 
-      initial.state.prior = args$initial.state.prior, 
-      timestamps = args$timestamps, 
-      series.id = args$series.id, 
-      sdy = args$sdy
-    )
-    
-  } else if (name == 'AddStaticIntercept') {
-  
-    list(
-      name = 'AddStaticIntercept',
-      func = AddStaticIntercept,
-      # state.space = NULL,
-      # y.pre.treat.NAs.post.treat = NULL, 
-      initial.state.prior = args$initial.state.prior
-    )
-    
-  } else if (name == 'AddStudentLocalLinearTrend') {
-    
-    list(
-      name = 'AddStudentLocalLinearTrend',
-      func = AddStudentLocalLinearTrend,
-      # state.space = NULL, 
-      # y.pre.treat.NAs.post.treat = NULL, 
-      save.weights = args$save.weights, 
-      level.sigma.prior = args$level.sigma.prior, 
-      level.nu.prior = args$level.nu.prior, 
-      slope.sigma.prior = args$slope.sigma.prior, 
-      slope.nu.prior = args$slope.nu.prior, 
-      initial.level.prior = args$initial.level.prior, 
-      initial.slope.prior = args$initial.slope.prior, 
-      sdy = args$sdy, 
-      initial.y = args$initial.y
-    )
-    
-  } else if (name == 'AddTrig') {
-    
-    list(
-      name = 'AddTrig',
-      func = AddTrig,
-      # state.space = NULL,
-      # y.pre.treat.NAs.post.treat = NULL, 
-      period = args$period, 
-      frequencies = args$frequencies,
-      sigma.prior = args$sigma.prior,
-      initial.state.prior = args$initial.state.prior,
-      sdy = args$sdy,
-      method = 'harmonic'
-    )
-      
-  } else {
-    list()
-  }
-  
-  return(conf)
-  
-} ## end func
-
-
-
-
-# ##*******************************************************************
-# nss <- length(state.conf)
-# ## State Space Config list
-# st.sp <- list()
-# if (nss > 0) {
-#   for (jj in 1:nss) {
-#     addStateComp <- state.conf[[ jj ]]
-#     ## check if element is a list for an AddTrig() bsts state component
-#     # isTrig <- FALSE
-#     # if (length(names(addStateComp)) > 0) {
-#     #   if ('name' %in% names(addStateComp)) {
-#     #     if (addStateComp$name == 'AddTrig') {
-#     #       isTrig <- TRUE
-#     #     }
-#     #   }
-#     # }
-#     if (class(addStateComp)=='list')
-#     {
+# ###############################################
+# ##
+# ## GRIDSEARCH OVER MAIN DIMENSIONS
+# ##   OF SIMULATION / DGP
+# ##
+# ###############################################
+# 
+# ##
+# npds <- 100
+# actor.sizes <- c(100)
+# intpds <- round( c(npds*2/3) )   ### round(c(3*npds/4, npds/2, npds/4))
+# ##
+# noise.levels <- c(1.0, 0.5)
+# ##
+# treat.rules <- c('random', 'below.benchmark')
+# ##
+# autocors <- c(0, .2)
+# ##
+# bsts.nseasons <- c(12, 7) ## correct, incorrect [for DGP_nseasons = 12]
+# seasonalities <- c(FALSE, TRUE)
+# linear.trends <- c(0, .05)
+# ##
+# treat.thresholds <- c(.5, .25)
+# 
+# # g = h = i = ii = j = k = l = m = n = p = 1
+# 
+# ##==================================
+# ## SIMULATION CONFIGURATION BUILDER LOOP
+# ##----------------------------------
+# simlist <- list()
+# # for (l in 1:length(bsts.nseasons)) {
+# #   bsts.nseason <- bsts.nseasons[l]
+# for (j in 1:length(intpds)) {
+#   intpd <- intpds[j]
+#     
+#   for (g in 1:length(actor.sizes)) {
+#     actor.size <- actor.sizes[g]
+#     
+#     for (h in 1:length(noise.levels)) {
+#       noise.level <- noise.levels[h]
 #       
-#       if (length(names(addStateComp))==0) {
-#         names(addStateComp) <- 1:length(addStateComp)
-#       }
+#       for (k in 1:length(autocors)) {
+#         autocor <- autocors[k]
+#         
+#         for (i in 1:length(treat.rules)) {
+#           treat.rule <- treat.rules[i]
+#           
+#           for (ii in 1:length(treat.thresholds)) {
+#             treat.threshold <- treat.thresholds[ii]
+#               
+#             ##
+#             
+#               for (m in 1:length(seasonalities)) {
+#                 seasonality <- seasonalities[m]
+#                 
+#                 for (n in 1:length(linear.trends)) {
+#                   linear.trend <- linear.trends[n]
+#                   
+# 
+#                   
+#                   key <- sprintf('j%s|g%s|h%s|k%s|i%s|ii%s|m%s|n%s',
+#                                  j,g,h,k,i,ii,m,n)
+#                   cat(sprintf('\n%s\n',key))
+#                   
+#                   ## Skip if 'random' treat.rule and treat.threshold index ii > 0
+#                   ##   (random treat.rule already in simlist; no need to replicate bc treat.threshold not used)
+#                   if (treat.rule=='random' & ii>1) {
+#                     cat(sprintf(' skipping redundant config for treat.rule=random, ii=%s\n',ii))
+#                     next
+#                   }
+#                   
+#                   ## Append simulation configuration to simlist
+#                   simlist[[key]] <- list(
+#                     n = actor.size,    ## Number of firms
+#                     npds = 100,  ## Number of periods
+#                     intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
+#                     ##
+#                     noise.level = noise.level, ## stdev of simulated noise terms
+#                     ##
+#                     treat.rule = treat.rule, 
+#                     treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+#                     treat.threshold = ifelse(treat.rule=='random', 1, treat.threshold),
+#                     b4 = 1,   ## seasonal component weight
+#                     b5 = linear.trend, ##
+#                     b9 = autocor  , ## autocorrelation
+#                     dgp.nseasons= ifelse(seasonality,  12,  NA), 
+#                     dgp.freq= ifelse(seasonality,  1,  NA),
+#                     bsts.state.specs=state.configs.list,
+#                     # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+#                     rand.seed = 54321
+#                   )
+# 
+#                   # .debug.sim <- runSimBstsDiDComparison(simlist, plot.show = T, plot.save = T)
+#                   # stop('DEBUG STOP')
+#                     
+#                     
+#                   
+#                 }
+#                 
+#               }
 #       
-#       if (addStateComp$name == 'AddTrig') {
-#         st.sp <- AddTrig(st.sp, y.pre.treat.NAs.post.treat, 
-#                          period = addStateComp$bsts.nseasons, 
-#                          frequencies = addStateComp$freq,
-#                          method = 'harmonic')
-#       } else if () {
-#         
-#       } else if () {
-#         
-#       } else if () {
-#         
-#       } else {
+#             
+#           }
+#           
+#         }
 #         
 #       }
 #       
 #     }
-#     ##
-#     # print('runSimBstsDiDComparison():: BSTS addStateComp loop')
-#     # print(addStateComp)
-#     if (class(addStateComp)=='function') {
-#       ## STATE COMPONENT FUNCTIONS (excluding seasonality)
-#       st.sp <- addStateComp(st.sp, y.pre.treat.NAs.post.treat) 
-#     } else if (isTrig) {
-#       ## SEASONALITY
-#       
-#     } else {
-#       cat('\nWarning state component excluded (not a state function or seasonal effect list\n')
-#     }
+#     
 #   }
-# } else {
-#   ## Default in CausalImpact package
-#   st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post.treat)
+#   
 # }
-# ##****************************************************************
-
-
-
-
-
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#############################  TO DO NEXT - UPDATE STATE SPACE CONFIGS ################################
-######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-#######################################################################################################
-######################################################################################################
-
-
-
-# ##=====================================
-# ##
-# ## BUILD META SIMLIST
-# ##  - GRID SEARCH ALL DIMENSIONS OF SIMULATION
-# ##
-# ##=====================================
 # 
-# # npds <- 100
-# # effect.types <- c('constant','quadratic','geometric')
+# # }
 # 
-# #  BSTS State Space Component Functions 
-# # bsts::AddAr
-# # bsts::AddAutoAr
-# # bsts::AddDynamicRegression
-# # bsts::AddGeneralizedLocalLinearTrend
-# # bsts::AddHierarchicalRegressionHoliday
-# # bsts::AddLocalLevel
-# # bsts::AddLocalLinearTrend
-# # bsts::AddMonthlyAnnualCycle
-# # bsts::AddRandomWalkHoliday
-# # bsts::AddRegressionHoliday
-# # bsts::AddSeasonal
-# # bsts::AddSemilocalLinearTrend
-# # bsts::AddSharedLocalLevel
-# # bsts::AddStaticIntercept
-# # bsts::AddStudentLocalLinearTrend
-# # bsts::AddTrig
-# # ## Make BSTS state space configurations
-# state.configs.list <- list(
-#   list(
-#     AddLocalLevel
-#   ),
-#   list(
-#     AddLocalLinearTrend
-#   ),
-#   list(
-#     AddStudentLocalLinearTrend
-#   ),
-#   list(
-#     AddAr
-#   ),
-#   list(
-#     list(name='AddTrig', bsts.nseasons=12,  freq=1)
-#   ),
-#   list(
-#     list(name='AddTrig', bsts.nseasons=7,  freq=1)  ## *** incorrect seasonality in BSTS ***
-#   ),
-#   list(
-#     AddLocalLevel, 
-#     list(name='AddTrig', bsts.nseasons=12, freq=1)
-#   ),
-#   list(
-#     AddLocalLevel, 
-#     AddAr
-#   ),
-#   list(
-#     list(name='AddTrig', bsts.nseasons=12, freq=1), 
-#     AddAr
-#   ),
-#   list(
-#     AddLocalLevel,
-#     list(name='AddTrig', bsts.nseasons=12, freq=1), 
-#     AddAr
-#   )
-# )
-
-
-
-
-
-
-##
-npds <- 100
-actor.sizes <- c(100)
-intpds <- round( c(npds*2/3) )   ### round(c(3*npds/4, npds/2, npds/4))
-##
-noise.levels <- c(1.0, 0.5)
-##
-treat.rules <- c('random', 'below.benchmark')
-##
-autocors <- c(0, .2)
-##
-bsts.nseasons <- c(12, 7) ## correct, incorrect [for DGP_nseasons = 12]
-seasonalities <- c(FALSE, TRUE)
-linear.trends <- c(0, .05)
-##
-treat.thresholds <- c(.5, .25)
-
-# g = h = i = ii = j = k = l = m = n = p = 1
-
-##==================================
-## SIMULATION CONFIGURATION BUILDER LOOP
-##----------------------------------
-simlist <- list()
-# for (l in 1:length(bsts.nseasons)) {
-#   bsts.nseason <- bsts.nseasons[l]
-for (j in 1:length(intpds)) {
-  intpd <- intpds[j]
-    
-  for (g in 1:length(actor.sizes)) {
-    actor.size <- actor.sizes[g]
-    
-    for (h in 1:length(noise.levels)) {
-      noise.level <- noise.levels[h]
-      
-      for (k in 1:length(autocors)) {
-        autocor <- autocors[k]
-        
-        for (i in 1:length(treat.rules)) {
-          treat.rule <- treat.rules[i]
-          
-          for (ii in 1:length(treat.thresholds)) {
-            treat.threshold <- treat.thresholds[ii]
-              
-            ##
-            
-              for (m in 1:length(seasonalities)) {
-                seasonality <- seasonalities[m]
-                
-                for (n in 1:length(linear.trends)) {
-                  linear.trend <- linear.trends[n]
-                  
-
-                  
-                  key <- sprintf('j%s|g%s|h%s|k%s|i%s|ii%s|m%s|n%s',
-                                 j,g,h,k,i,ii,m,n)
-                  cat(sprintf('\n%s\n',key))
-                  
-                  ## Skip if 'random' treat.rule and treat.threshold index ii > 0
-                  ##   (random treat.rule already in simlist; no need to replicate bc treat.threshold not used)
-                  if (treat.rule=='random' & ii>1) {
-                    cat(sprintf(' skipping redundant config for treat.rule=random, ii=%s\n',ii))
-                    next
-                  }
-                  
-                  ## Append simulation configuration to simlist
-                  simlist[[key]] <- list(
-                    n = actor.size,    ## Number of firms
-                    npds = 100,  ## Number of periods
-                    intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-                    ##
-                    noise.level = noise.level, ## stdev of simulated noise terms
-                    ##
-                    treat.rule = treat.rule, 
-                    treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-                    treat.threshold = ifelse(treat.rule=='random', 1, treat.threshold),
-                    b4 = 1,   ## seasonal component weight
-                    b5 = linear.trend, ##
-                    b9 = autocor  , ## autocorrelation
-                    dgp.nseasons= ifelse(seasonality,  12,  NA), 
-                    dgp.freq= ifelse(seasonality,  1,  NA),
-                    # bsts.state.specs=state.configs.list, 
-                    bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                    rand.seed = 54321
-                  )
-
-                  # .debug.sim <- runSimBstsDiDComparison(simlist, plot.show = T, plot.save = T)
-                  # stop('DEBUG STOP')
-                    
-                    
-                  
-                }
-                
-              }
-      
-            
-          }
-          
-        }
-        
-      }
-      
-    }
-    
-  }
-  
-}
-
-# }
-
-# simlist.files <- runSimUpdateCompareBstsDiD(simlist)  ## D:\\BSTS_external
-
-
-##########################################
-# ##_-------------------------------
-# ## Save Main Sim Grid Search Run -- ***SLOW***
-# ##_-------------------------------
-###########################################
-# sim.id <- round(10*as.numeric(Sys.time()))
-
-## Generate simulated data for each scenario in simlist
-simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
-
-## Run BSTS model versions and compare against DiD estimates
-## local.storage=True write each sim to file; returns list of output file paths
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
+# # simlist.files <- runSimUpdateCompareBstsDiD(simlist)  ## D:\\BSTS_external
+# 
+# 
+# ##########################################
+# # ##_-------------------------------
+# # ## Save Main Sim Grid Search Run -- ***SLOW***
+# # ##_-------------------------------
+# ###########################################
+# # sim.id <- round(10*as.numeric(Sys.time()))
+# 
+# ## Generate simulated data for each scenario in simlist
+# simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
+# 
+# ## Run BSTS model versions and compare against DiD estimates
+# ## local.storage=True write each sim to file; returns list of output file paths
+# simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
 
 
 
@@ -1477,25 +876,313 @@ simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  #
 
 
 
-key
-state.configs.list <- list(
-  list(
-    AddSemilocalLinearTrend
-  ),
-  list(
-    AddAutoAr
-  )
+# key
+# state.configs.list <- list(
+#   list(
+#     AddSemilocalLinearTrend
+#   ),
+#   list(
+#     AddAutoAr
+#   )
+# )
+
+
+
+##=======================================
+##
+##  STATESPACE CONFIG GRIDSEARCH
+##   1. search over priors/args in state space component function
+##
+##
+##=======================================
+
+## Static Defaults
+n <- 100
+npds <- 100
+intpd <- round( npds * 2/3 )
+noise.level <- 1.2
+# treat.rule <- 'random' # 'below.benchmark' ## 'random'
+# treat.prob <-  0.5
+# treat.threshold <- NA
+b4 <- 1
+b5 <- 0.04
+dgp.nseasons= 12
+dgp.freq= 1
+
+
+
+## Scenarios
+# lags = list(c(1),c(2),c(3)) 
+lags <- list( c(1) ) ##list(NULL)
+
+
+## 
+treat.rules <- c('random','below.benchmark')
+seasonalities <- c(TRUE, FALSE)
+prior.sd.scenarios <- c('sd.low', 'sd.high')
+# sigma.priors <- list(NULL)
+# sigma.priors = list(
+#   SdPrior(0.5, sample.size = .01, initial.value = 0.5, fixed = FALSE, upper.limit = Inf), 
+#   SdPrior(1.9, sample.size = .1, initial.value = 1.0, fixed = FALSE, upper.limit = Inf)
+# ) ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
+# initial.state.prior.ms <-list(NULL) ##list(c(0.3, 0.3), c(0.9, 0.9))
+# initial.state.prior.vs <-list(NULL)  ##list(matrix(c(0.5,0.1, 0.1,0.5), nrow = 2, byrow=TRUE),
+                             # matrix(c(0.9,0.3, 0.3,0.9), nrow = 2, byrow=TRUE) ) ## or use a Boom::MvnPrior(mean, variance)
+# sdy = NULL
+## 
+st.sp.lists <- list(
+  ## ## LEVEL
+  `1`=c('AddLocalLevel'),
+  ## ## TREND
+  `2`=c('AddLocalLinearTrend'),
+  `3`=c('AddStudentLocalLinearTrend'),
+  ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
+  `4`=c('AddSemilocalLinearTrend'),
+  ## ## SEASONAL
+  `5`=c('AddTrig'),
+  ## ## AUTOCORRELATION
+  # list('AddAr'),
+  `6`=c('AddAr'),
+  ##------ COMBINATIONS --------------
+  ## AR & SEASONALITY
+  `7`=c('AddTrig','AddAr'),
+  ## LEVEL + ...
+  `8`=c('AddLocalLevel','AddTrig'),
+  `9`=c('AddLocalLevel','AddAr'),
+  `10`=c('AddLocalLevel','AddTrig','AddAr'),
+  ## (LEVEL + SLOPE) + ...
+  `12`=c('AddLocalLinearTrend','AddTrig'),
+  `13`=c('AddLocalLinearTrend','AddAr'),
+  `14`=c('AddLocalLinearTrend','AddTrig','AddAr'),
+  `15`=c('AddStudentLocalLinearTrend','AddTrig'),
+  `16`=c('AddStudentLocalLinearTrend','AddAr'),
+  `17`=c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
+  ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
+  `18`=c('AddTrig','AddSemilocalLinearTrend')#,
 )
+# st.sp.autoar.lists <- list(
+#   ## ## LEVEL
+#   `1`=c('AddLocalLevel'),
+#   ## ## TREND
+#   `2`=c('AddLocalLinearTrend'),
+#   `3`=c('AddStudentLocalLinearTrend'),
+#   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
+#   `4`=c('AddSemilocalLinearTrend'),
+#   ## ## SEASONAL
+#   `5`=c('AddTrig'),
+#   ## ## AUTOCORRELATION
+#   # list('AddAr'),
+#   `6`=c('AddAutoAr'),
+#   ##------ COMBINATIONS --------------
+#   ## AR & SEASONALITY
+#   `7`=c('AddTrig','AddAutoAr'),
+#   ## LEVEL + ...
+#   `8`=c('AddLocalLevel','AddTrig'),
+#   `9`=c('AddLocalLevel','AddAutoAr'),
+#   `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
+#   ## (LEVEL + SLOPE) + ...
+#   `12`=c('AddLocalLinearTrend','AddTrig'),
+#   `13`=c('AddLocalLinearTrend','AddAutoAr'),
+#   `14`=c('AddLocalLinearTrend','AddTrig','AddAutoAr'),
+#   `15`=c('AddStudentLocalLinearTrend','AddTrig'),
+#   `16`=c('AddStudentLocalLinearTrend','AddAutoAr'),
+#   `17`=c('AddStudentLocalLinearTrend','AddTrig','AddAutoAr'),
+#   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
+#   `18`=c('AddTrig','AddSemilocalLinearTrend')#,
+# )
 
+## FOCAL CONSTRUCT
+dgp.ars <- list(0,.04,.08,.16,.32)  ## 0.6
+##
+simlist <- list()
+## AUTOCORRELATION VALUES
+for (g in 1:length(dgp.ars)) {
+  dgp.ar <- dgp.ars[[ g ]]
+  
+  ## SEASONALITY
+  for (h in 1:length(seasonalities)) {
+    seasonality <- seasonalities[[ h ]]
+    
+    ## ENDOGENEITY (SELF-SELECTION)
+    for (i in 1:length(treat.rules)) {
+      treat.rule <- treat.rules[[ i ]]
+      
+      ##--------------------------------------------
+      ## Setup state space configurations
+      ##--------------------------------------------
+      bsts.state.specs <- list()
+      ## PRIOR NOISE / UNCERTAINTY (PRIOR STDEV)
+      for (j in 1:length(prior.sd.scenarios)) {
+        prior.sd.scenario <- prior.sd.scenarios[[ j ]]
+        
+        ## STATE SPACE COMPONENTS CONFIGURATION
+        for (k in 1:length(st.sp.lists)) {
+          st.sp.vec <- st.sp.lists[[ k ]]
+          
+          key <- sprintf('h%s|i%s|j%s|k%s', h,i,j,k)
+          
+          bsts.state.config <- list()
+          for (kk in 1:length(st.sp.vec)) {
+            ## SKIP AddSharedLocalLevel() for now...
+            .id <- length(bsts.state.config)+1
+            bsts.state.config[[ .id ]] <- getStateSpaceConfBySimScenario(st.sp.vec[ kk ], prior.sd.scenario)#, ## c('sd.high','sd.low')
+            # x.spikslab.prior=x.spikslab.prior, ## X  values for Boom::SpikeSlabPrior()
+            # y.spikslab.prior=y.spikslab.prior)
+            .id <- .id + 1
+          }
+          cat(sprintf('\n%s\n',key))
+          bsts.state.specs[[key]] <- bsts.state.config
+        }
+        
+        ##--------------------------------------------
+        ## Append simulation configuration to simlist
+        ##--------------------------------------------
+        .idx <- sprintf('ar%s',dgp.ar)
+        simlist[[ .idx ]] <- list(
+          n = n,    ## Number of firms
+          npds = npds,  ## Number of periods
+          intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
+          noise.level = noise.level, ## stdev of simulated noise terms
+          treat.rule = treat.rule, 
+          treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+          treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+          b4 = b4,   ## seasonal component weight
+          b5 = b5, ##
+          b9 = dgp.ar  , ## autocorrelation
+          dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+          dgp.freq= ifelse(seasonality, dgp.freq, NA),
+          bsts.state.specs=bsts.state.specs,
+          # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+          rand.seed = 54321
+        )
+        
+      } ## // end prior.sd.scenarios loop
+      
+    } ## // end treat.rules loop
+    
+  } ## // end seasonalities loop
+  
+} ## // end ARs loop
+
+
+simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
+
+
+simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
+
+
+
+
+
+## Skip if 'random' treat.rule and treat.threshold index ii > 0
+##   (random treat.rule already in simlist; no need to replicate bc treat.threshold not used)
+# if (treat.rule=='random' & ii>1) {
+#   cat(sprintf(' skipping redundant config for treat.rule=random, ii=%s\n',ii))
+#   next
+# }
+# bsts.state.config <- list(
+# AddTrig=getStateSpaceConf('AddTrig',
+#                           period=dgp.nseasons,
+#                           frequencies=dgp.freq,
+#                           sigma.prior = SdPrior(sigma.guess =.01, sample.size =.1, initial.value =.1, upper.limit = Inf),
+#                           # initial.state.prior=NormalPrior(mu=.1, sigma=1, initial.value = .1),
+#                           # initial.state.prior = MvnDiagonalPrior(mean.vector = c(.1, .1), 
+#                           #                                        sd.vector = c(1, 1)),
+#                           method='harmonic'
+#                           ),
+# AddLocalLevel=getStateSpaceConf('AddLocalLevel',
+#                   sigma.prior = SdPrior(sigma.guess =.01, sample.size =.1, initial.value = .1, upper.limit = Inf),
+#                   initial.state.prior = NormalPrior(mu=.01,sigma = .1,initial.value = .1))#,
+# AddAr=getStateSpaceConf('AddAr',
+#                  lags=lag,
+#                  sigma.prior=sigma.prior,
+#                  initial.state.prior=initial.state.prior)
+# AddAutoAr=getStateSpaceConf('AddAutoAr',
+#                             lags=lag,
+#                             prior=SpikeSlabArPrior(
+#                               lag,
+#                               prior.inclusion.probabilities = GeometricSequence( lag, initial.value = .9, discount.factor = .3),
+#                               prior.mean = rep(0, lag),
+#                               prior.sd = GeometricSequence(lag, initial.value = .9, discount.factor = .3),
+#                               sdy=.5,
+#                               prior.df = 1,
+#                               expected.r2 = .5,
+#                               sigma.upper.limit = Inf,
+#                               truncate = TRUE)
+#                             )#,
+# AddLocalLinearTrend=getStateSpaceConf('AddLocalLinearTrend',
+#                                       level.sigma.prior= SdPrior(sigma.guess = .01, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                                       slope.sigma.prior = SdPrior(sigma.guess = .01, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                                       initial.level.prior = NormalPrior(mu = .01, sigma = .1, initial.value = .01),
+#                                       initial.slope.prior = NormalPrior(mu = .01, sigma = .1, initial.value = .01)
+#                                       )#,
+# AddStudentLocalLinearTrend=getStateSpaceConf('AddStudentLocalLinearTrend', save.weights=TRUE,
+#                               level.sigma.prior= SdPrior(sigma.guess =.01, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                               # level.nu.prior= GammaPrior(a = 1.5, b = 4, prior.mean = 3/4, initial.value = 3/4), ### Inherits: DoubleModel(),
+#                               level.nu.prior= LognormalPrior(mu = .01, sigma = .01, initial.value = NULL), ### Inherits: DoubleModel(),
+#                               slope.sigma.prior = SdPrior(sigma.guess =.01, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                               # slope.nu.prior =GammaPrior(a = 2.5, b = 2, prior.mean = 5/4, initial.value =5/4),
+#                               slope.nu.prior= LognormalPrior(mu = .01, sigma = .01, initial.value = NULL), ### Inherits: DoubleModel(),
+#                               initial.level.prior = NormalPrior(mu = .01, sigma = .01, initial.value = .01),
+#                               initial.slope.prior = NormalPrior(mu = .01, sigma = .01, initial.value = .01)
+#                             )#,
+# AddSemilocalLinearTrend=getStateSpaceConf('AddSemilocalLinearTrend',
+#                                           level.sigma.prior= SdPrior(sigma.guess=.1, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                                           slope.mean.prior = NormalPrior(mu=.01, sigma = .1, initial.value = .01),
+#                                           slope.ar1.prior = Ar1CoefficientPrior(mu = .01, sigma = .1, force.stationary = F, force.positive = F, initial.value = .6),
+#                                           slope.sigma.prior = SdPrior(sigma.guess =.1, sample.size = .01, initial.value = .01, upper.limit = Inf),
+#                                           # slope.nu.prior =GammaPrior(a = 2.5, b = 2, prior.mean = 5/4, initial.value =5/4),
+#                                           # level.nu.prior= GammaPrior(a = 1.5, b = 4, prior.mean = 3/4, initial.value = 3/4), ### Inherits: DoubleModel(),
+#                                           initial.level.prior = NormalPrior(mu = .01, sigma = .1, initial.value = .01),
+#                                           initial.slope.prior = NormalPrior(mu = .01, sigma = .1, initial.value = .01)
+#                                           )
+# ) ## end list bsts.state.config
+
+
+
+######################################################
+######################################################
+######################################################
+######################################################
+################# TODO: META SIM #####################
+######################################################
+######################################################
+######################################################
+######################################################
+
+### META SIMULATION TO COMPUTE EXPECTATION OF BIAS
+###  AS AVG OF SIMULATION RUN BIAS [ATT - DGP]
+runMetaSim(simlist, metric='att.error', nruns=10)
+
+
+######################################################
+######################################################
+######################################################
+##################### END TODO #######################
+######################################################
+######################################################
+######################################################
+
+
+
+
+
+######################################################### DEBUG #####
+simi <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__16689319176_1.rds'))
+
+bstss <- lapply(simi$compare$bsts,function(z)z[[1]]$CausalImpact$model$bsts.model)
+CompareBstsModels(bstss)
 
 
 
 
 ##########################################
+##########################################
 ##
-##  Summarize Simulation Scenarios
+##  Summarize Simulation Scenarios simlist
 ##
 ##########################################
+#########################################
 
 
 # graphics.off()
@@ -1626,10 +1313,11 @@ ggplot(compdf.stack, aes(factor(heat.x), factor(heat.y), fill= b3.diff)) +
   xlab(paste(heat.x.cols,collapse = ' | ')) + 
   ylab(paste(heat.y.cols,collapse=' | ')) + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
-  scale_fill_gradientn(colours=c('red','yellow','white','cyan','blue'), 
-                       # values=rescale(c(-1,0-.Machine$double.eps,0,0+.Machine$double.eps,1)),
-                       values=rescale(col.scale.vals)
-                       )
+  scale_fill_gradient2() #+
+  # scale_fill_gradientn(colours=c('red','yellow','white','cyan','blue'), 
+  #                      # values=rescale(c(-1,0-.Machine$double.eps,0,0+.Machine$double.eps,1)),
+  #                      values=rescale(col.scale.vals)
+  #                      )
   # scale_fill_gradient(low="white", high="blue") 
 
 #

@@ -80,9 +80,10 @@ file.exists(file.path(dir_ext, file.name))
 simi <- readRDS(file.path(dir_ext, file.name))
 
 #### DEBUG #####
-i.bsts <- simi$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model
+(i.bsts <- simi$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model)
 
 par(mfrow=c(3,3));for(i in 1:ncol(i.bsts$predictors))hist(i.bsts$predictors[,i],main=colnames(i.bsts$predictors)[i])
+
 
 
 
@@ -92,6 +93,7 @@ par(mfrow=c(3,3));for(i in 1:ncol(i.bsts$predictors))hist(i.bsts$predictors[,i],
 ##
 ##########################################
 
+sim.files <- dir(dir_ext, pattern ='__GRIDSEARCH_output__16685974280')
 
 # graphics.off()
 
@@ -112,11 +114,13 @@ for (i in 1:length(sim.files))
   for (k in 1:length(effect.types)) 
   {   
       effect.type <- effect.types[k]
-      res.tbl <- simi$compare$res.tbl[[ effect.type ]]
-      
+
       # TODO: ADD
       bsts.res.list <- simi$compare$bsts[[ effect.type ]]
       for (j in 1:length(bsts.res.list)) {
+        
+        res.tbl <- simi$compare$res.tbl[[ effect.type ]][[ j ]]
+        
         bsts.res.j <- bsts.res.list[[ j ]]
       
         agg.es <- simi$compare$did[[ effect.type ]]$agg.es
@@ -130,14 +134,37 @@ for (i in 1:length(sim.files))
         ## TODO: Change to loop j over BSTS configs list
         ## BSTS State Specifications
         # bsts.state.spec.j <- simi$compare$bsts[[ j ]][[ effect.type ]]$CausalImpact$model$bsts.model$state.specification  ## with all bsts state specs
-        bsts.state.spec.j <- simi$compare$bsts[[ effect.type ]]$CausalImpact$model$bsts.model$state.specification
+        bsts.state.spec.j <- simi$compare$bsts[[ effect.type ]][[j]]$CausalImpact$model$bsts.model$state.specification
         bsts.state.comps <- sapply(bsts.state.spec.j,function(z)class(z)[1])
+        
+        
+        # ############################################
+        # ########################### TODO ### ### ###
+        # ############################################
+        # ## Append results to output list
+        # simlist[[key]]$compare$did[[effect.type]]$attgt <- ccattgt
+        # simlist[[key]]$compare$did[[effect.type]]$agg.simple <- agg.simple
+        # simlist[[key]]$compare$did[[effect.type]]$agg.es <- agg.es
+        # simlist[[key]]$compare$did[[effect.type]]$self.select.cor <- self.select.cor
+        # ##
+        # simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
+        # simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$cumu.pred.error <-  cumsum(colSums(abs(bsts.pred.er)))
+        # ##
+        # simlist[[key]]$compare$res.tbl[[effect.type]][[ h ]] <- res.tbl
+        # simlist[[key]]$compare$att.err.tbl[[effect.type]][[ h ]] <- errdf
+        # simlist[[key]]$compare$att.err.mean.bsts[[effect.type]][[ h ]] <- mean(errdf$error[errdf$method=='BSTS'],na.rm = T)
+        # simlist[[key]]$compare$att.err.mean.did[[effect.type]][[ h ]]  <- mean(errdf$error[errdf$method=='DiD'],na.rm = T)
+        # simlist[[key]]$compare$att.err.sd.bsts[[effect.type]][[ h ]] <- sd(errdf$error[errdf$method=='BSTS'],na.rm = T)
+        # simlist[[key]]$compare$att.err.sd.did[[effect.type]][[ h ]]  <- sd(errdf$error[errdf$method=='DiD'],na.rm = T)
+        # ###############################
+        # ############################
+        # #########################
         
         ## Simulation scenario (row) dataframe
         df.ijk <- data.frame(
           n = simi$n,
           npds = simi$npds,
-          intpd = simi$npds,
+          intpd = simi$intpd,
           effect.type = effect.type,
           noise.level = simi$noise.level,
           treat.rule = simi$treat.rule,
@@ -163,6 +190,13 @@ for (i in 1:length(sim.files))
           ###
           did.b3.diff = (gatt.did - gatt.b3),
           bsts.b3.diff = (gatt.bsts - gatt.b3),
+          ##
+          att.err.mean.bsts = simi$compare$att.err.mean.bsts[[effect.type]][[ j ]],
+          att.err.mean.did = simi$compare$att.err.mean.did[[effect.type]][[ j ]] ,
+          att.err.sd.bsts = simi$compare$att.err.sd.bsts[[effect.type]][[ j ]],
+          att.err.sd.did = simi$compare$att.err.sd.did[[effect.type]][[ j ]],
+          ##
+          self.select.cor.did = simi$compare$did[[effect.type]]$self.select.cor,
           ##
           rand.seed = simi$rand.seed
         )
@@ -202,8 +236,8 @@ View(compdf)
 # data <- expand.grid(X=x, Y=y)
 # data$Z <- runif(400, 0, 5)
 library(stringr)
-heat.x.cols <- c('b9','b5','effect.type','bsts.state.comps')
-heat.y.cols <- c('dgp.nseasons','treat.rule','treat.threshold','noise.level')
+heat.x.cols <- c('bsts.state.comps','effect.type')
+heat.y.cols <- c('b9','dgp.nseasons','noise.level','treat.threshold','treat.rule','b5')
 compdf$heat.x <- apply(compdf[,heat.x.cols],1,function(x)paste(x,collapse = '|'))
 compdf$heat.y <- apply(compdf[,heat.y.cols],1,function(x)paste(x,collapse = '|')) 
 
@@ -227,11 +261,12 @@ ggplot(compdf.stack, aes(factor(heat.x), factor(heat.y), fill= b3.diff)) +
   geom_tile() + facet_wrap( . ~ factor(stats.type)) +
   xlab(paste(heat.x.cols,collapse = ' | ')) + 
   ylab(paste(heat.y.cols,collapse=' | ')) + 
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 6)) + 
   scale_fill_gradientn(colours=c('red','yellow','white','cyan','blue'), 
                        # values=rescale(c(-1,0-.Machine$double.eps,0,0+.Machine$double.eps,1)),
                        values=rescale(col.scale.vals)
                        )
+ggsave(filename = sprintf('grid_search_heatmap_%s.png',sim.id), width = 30, height = 20, units = 'in', dpi = 300)
   # scale_fill_gradient(low="white", high="blue") 
 
 #
@@ -256,6 +291,11 @@ ggplot(compdf, aes(factor(heat.x), factor(heat.y), fill= did.b3.diff)) +
 
 
 
+# 
+# heatmap(
+#   as.matrix(dat), Rowv=NA,
+#   Colv=as.dendrogram(hclust(dist(t(as.matrix(dat)))))
+# )
 
 
 ##=====================================
