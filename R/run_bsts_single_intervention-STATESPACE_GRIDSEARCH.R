@@ -141,7 +141,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
                                     effect.types=c('constant','quadratic','geometric'), 
                                     sim.id=round(10*as.numeric(Sys.time())),
                                     save.items.dir=NA, ## save updated simlist items to seprate RDS files
-                                    bsts.niter=2000
+                                    bsts.niter=1e3
                                     ) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
@@ -228,7 +228,12 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       agg.es <- aggte(ccattgt, type = "dynamic")
       # summary(agg.es)
       # tidy(agg.es)
-      ggdid(agg.es)
+      p.agg.es <- ggdid(agg.es) + 
+        scale_color_manual(values = c('black','darkgray')) +
+        geom_vline(xintercept=0, lty=2) +
+        theme_bw() +
+        theme(legend.position='none') +
+        ggtitle(' DiD: Average Effect by Length of Exposure')
       ggsave(filename = file.path(save.img.dir,
                                   sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
                                           prefix,h,key.strip,effect.type,sim.id))
@@ -372,6 +377,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           for (jj in 1:nss) {
             state.conf.item <- state.conf[[ jj ]]
             if (class(state.conf.item)=='list') {
+              
               if(state.conf.item$name=='AddSharedLocalLevel') {
                 state.conf$coefficient.prior <- SpikeSlabPrior(
                    x = predictors,
@@ -386,7 +392,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
                    # prior.inclusion.probabilities = NULL,
                    sigma.upper.limit = Inf
                  )
-              } ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
+              } 
+              ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
               st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
                                                                 y.pre.treat.NAs.post.treat,  
                                                                 state.conf.item)
@@ -402,10 +409,33 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
         
         ## BSTS model
-        bsts.model <- bsts(y.pre.treat.NAs.post.treat ~ . ,
-                           state.specification = st.sp,
-                           data = predictors,
-                           niter = bsts.niter)
+        bsts.model <- tryCatch(expr = {
+            bsts(y.pre.treat.NAs.post.treat ~ . ,
+                 state.specification = st.sp,
+                 data = predictors,
+                 niter = bsts.niter)
+          },
+          error=function(e) {
+            message(sprintf('bsts() error: %s', as.character(e)))
+            # message(cond)
+            # # Choose a return value in case of error
+            # return(NA)
+          },
+          warning=function(w) {
+            message(sprintf('bsts() warning: %s', as.character(w)))
+            # message(paste("URL caused a warning:", url))
+            # return(NA)
+          },
+          finally={
+            ##PASS
+          })
+        # bsts.model <- bsts(y.pre.treat.NAs.post.treat ~ . ,
+        #                    state.specification = st.sp,
+        #                    data = predictors,
+        #                    niter = bsts.niter)
+        if ( class(bsts.model) != 'bsts' ) {
+          next
+        }
         ##
         plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
         PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
@@ -433,7 +463,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         # summary(impact_amount)
         # png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
         #                         key,effect.type,sim.id))
-        plot(impact_amount, c('original','pointwise','cumulative'))
+        p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
         ggsave(filename = file.path(save.img.dir,
                                     sprintf('%s_bsts_CausalImpact_plot_ss%s_%s_%s_%s.png',
                                             prefix,h,key.strip,effect.type,sim.id))
@@ -527,7 +557,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           geom_vline(xintercept=0, linetype='dotted')+
           scale_color_manual(values=c(hue2[1],hue2[2],'black')) + 
           scale_shape_manual(values=c(17,19,NA)) +
-          scale_linetype_manual(values=c(2,3,1)) 
+          scale_linetype_manual(values=c(2,3,1))  + 
+          theme(legend.position='top')
         # png(filename = file.path(save.img.dir,
         #                          sprintf('%s_BSTS_dynamic_treatment_effect_comparison_ss%s_%s_%s_%s.png',
         #                                  prefix,h,key.strip,effect.type,sim.id)))
@@ -583,17 +614,74 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         #                             sprintf('%s_ATT_est_pointwise_error_distributions_ss%s_%s_%s_%s.png',
         #                                     prefix,h,key.strip,effect.type,sim.id)))
         
+        # ## SIMULATED DATA GROUPS FOR EFFECT.TYPE=k
+        # df.group.series <-  ddply(sim$df %>% dplyr::filter(effect.type==effect.type), .(t,effect.type,group), summarize,
+        #                           min=min(y, na.rm=T),
+        #                           cl=quantile(y, probs=0.025, na.rm=T),
+        #                           med=median(y, na.rm=T),
+        #                           cu=quantile(y, probs=0.975, na.rm=T),
+        #                           max=max(y, na.rm=T))
+        # ## ## sim$df.summary %>% dplyr::filter(effect.type==effect.type)
+        # p.group.series <- ggplot( df.group.series, aes(x=as.numeric(t), y=med, color=group)) +
+        #   geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
+        #   geom_line(size=1.2) +
+        #   geom_point(aes(x=as.numeric(t), y=min),pch=1,alpha=.3) + geom_point(aes(x=as.numeric(t),y=max),pch=1,alpha=.3) +
+        #   geom_hline(yintercept=0) + geom_vline(xintercept=intpd, lty=2) +
+        #   ylab('Y') +
+        #   # facet_grid( effect.type ~ . ) +
+        #   theme_bw() + theme(legend.position='top') # + ggtitle(plot.main)
+        ## ## ALL SIMULATED ACTOR TIMESERIRES
+        # df.ind.series <- simlist[[key]]$sim$df.plot %>% dplyr::filter(effect.type == effect.type)
+        df.plot <- simlist[[key]]$sim$df
+        df.ind.series <- df.plot[which(df.plot$effect.type == effect.type),]
+        # df.ind.series$t0 <-df.ind.series$t - df.ind.series$t.post.intpd
+        p.ind.series <- ggplot(data=df.ind.series, mapping=aes(x=t,y=y, color=group, group=actor)) +
+          geom_line(size=1.05, alpha=0.2) +
+          # geom_point(, color=rgb(0.2, 0.2, 0.8, 0.1))+
+          geom_hline(yintercept=0)  + # facet_grid( effect.type ~ . ) +
+          geom_vline(xintercept=intpd, linetype='dotted')+
+          scale_color_manual(values = c(rgb(.2,.2,.8,.3), rgb(.8,.2,.2,.3))) +
+          theme_bw() + theme(legend.position='bottom') #+ ggtitle(plot.main) #+
+        # guides(color=guide_legend(nrow=3,byrow=TRUE)) #+
+        
+        ## BSTS
+        # ## GROUP SUMMARY TIME SERIES
+        bsts.wide <- as.data.frame(impact_amount$series)
+        bsts.wide$t <- 1:nrow(bsts.wide)
+        bsts.wide$t0 <- bsts.wide$t - (intpd-1)
+        # bsts.long <- gather(bsts.wide, point, val, point.effect:point.effect.upper, factor_key = T)
+        # ##
+        # print(bsts.long)
+        # ia <- as.data.frame(impact_amount$series)
+        # bsts.long <- rbind(
+        #   data.frame(variable='point.effect', value=ia$point.effect),
+        #   data.frame(variable='point.effect.lower', value=ia$point.effect.lower),
+        #   data.frame(variable='point.effect.upper', value=ia$point.effect.upper)
+        # )
+        p.bsts.impact <- ggplot(bsts.wide, aes(x=t0, y=point.effect)) +
+          geom_ribbon(aes(ymin=point.effect.lower,ymax=point.effect.upper), alpha=.25, size=.01, lty=1) +
+          geom_line(size=1.1, lty=1) +
+          # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
+          geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
+          ylab('Y') +  xlab('Event Time') + # facet_grid( effect.type ~ . ) +
+          theme_bw() + #theme(legend.position='bottom') + 
+          ggtitle('BSTS CausalImpact: Average Effect By Length of Exposure')
+        
         ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
         # ggarrange(p.err2, p.err3, p.err1, ncol=2, nrow=2, widths = , common.legend = F)
         ggdraw() +
-          draw_plot(p.err1, x = 0,  y = .5, width = 1, height = 0.5) +
-          draw_plot(p.err2, x = 0,  y = 0, width = .5, height = .5) +
-          draw_plot(p.err3, x = .5, y = 0, width = .5, height = .5) +
-          draw_plot_label(label = c("A", "B", "C"), size = 15,
-                          x = c(0, 0, 0.5), y = c(1, 0.5, 0.5))
+          draw_plot(p.ind.series, x= 0 , y= 4/5, width=1, height=1/5) +
+          draw_plot(p.agg.es, x=0, y=3/5, width=1, height=1/5) +  ## *** DiD ***
+          draw_plot(p.bsts.impact, x=0, y=2/5, width=1, height=1/5) +  ## *** BSTS ***
+          draw_plot(p.err1, x = 0,  y = 1/5, width = 1, height = 1/5) +
+          draw_plot(p.err2, x = 0,  y = 0, width = .5, height = 1/5) +
+          draw_plot(p.err3, x = .5, y = 0, width = .5, height = 1/5) +
+          draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
+                          x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
         ggsave(filename = file.path(save.img.dir,
                                     sprintf('%s_ATT_pointwise_error_distribution_compare_ss%s_%s_%s_%s.png',
-                                            prefix,h,key.strip,effect.type,sim.id)))
+                                            prefix,h,key.strip,effect.type,sim.id)),
+               height=15, width=9, units = 'in', dpi = 300)
         
         ##===============================================================
         ## 1-step ahead prediction error
@@ -951,14 +1039,14 @@ st.sp.lists <- list(
   `9`=c('AddLocalLevel','AddAr'),
   `10`=c('AddLocalLevel','AddTrig','AddAr'),
   ## (LEVEL + SLOPE) + ...
-  `12`=c('AddLocalLinearTrend','AddTrig'),
-  `13`=c('AddLocalLinearTrend','AddAr'),
-  `14`=c('AddLocalLinearTrend','AddTrig','AddAr'),
-  `15`=c('AddStudentLocalLinearTrend','AddTrig'),
-  `16`=c('AddStudentLocalLinearTrend','AddAr'),
-  `17`=c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
+  `11`=c('AddLocalLinearTrend','AddTrig'),
+  `12`=c('AddLocalLinearTrend','AddAr'),
+  # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
+  `13`=c('AddStudentLocalLinearTrend','AddTrig'),
+  `14`=c('AddStudentLocalLinearTrend','AddAr'),
+  # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `18`=c('AddTrig','AddSemilocalLinearTrend')#,
+  `15`=c('AddTrig','AddSemilocalLinearTrend')#,
 )
 # st.sp.autoar.lists <- list(
 #   ## ## LEVEL
@@ -1019,8 +1107,6 @@ for (g in 1:length(dgp.ars)) {
         for (k in 1:length(st.sp.lists)) {
           st.sp.vec <- st.sp.lists[[ k ]]
           
-          key <- sprintf('h%s|i%s|j%s|k%s', h,i,j,k)
-          
           bsts.state.config <- list()
           for (kk in 1:length(st.sp.vec)) {
             ## SKIP AddSharedLocalLevel() for now...
@@ -1030,15 +1116,16 @@ for (g in 1:length(dgp.ars)) {
             # y.spikslab.prior=y.spikslab.prior)
             .id <- .id + 1
           }
-          cat(sprintf('\n%s\n',key))
-          bsts.state.specs[[key]] <- bsts.state.config
+          bsts.state.specs[[ paste(st.sp.vec[ kk ], collapse='|') ]] <- bsts.state.config
         }
         
         ##--------------------------------------------
         ## Append simulation configuration to simlist
         ##--------------------------------------------
-        .idx <- sprintf('ar%s',dgp.ar)
-        simlist[[ .idx ]] <- list(
+        key <- sprintf('g%s|h%s|i%s|j%s', g,h,i,j)
+        cat(sprintf('\n%s\n',key))
+        # .idx <- sprintf('ar%s',dgp.ar)
+        simlist[[ key ]] <- list(
           n = n,    ## Number of firms
           npds = npds,  ## Number of periods
           intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
@@ -1065,7 +1152,7 @@ for (g in 1:length(dgp.ars)) {
 } ## // end ARs loop
 
 
-simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
+simlist <- runSimUpdateSimlist(simlist, plot.show = TRUE, plot.save = FALSE )
 
 
 simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
