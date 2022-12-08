@@ -323,6 +323,10 @@ ggsave(filename = sprintf('grid_search_heatmap_did_bsts_%s.png',sim.id), width =
   # scale_fill_gradient(low="white", high="blue") 
 
 
+
+
+
+
 #################################
 ## SUMMARY OF SCENARIO GRIDSEARCH
 ##  COMPARISON OF BSTS VS DID
@@ -336,6 +340,7 @@ for (i in 1:length(heat.ys)) {
   
   best.bsts.bias <- NA
   best.bsts.state.space <- NA
+  best.heat.x <- NA
   best.j <- NA
   for (j in 1:length(heat.xs)) {
     
@@ -349,6 +354,7 @@ for (i in 1:length(heat.ys)) {
         best.bsts.bias <- dfij$bsts.b3.diff
         best.bsts.state.space <- dfij$bsts.state.comps
         best.j <- j
+        best.heat.x <- stconfig
       }
 
     }
@@ -356,7 +362,7 @@ for (i in 1:length(heat.ys)) {
   }
   
   
-  tmpdf <- data.frame(i=i, j=best.j, heat.y=scenario, heat.x=stconfig,
+  tmpdf <- data.frame(i=i, j=best.j, heat.y=scenario, heat.x=best.heat.x,
                       bsts.state.space=best.bsts.state.space,
                       bsts.bias=best.bsts.bias, did.bias=dfij$did.b3.diff )
   z <- rbind(z, tmpdf)
@@ -367,18 +373,415 @@ View(z)
 z$bsts.better <- apply(z[,c('bsts.bias','did.bias')],1,function(x)abs(x[1]) < abs(x[2]))
 
 
-z %>% 
+df.gs.summary <- z %>% 
   group_by(bsts.better, bsts.state.space) %>% 
   summarize(
     n=n(),
-    bsts.mean=mean(bsts.bias, na.rm=T),
-    bsts.sd=sd(bsts.bias, na.rm=T),
-    did.mean=mean(did.bias, na.rm=T),
-    did.sd=sd(did.bias, na.rm=T),
-    abs.bsts.did = mean(abs(bsts.bias)) / mean(abs(did.bias)),
-    bsts.did = mean(bsts.bias) / mean(did.bias)
+    bsts.mean= round( mean(bsts.bias, na.rm=T), 3),
+    bsts.sd= round( sd(bsts.bias, na.rm=T), 3),
+    did.mean= round( mean(did.bias, na.rm=T), 3),
+    did.sd= round( sd(did.bias, na.rm=T), 3),
+    abs.bsts.did = round( mean(abs(bsts.bias)) / mean(abs(did.bias)), 3)#,
+    # bsts.did = mean(bsts.bias) / mean(did.bias)
   ) %>%
   arrange(abs.bsts.did)
+
+write.csv(df.gs.summary, file = 'bsts_did_simulation_gridsearch_ATT_bias_summary.csv',row.names = F)
+
+
+
+
+
+
+
+##==================================
+## GET SIMLIST FROM EXTERNAL STORAGE
+##----------------------------------
+# '__GRIDSEARCH_output__16690657090_g1h1i1j1.rds'
+sim.id <- 16690657090
+##
+g <- 1  ## autocorrelation  0, .1, .2, .4
+# h <- 1  ## Seasonality: TRUE (12 pds), FALSE
+h <- 2
+i <- 1  ## self-selection:  No (random); Yes (below median)
+j <- 1  ## priod SD: 0.01, 0.1
+# i <- 1
+# ii<- 1
+# m <- 1
+# n <- 1
+key.vec <- sprintf('g%s|h%s|i%s|j%s',
+                   g,  h,  i, j)
+key <- paste(key.vec, collapse = '|')
+key.strip <- gsub('[|]','',key.vec)
+# key <- 'j1g1h1k1i1ii1m1n1'
+##
+file.name <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key.strip)
+
+file.exists(file.path(dir_ext, file.name))
+
+# ( sim.files <- dir(dir_ext, pattern = as.character(sim.id)) )
+# 
+# k2files <- sim.files[ grep(key, x = sim.files, ignore.case = T, perl = T) ]
+simi <- readRDS(file.path(dir_ext, file.name))
+
+effect.types <- c('constant','geometric','quadratic')
+st.sp.id <- 5
+for (effect.type in effect.types) {
+  res.tbl.filename <- sprintf('bsts_did_gridsearch_res-tbl_%s_%s.csv',effect.type,key.strip)
+  xdf <- simi$compare$res.tbl[[ effect.type ]][[ st.sp.id ]]
+  print(xdf)
+  write.csv(xdf, res.tbl.filename)
+}
+
+
+#### DEBUG #####
+(i.bsts <- simi$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model)
+
+par(mfrow=c(3,3));for(i in 1:ncol(i.bsts$predictors))hist(i.bsts$predictors[,i],main=colnames(i.bsts$predictors)[i])
+#################
+
+
+
+simi$compare$did$quadratic$attgt
+
+
+intpd <- 67
+res5 <- residuals( simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model)[,1:(intpd-1)]
+res8 <- residuals( simi$compare$bsts$quadratic[[8]]$CausalImpact$model$bsts.model)[,1:(intpd-1)]
+qqdist(res5); qqdist(res8)
+par(mfrow=c(1,2))
+AcfDist(res5)
+AcfDist(res8)
+
+burnin  <- 200
+bsts.iter <- 1000
+err5 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+err8 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+err15 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+par(mfrow=c(1,2))
+plot(rowMeans(err5 ^ 2), type = "l"); plot(rowMeans(err8 ^ 2), type = "l")
+plot(rowMeans(err15 ^ 2), type = "l")
+
+
+coefmc5 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$coefficients[burnin:bsts.iter,]
+par(mfrow=c(3,3))
+for (i in 1:ncol(coefmc5)) {
+  attr <- dimnames(coefmc5)[[2]][i]
+  hist(coefmc5[,i], main=attr, xlab='')
+}
+
+## CODA DIAGNOSTICS
+library(coda)
+geweke.diag(rowMeans(err5 ^ 2), .1, .5)
+geweke.diag(coefmc5, .1, .5)
+
+heidel.diag(rowMeans(err5 ^ 2))
+heidel.diag(coefmc5)
+
+
+CompareBstsModels(list(
+  # simi$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[2]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[3]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[4]]$CausalImpact$model$bsts.model,
+  `Trig`=simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[6]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[7]]$CausalImpact$model$bsts.model,
+  `Trig|LocalLevel`=simi$compare$bsts$quadratic[[8]]$CausalImpact$model$bsts.model#,
+  # simi$compare$bsts$quadratic[[9]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[10]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[11]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[12]]$CausalImpact$model$bsts.model,
+  # simi$compare$bsts$quadratic[[13]]$CausalImpact$model$,,
+  # simi$compare$bsts$quadratic[[14]]$CausalImpact$model$bsts.model,
+  # `Trig|SemilocalLinearTrend`=simi$compare$bsts$quadratic[[15]]$CausalImpact$model$bsts.model
+), burn = 100)
+
+
+
+bsts5 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model
+bsts8 <- simi$compare$bsts$quadratic[[8]]$CausalImpact$model$bsts.model
+bsts15 <- simi$compare$bsts$quadratic[[15]]$CausalImpact$model$bsts.model
+
+plot(bsts5)
+
+PlotBstsComponents(bsts5, burn = 100)
+PlotBstsComponents(bsts8, burn = 100)
+PlotBstsComponents(bsts15, burn = 100) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+# PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsSize(bsts5)
+# PlotBstsSize(bsts8)
+# PlotBstsSize(bsts15)
+# 
+# PlotBstsState(bsts5)
+# PlotBstsState(bsts8)
+# PlotBstsState(bsts15)
+# 
+# PlotBstsResiduals(bsts5)
+# PlotBstsPredictionErrors(bsts5)
+# PlotBstsForecastDistribution(bsts5)
+##
+
+# ## BSTS model for Dynamic Regression
+# bsts.model <- bsts(y.pre.treat.NAs.post.treat,
+#                    state.specification = st.sp,
+#                    niter = 5000)
+
+## Use BSTS prediction of counterfactual to estimate CausalImpact
+impact_amount <- CausalImpact(bsts.model=bsts.model,
+                              post.period.response = post.period.response,
+                              alpha=0.05, model.args = list(niter = bsts.niter))
+# ##
+# summary(impact_amount)
+# summary(impact_amount$model$bsts.model)
+# plot(impact_amount)
+
+# summary(impact_amount)
+# png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
+#                         key,effect.type,sim.id))
+p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+######################################################
+######################################################
+# '__GRIDSEARCH_output__16690657090_g1h1i1j1.rds'
+sim.id <- 16690657090
+##
+g <- 1  ## autocorrelation  0, .1, .2, .4
+# h <- 1  ## Seasonality: TRUE (12 pds), FALSE
+h <- 2
+i <- 1  ## self-selection:  No (random); Yes (below median)
+j <- 1  ## priod SD: 0.01, 0.1
+# i <- 1
+# ii<- 1
+# m <- 1
+# n <- 1
+key.vec <- sprintf('g%s|h%s|i%s|j%s',
+                   g,  h,  i, j)
+key <- paste(key.vec, collapse = '|')
+key.strip <- gsub('[|]','',key.vec)
+# key <- 'j1g1h1k1i1ii1m1n1'
+##
+file.name <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key.strip)
+
+file.exists(file.path(dir_ext, file.name))
+
+# ( sim.files <- dir(dir_ext, pattern = as.character(sim.id)) )
+# 
+# k2files <- sim.files[ grep(key, x = sim.files, ignore.case = T, perl = T) ]
+simi <- readRDS(file.path(dir_ext, file.name))
+
+npds <- 100
+noise.level <- 1.2
+
+simdf <- simi$sim$df
+
+simdf$gname <- 0
+simdf$gname[simdf$group=='treatment'] <- simdf$match_pd[simdf$group=='treatment']
+
+
+tsdf <- simdf %>%
+  dplyr::filter( ! is.na(match_id)) %>%
+  dplyr::group_by(t, t.post.intpd, match_pd, gname, group) %>%
+  dplyr::summarize(
+    n_in_pd = n(),
+    actors = paste(unique(actor), collapse = '|'),
+    y_mean = mean(y, na.rm=T),
+    y_sum = sum(y, na.rm=T),
+    y_sd = sd(y, na.rm=T),
+    y_min = min(y, na.rm=T),
+    y_max = max(y, na.rm=T),
+    x1_mean = mean(x1, na.rm=T),
+    x2_mean = mean(x2, na.rm=T),
+    x3_mean = mean(x3, na.rm=T),
+    ##
+    c1_mean = mean(c1, na.rm=T),
+    c2_mean = mean(c2, na.rm=T),
+    c3_mean = mean(c3, na.rm=T),
+    #
+    b1_mean = mean(b1, na.rm=T),
+    b2_mean = mean(b2, na.rm=T),
+    b3_mean = mean(b3, na.rm=T),
+    #
+    u_mean = mean(u, na.rm=T),
+    v_mean = mean(v, na.rm=T)
+  )
+tsdf$.id <- 1:nrow(tsdf)
+
+## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
+val.cols <- c('y_mean','y_sum','y_min','y_max','y_sd',
+              'x1_mean','x2_mean','x3_mean',
+              'c1_mean','c2_mean','c3_mean',
+              'b1_mean','b2_mean','b3_mean',
+              'u_mean','v_mean')
+ts <- unique(tsdf$t)
+groups <- unique(tsdf$group)
+## init timeseries dataframe - wide
+tsdfw <- data.frame(t=ts,  stringsAsFactors = F)
+for (jj in 1:length(groups)) {
+  id.j <- which( tsdf$group == groups[ jj ] ) 
+  for (kk in 1:length(val.cols)) {
+    df.col <- data.frame( tsdf[ id.j , val.cols[ kk ] ] )
+    names(df.col) <- sprintf('%s_%s',groups[ jj ],val.cols[ kk ])
+    tsdfw <- cbind(tsdfw,  df.col)
+  }
+}
+
+
+# Set up pre- and post-treatment period
+# pre.period <- as.Date(c("2013-01-01","2016-01-25"))
+pre.period <- c(1, intpd-1)  
+# post.period <- as.Date(c("2016-01-26","2018-01-01"))
+post.period <- c(intpd, npds) 
+
+# # BSTS causal effect analysis using CausalImpact package
+# # CausalImpact option: 
+# # niter: Number of MCMC samples to draw. More samples lead to more accurate inferences. Defaults to 1000.
+# # standardize.data: Whether to standardize all columns of the data before fitting the model (i.e., setting Bayes priors), Defaults to TRUE.
+# # prior.level.sd: Prior standard deviation of the Gaussian random walk of the local level. Defaults to 0.01.
+# # nseasons: Period of the seasonal components. Default to 1.
+# # dynamic.regression: Whether to include time-varying regression coefficients. Defaults to FALSE.
+# impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
+# summary(impact_amount)
+# plot(impact_amount)
+dat <- tsdfw[,c('treatment_y_sum','control_y_sum','control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
+                'control_c1_mean','control_c2_mean','control_c3_mean'#,
+                # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
+                # 'control_u_mean','control_v_mean'
+)]
+## Train on y pre-treatment but NA's post-treatment
+y.pre.treat.NAs.post.treat <- c(dat$treatment_y_sum[1:(intpd-1)], rep(NA,npds-intpd+1))
+## Then use the post-treatment response for causal impact estimation
+post.period.response <- dat$treatment_y_sum[intpd:npds]
+## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
+predictors <- dat[, ! names(dat) %in% 'treatment_y_sum'] ## remove response; convert to matrix
+# ## Covariates (predictors) - Dataframe for "data" argument
+# predictors <- as.matrix(predictors) 
+
+## ADD temporal trend to covariates
+predictors$covar_temp_trend <- (1:npds) + rnorm(npds, 0, noise.level)   ## * simlist$`0.rand.base`$b5
+
+
+st.sp <- list()
+st.sp <- AddTrig(st.sp, y.pre.treat.NAs.post.treat, period = 12, frequencies = 1)
+# st.sp <- AddAr(st.sp, y.pre.treat.NAs.post.treat, lags=2)
+st.sp <- AddAutoAr(st.sp, y.pre.treat.NAs.post.treat)
+
+bsts.fit <- bsts(y.pre.treat.NAs.post.treat ~ . ,
+                 state.specification = st.sp,
+                 data = predictors,
+                 niter = 10000)
+
+
+
+  
+##
+plot(bsts.fit)
+PlotBstsComponents(bsts.fit) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+# PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+# PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+PlotBstsSize(bsts.fit)
+##
+
+
+intpd <- 67
+res <- residuals( bsts.fit )[,1:(intpd-1)]
+# res8 <- residuals( simi$compare$bsts$quadratic[[8]]$CausalImpact$model$bsts.model)[,1:(intpd-1)]
+qqdist(res); qqdist(res)
+par(mfrow=c(1,1))
+AcfDist(res)
+# AcfDist(res8)
+
+burnin  <- 2000
+bsts.iter <- 10000
+err <- bsts.fit$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+# err8 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+# err15 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model$one.step.prediction.errors[burnin:bsts.iter, 1:(intpd-1)]
+par(mfrow=c(1,1))
+plot(rowMeans(err ^ 2), type = "l") #; plot(rowMeans(err8 ^ 2), type = "l")
+# plot(rowMeans(err15 ^ 2), type = "l")
+
+
+coefmc <- bsts.fit$coefficients[burnin:bsts.iter,]
+par(mfrow=c(3,3))
+for (i in 1:ncol(coefmc5)) {
+  attr <- dimnames(coefmc)[[2]][i]
+  hist(coefmc[,i], main=attr, xlab='')
+}
+
+## CODA DIAGNOSTICS
+library(coda)
+geweke.diag(rowMeans(err ^ 2), .1, .5)
+geweke.diag(coefmc, .1, .5)
+
+heidel.diag(rowMeans(err ^ 2))
+heidel.diag(coefmc)
+
+
+CompareBstsModels(list(
+  bsts.fit,
+  bsts.fit
+), burn = 2000)
+
+
+
+bsts5 <- simi$compare$bsts$quadratic[[5]]$CausalImpact$model$bsts.model
+bsts8 <- simi$compare$bsts$quadratic[[8]]$CausalImpact$model$bsts.model
+bsts15 <- simi$compare$bsts$quadratic[[15]]$CausalImpact$model$bsts.model
+
+plot(bsts5)
+
+PlotBstsComponents(bsts.fit, burn = 2000)
+
+
+######################################################
+######################################################
+
+
+
+
 
 # compdf.scaled <- compdf.stack
 # col.idx <- which(names(compdf) %in% c('b3.diff')) #which(unname(sapply(compdf.scaled,function(x)is.numeric(x))))
@@ -418,235 +821,238 @@ z %>%
 #   # names(compdf.wide)[ncol(compdf.wide)] <- st.sps[i]
 # }
 
-##===========================================================
-##
-## PLOT HEATMAP OF STATE SPACE CONFIGURATIONS
-##
-##------------------------------------------------------------
-
-heat.xs <- unique(compdf$heat.x)
-compdf.wide <- data.frame()
-## Loop over all Scenarios (simulation data-structure combinations )
-for (i in 1:length(heat.xs)) {
-  cat(sprintf('\ni=%s, %s\n',i,heat.xs[i]))
-  
-  heat.x <- heat.xs[ i ]
-  compdf.i <- compdf[compdf$heat.x == heat.x,  ]
-  heat.ys <- unique(compdf.i$heat.y)
-
-  z <- rbind(
-    data.frame(heat.y=compdf.i$heat.y, stat.type='bsts', b3.diff=compdf.i$bsts.b3.diff),
-    data.frame(heat.y=compdf.i$heat.y, stat.type='did', b3.diff=compdf.i$did.b3.diff)
-  )
-  names(z)[ncol(z)] <- heat.x
-
-  if (i == 1) {
-    compdf.wide <- z
-  } else {
-    .dfi <- z ## as data.frame
-    # names(.dfi)[which(names(.dfi)=='b3.diff')] <- 
-    # names(.dfi)[1] <- heat.y
-    # compdf.wide <- cbind(compdf.wide, .dfi )
-    compdf.wide <- merge(x=compdf.wide, y=.dfi, by=c('heat.y','stat.type'), all=T)
-  }
-  # ## Loop over BSTS State Space Config for each DGP Scenario
-  # for (j in 1:length(heat.xs)) {
-  #   heat.x.j <- heat.xs[ j ]
-  #   compdf.y.i[compdf.y.i$heat.x==heat.x.j, ]
-  # }
-  # compdf.wide <- cbind(compdf.wide, data.frame(compdf.y.i$bsts.b3.diff) ) ## ***TODO***
-  # names(compdf.wide)[ncol(compdf.wide)] <- st.sps[i]
-}
-
-# View(compdf.wide)
-stat.type <- 'bsts'
-##
-compdf.wide.stat <- compdf.wide[compdf.wide$stat.type==stat.type, ] 
-mat <- as.matrix( compdf.wide.stat[,-c(1:2)] )
-mat.scale <- scale(mat)
-rownames(mat.scale) <- compdf.wide.stat$heat.y
-xdist <- dist(mat.scale)
-xcl <- hclust(xdist)
-xdend <-as.dendrogram(xcl)
-xdendord <- order.dendrogram(xdend)
-compdf$heat.y.ord <- factor(x=compdf$heat.y,
-                              levels=compdf.wide.stat$heat.y[ xdendord ], #xdendord
-                              ordered = TRUE)
-##
-txdist <- dist(t(mat.scale))
-txcl <- hclust(txdist)
-txdend <-as.dendrogram(txcl)
-txdendord <- order.dendrogram(txdend)
-compdf$heat.x.ord <- factor(x=compdf$heat.x,
-                            levels=levels(factor(compdf$heat.x))[ txdendord ], #xdendord
-                            ordered = TRUE)
-##
-compdf$bsts.b3.diff.alog <- sapply(compdf$bsts.b3.diff, function(x) {
-  log(abs(x) + .01) * ifelse(x>0, 1, -1) 
-} )
-##
-
-# hmout <- heatmap(mat.scale, keep.dendro = T)
-# hmout
-
-##
-p.bsts.heatmap <- ggplot(compdf, aes(y=heat.y.ord, x=heat.x.ord, fill= bsts.b3.diff.alog )) + 
-  geom_tile() + 
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 70)) +
-  ylab('Data Generating Process (DGP) Scenarios')  + xlab('BSTS State Space Configurations') + 
-  scale_fill_gradient2() + theme_bw()
-print(p.bsts.heatmap)
-ggsave(filename='heatmap_statespace_gridsearch_hclust__ggplot.png', width = 10, height = 10, units = 'in', dpi = 300)
-
-library(RColorBrewer)
-
-# par(mar=c(3,3,3,6))
-png(filename = 'heatmap_hclust_statespace_gridsarch__heatmap-func.png', width = 12, height = 10, units = 'in', res=300)
-hdend <- heatmap(mat.scale,col= RColorBrewer::brewer.pal(11,'RdBu'), keep.dendro = T, margins=c(5,12))
-dev.off()
 
 
-## COMPARE STATE SPACE CONFIGURATIONS
-cSum <- colSums(mat.scale, na.rm = T)
-cSd <- apply(mat.scale,1,function(x)sd(x,na.rm=T),simplify = T)
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
-  geom_density(alpha=0.2,size=.6) + facet_wrap( . ~ bsts.state.comps) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_bsts.png')
-### ALL separate densities
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=bsts.state.comps, fill=bsts.state.comps, line=bsts.state.comps)) + 
-  geom_density(alpha=0.2,size=.6) + facet_grid( effect.type ~ bsts.state.comps) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_ALL_DENSITIES_FACETGRID.png',
-       width=20,height = 8,units = 'in',dpi = 500)
-
-
-compdf$has.seasonality <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('trig',x,ignore.case = T,perl = T),'Season','No Season'), simplify = T)
-compdf$has.level <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('locallevel',x,ignore.case = T,perl = T),'Level','No Level'), simplify = T)
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
-  geom_density(alpha=0.2,size=.6) + facet_grid(has.level  ~ has.seasonality) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_2x2_season_locallevel.png')
-
-
-##===========================================
-##
-##  COMPARE  BSTS vs DID in HEATMAP AND DENSITIY FACETS
-##
-##-------------------------------------------
-
-## LONG DF
-compdf$bsts.did.b3.absdiff <- abs(compdf$bsts.b3.diff) -  abs(compdf$did.b3.diff)
-compdf$bsts.did.b3.absdiff.alog <- sapply(compdf$bsts.did.b3.absdiff, function(x) {
-  log(abs(x) + .001) * ifelse(x>0, 1, -1)
-} )
-
-## WIDE DF
-# View(compdf.wide)
+# 
+# ##===========================================================
+# ##
+# ## PLOT HEATMAP OF STATE SPACE CONFIGURATIONS
+# ##
+# ##------------------------------------------------------------
+# 
+# heat.xs <- unique(compdf$heat.x)
+# compdf.wide <- data.frame()
+# ## Loop over all Scenarios (simulation data-structure combinations )
+# for (i in 1:length(heat.xs)) {
+#   cat(sprintf('\ni=%s, %s\n',i,heat.xs[i]))
+#   
+#   heat.x <- heat.xs[ i ]
+#   compdf.i <- compdf[compdf$heat.x == heat.x,  ]
+#   heat.ys <- unique(compdf.i$heat.y)
+# 
+#   z <- rbind(
+#     data.frame(heat.y=compdf.i$heat.y, stat.type='bsts', b3.diff=compdf.i$bsts.b3.diff),
+#     data.frame(heat.y=compdf.i$heat.y, stat.type='did', b3.diff=compdf.i$did.b3.diff)
+#   )
+#   names(z)[ncol(z)] <- heat.x
+# 
+#   if (i == 1) {
+#     compdf.wide <- z
+#   } else {
+#     .dfi <- z ## as data.frame
+#     # names(.dfi)[which(names(.dfi)=='b3.diff')] <- 
+#     # names(.dfi)[1] <- heat.y
+#     # compdf.wide <- cbind(compdf.wide, .dfi )
+#     compdf.wide <- merge(x=compdf.wide, y=.dfi, by=c('heat.y','stat.type'), all=T)
+#   }
+#   # ## Loop over BSTS State Space Config for each DGP Scenario
+#   # for (j in 1:length(heat.xs)) {
+#   #   heat.x.j <- heat.xs[ j ]
+#   #   compdf.y.i[compdf.y.i$heat.x==heat.x.j, ]
+#   # }
+#   # compdf.wide <- cbind(compdf.wide, data.frame(compdf.y.i$bsts.b3.diff) ) ## ***TODO***
+#   # names(compdf.wide)[ncol(compdf.wide)] <- st.sps[i]
+# }
+# 
+# # View(compdf.wide)
 # stat.type <- 'bsts'
-##
-compdf.wide.stat.bsts <- compdf.wide[compdf.wide$stat.type=='bsts', ] 
-compdf.wide.stat.did <- compdf.wide[compdf.wide$stat.type=='did', ] 
-compdf.wide.bsts.did.absdiff <- compdf.wide.stat.bsts
-for (i in 1:nrow(compdf.wide.bsts.did.absdiff)) {
-  compdf.wide.bsts.did.absdiff[i,-c(1:2)] <- abs(compdf.wide.stat.bsts[i, -c(1:2)]) - abs(compdf.wide.stat.did[i, -c(1:2)])
-}
-compdf.wide.bsts.did.absdiff.alog <- compdf.wide.bsts.did.absdiff
-for (i in 1:nrow(compdf.wide.bsts.did.absdiff)) {
-  for (j in 3:ncol(compdf.wide.bsts.did.absdiff)) {
-    x <- compdf.wide.bsts.did.absdiff[i,j]
-    compdf.wide.bsts.did.absdiff.alog[i,j] <-  log(abs(x) + .001) * ifelse(x>0, 1, -1) 
-  }
-}
-
-mat <- as.matrix( compdf.wide.bsts.did.absdiff.alog[,-c(1:2)] )
-mat.scale <- scale(mat)
-rownames(mat.scale) <- compdf.wide.bsts.did.absdiff.alog$heat.y
-xdist <- dist(mat.scale)
-xcl <- hclust(xdist)
-##
-xdend <-as.dendrogram(xcl)
-xdendord <- order.dendrogram(xdend)
-compdf$heat.y.ord <- factor(x=compdf$heat.y,
-                            levels=compdf.wide.stat$heat.y[ xdendord ], #xdendord
-                            ordered = TRUE)
-##
-txdist <- dist(t(mat.scale))
-txcl <- hclust(txdist)
-txdend <-as.dendrogram(txcl)
-txdendord <- order.dendrogram(txdend)
-compdf$heat.x.ord <- factor(x=compdf$heat.x,
-                            levels=levels(factor(compdf$heat.x))[ txdendord ], #xdendord
-                            ordered = TRUE)
+# ##
+# compdf.wide.stat <- compdf.wide[compdf.wide$stat.type==stat.type, ] 
+# mat <- as.matrix( compdf.wide.stat[,-c(1:2)] )
+# mat.scale <- scale(mat)
+# rownames(mat.scale) <- compdf.wide.stat$heat.y
+# xdist <- dist(mat.scale)
+# xcl <- hclust(xdist)
+# xdend <-as.dendrogram(xcl)
+# xdendord <- order.dendrogram(xdend)
+# compdf$heat.y.ord <- factor(x=compdf$heat.y,
+#                               levels=compdf.wide.stat$heat.y[ xdendord ], #xdendord
+#                               ordered = TRUE)
+# ##
+# txdist <- dist(t(mat.scale))
+# txcl <- hclust(txdist)
+# txdend <-as.dendrogram(txcl)
+# txdendord <- order.dendrogram(txdend)
+# compdf$heat.x.ord <- factor(x=compdf$heat.x,
+#                             levels=levels(factor(compdf$heat.x))[ txdendord ], #xdendord
+#                             ordered = TRUE)
 # ##
 # compdf$bsts.b3.diff.alog <- sapply(compdf$bsts.b3.diff, function(x) {
 #   log(abs(x) + .01) * ifelse(x>0, 1, -1) 
 # } )
-##
-# hmout <- heatmap(mat.scale, keep.dendro = T)
-# hmout
-
-##
-p.bsts.heatmap <- ggplot(compdf, aes(y=heat.y.ord, x=heat.x.ord, fill= bsts.did.b3.absdiff.alog )) + 
-  geom_tile() + 
-  scale_x_discrete(labels = function(x) str_wrap(x, width = 70)) +
-  ylab('Data Generating Process (DGP) Scenarios')  + xlab('BSTS State Space Configurations') + 
-  scale_fill_gradient2() + theme_bw()
-print(p.bsts.heatmap)
-ggsave(filename='heatmap_statespace_gridsearch_hclust_ABS-DIFF__ggplot.png', width = 10, height = 10, units = 'in', dpi = 300)
-
-library(RColorBrewer)
-
-# par(mar=c(3,3,3,6))
-png(filename = 'heatmap_hclust_statespace_gridsarch_ABS-DIFF__heatmap-func.png', width = 12, height = 10, units = 'in', res=300)
-hdend <- heatmap(mat.scale,col= RColorBrewer::brewer.pal(11,'RdBu'), keep.dendro = T, margins=c(5,12))
-dev.off()
-
-
-## COMPARE STATE SPACE CONFIGURATIONS
-cSum <- colSums(mat.scale, na.rm = T)
-cSd <- apply(mat.scale,1,function(x)sd(x,na.rm=T),simplify = T)
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
-  geom_density(alpha=0.2,size=.6) + facet_wrap( . ~ bsts.state.comps) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_bsts.png')
-### ALL separate densities
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=bsts.state.comps, fill=bsts.state.comps, line=bsts.state.comps)) + 
-  geom_density(alpha=0.2,size=.6) + facet_grid( effect.type ~ bsts.state.comps) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_ALL_DENSITIES_FACETGRID.png',
-       width=20,height = 8,units = 'in',dpi = 500)
-
-
-compdf$has.seasonality <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('trig',x,ignore.case = T,perl = T),'Season','No Season'), simplify = T)
-compdf$has.level <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('locallevel',x,ignore.case = T,perl = T),'Level','No Level'), simplify = T)
-ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
-  geom_density(alpha=0.2,size=.6) + facet_grid(has.level  ~ has.seasonality) +
-  geom_vline(xintercept=0, lty=2, size=.2) +
-  theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
-ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_2x2_season_locallevel.png')
-
-
-
-
-st.sp.perf <- compdf %>% 
-  dplyr::group_by( bsts.state.comps,effect.type) %>%   ## effect.type
-  dplyr::summarize(perf.sd=sd(bsts.did.b3.absdiff.alog,na.rm=T),
-                   perf.mean=mean(bsts.did.b3.absdiff.alog,na.rm=T)) %>% 
-  dplyr::arrange(perf.mean)
-print(st.sp.perf, n=50)
-plot(st.sp.perf$perf.sd, st.sp.perf$perf.mean)
-# for (i in 3:ncol(compdf.wide.stat)) {
-#   x <- compdf.wide.stat[,i] 
-#   x[x<0] <- -1 * log( abs(x[x<0]) + .001)
-#   x[x>0] <- log( x[x>0] + .001 )
-#   compdf.wide.stat[,i] <- x
+# ##
+# 
+# # hmout <- heatmap(mat.scale, keep.dendro = T)
+# # hmout
+# 
+# ##
+# p.bsts.heatmap <- ggplot(compdf, aes(y=heat.y.ord, x=heat.x.ord, fill= bsts.b3.diff.alog )) + 
+#   geom_tile() + 
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 70)) +
+#   ylab('Data Generating Process (DGP) Scenarios')  + xlab('BSTS State Space Configurations') + 
+#   scale_fill_gradient2() + theme_bw()
+# print(p.bsts.heatmap)
+# ggsave(filename='heatmap_statespace_gridsearch_hclust__ggplot.png', width = 10, height = 10, units = 'in', dpi = 300)
+# 
+# library(RColorBrewer)
+# 
+# # par(mar=c(3,3,3,6))
+# png(filename = 'heatmap_hclust_statespace_gridsarch__heatmap-func.png', width = 12, height = 10, units = 'in', res=300)
+# hdend <- heatmap(mat.scale,col= RColorBrewer::brewer.pal(11,'RdBu'), keep.dendro = T, margins=c(5,12))
+# dev.off()
+# 
+# 
+# ## COMPARE STATE SPACE CONFIGURATIONS
+# cSum <- colSums(mat.scale, na.rm = T)
+# cSd <- apply(mat.scale,1,function(x)sd(x,na.rm=T),simplify = T)
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_wrap( . ~ bsts.state.comps) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_bsts.png')
+# ### ALL separate densities
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=bsts.state.comps, fill=bsts.state.comps, line=bsts.state.comps)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_grid( effect.type ~ bsts.state.comps) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_ALL_DENSITIES_FACETGRID.png',
+#        width=20,height = 8,units = 'in',dpi = 500)
+# 
+# 
+# compdf$has.seasonality <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('trig',x,ignore.case = T,perl = T),'Season','No Season'), simplify = T)
+# compdf$has.level <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('locallevel',x,ignore.case = T,perl = T),'Level','No Level'), simplify = T)
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_grid(has.level  ~ has.seasonality) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ATT_error_by_dynamic_treatment_effect_shape_2x2_season_locallevel.png')
+# 
+# 
+# ##===========================================
+# ##
+# ##  COMPARE  BSTS vs DID in HEATMAP AND DENSITIY FACETS
+# ##
+# ##-------------------------------------------
+# 
+# ## LONG DF
+# compdf$bsts.did.b3.absdiff <- abs(compdf$bsts.b3.diff) -  abs(compdf$did.b3.diff)
+# compdf$bsts.did.b3.absdiff.alog <- sapply(compdf$bsts.did.b3.absdiff, function(x) {
+#   log(abs(x) + .001) * ifelse(x>0, 1, -1)
+# } )
+# 
+# ## WIDE DF
+# # View(compdf.wide)
+# # stat.type <- 'bsts'
+# ##
+# compdf.wide.stat.bsts <- compdf.wide[compdf.wide$stat.type=='bsts', ] 
+# compdf.wide.stat.did <- compdf.wide[compdf.wide$stat.type=='did', ] 
+# compdf.wide.bsts.did.absdiff <- compdf.wide.stat.bsts
+# for (i in 1:nrow(compdf.wide.bsts.did.absdiff)) {
+#   compdf.wide.bsts.did.absdiff[i,-c(1:2)] <- abs(compdf.wide.stat.bsts[i, -c(1:2)]) - abs(compdf.wide.stat.did[i, -c(1:2)])
 # }
+# compdf.wide.bsts.did.absdiff.alog <- compdf.wide.bsts.did.absdiff
+# for (i in 1:nrow(compdf.wide.bsts.did.absdiff)) {
+#   for (j in 3:ncol(compdf.wide.bsts.did.absdiff)) {
+#     x <- compdf.wide.bsts.did.absdiff[i,j]
+#     compdf.wide.bsts.did.absdiff.alog[i,j] <-  log(abs(x) + .001) * ifelse(x>0, 1, -1) 
+#   }
+# }
+# 
+# mat <- as.matrix( compdf.wide.bsts.did.absdiff.alog[,-c(1:2)] )
+# mat.scale <- scale(mat)
+# rownames(mat.scale) <- compdf.wide.bsts.did.absdiff.alog$heat.y
+# xdist <- dist(mat.scale)
+# xcl <- hclust(xdist)
+# ##
+# xdend <-as.dendrogram(xcl)
+# xdendord <- order.dendrogram(xdend)
+# compdf$heat.y.ord <- factor(x=compdf$heat.y,
+#                             levels=compdf.wide.stat$heat.y[ xdendord ], #xdendord
+#                             ordered = TRUE)
+# ##
+# txdist <- dist(t(mat.scale))
+# txcl <- hclust(txdist)
+# txdend <-as.dendrogram(txcl)
+# txdendord <- order.dendrogram(txdend)
+# compdf$heat.x.ord <- factor(x=compdf$heat.x,
+#                             levels=levels(factor(compdf$heat.x))[ txdendord ], #xdendord
+#                             ordered = TRUE)
+# # ##
+# # compdf$bsts.b3.diff.alog <- sapply(compdf$bsts.b3.diff, function(x) {
+# #   log(abs(x) + .01) * ifelse(x>0, 1, -1) 
+# # } )
+# ##
+# # hmout <- heatmap(mat.scale, keep.dendro = T)
+# # hmout
+# 
+# ##
+# p.bsts.heatmap <- ggplot(compdf, aes(y=heat.y.ord, x=heat.x.ord, fill= bsts.did.b3.absdiff.alog )) + 
+#   geom_tile() + 
+#   scale_x_discrete(labels = function(x) str_wrap(x, width = 70)) +
+#   ylab('Data Generating Process (DGP) Scenarios')  + xlab('BSTS State Space Configurations') + 
+#   scale_fill_gradient2() + theme_bw()
+# print(p.bsts.heatmap)
+# ggsave(filename='heatmap_statespace_gridsearch_hclust_ABS-DIFF__ggplot.png', width = 10, height = 10, units = 'in', dpi = 300)
+# 
+# library(RColorBrewer)
+# 
+# # par(mar=c(3,3,3,6))
+# png(filename = 'heatmap_hclust_statespace_gridsarch_ABS-DIFF__heatmap-func.png', width = 12, height = 10, units = 'in', res=300)
+# hdend <- heatmap(mat.scale,col= RColorBrewer::brewer.pal(11,'RdBu'), keep.dendro = T, margins=c(5,12))
+# dev.off()
+# 
+# 
+# ## COMPARE STATE SPACE CONFIGURATIONS
+# cSum <- colSums(mat.scale, na.rm = T)
+# cSd <- apply(mat.scale,1,function(x)sd(x,na.rm=T),simplify = T)
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_wrap( . ~ bsts.state.comps) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_bsts.png')
+# ### ALL separate densities
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=bsts.state.comps, fill=bsts.state.comps, line=bsts.state.comps)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_grid( effect.type ~ bsts.state.comps) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_ALL_DENSITIES_FACETGRID.png',
+#        width=20,height = 8,units = 'in',dpi = 500)
+# 
+# 
+# compdf$has.seasonality <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('trig',x,ignore.case = T,perl = T),'Season','No Season'), simplify = T)
+# compdf$has.level <- sapply(compdf$bsts.state.comps,function(x)ifelse(grepl('locallevel',x,ignore.case = T,perl = T),'Level','No Level'), simplify = T)
+# ggplot(compdf, aes(bsts.b3.diff.alog, colour=effect.type, fill=effect.type, line=effect.type)) + 
+#   geom_density(alpha=0.2,size=.6) + facet_grid(has.level  ~ has.seasonality) +
+#   geom_vline(xintercept=0, lty=2, size=.2) +
+#   theme_bw() + ggtitle('Robustness of Pointwise ATT Error to Dynamic Treatment Effect Shape')
+# ggsave(filename='statespace_gridsearch_compare_ABS-DIFF_ATT_error_by_dynamic_treatment_effect_shape_2x2_season_locallevel.png')
+# 
+# 
+# 
+# 
+# st.sp.perf <- compdf %>% 
+#   dplyr::group_by( bsts.state.comps,effect.type) %>%   ## effect.type
+#   dplyr::summarize(perf.sd=sd(bsts.did.b3.absdiff.alog,na.rm=T),
+#                    perf.mean=mean(bsts.did.b3.absdiff.alog,na.rm=T)) %>% 
+#   dplyr::arrange(perf.mean)
+# print(st.sp.perf, n=50)
+# plot(st.sp.perf$perf.sd, st.sp.perf$perf.mean)
+# # for (i in 3:ncol(compdf.wide.stat)) {
+# #   x <- compdf.wide.stat[,i] 
+# #   x[x<0] <- -1 * log( abs(x[x<0]) + .001)
+# #   x[x>0] <- log( x[x>0] + .001 )
+# #   compdf.wide.stat[,i] <- x
+# # }
 
 ## HEATMAP() FUNCTION
 # hdend <- heatmap(as.matrix(compdf.wide.stat[,-c(1:2)]), col=RColorBrewer::brewer.pal(11,'RdBu'), 
@@ -767,66 +1173,66 @@ ggplot(compdf, aes(factor(heat.x), factor(heat.y), fill= did.b3.diff)) +
 #   Colv=as.dendrogram(hclust(dist(t(as.matrix(dat)))))
 # )
 
-
-##=====================================
-##  Structural Changes
-##-------------------------------------
-# ## devtools::install_github("KevinKotze/tsm")
-# ## devtools::install_github("cran/fArma")
-# library(tsm)
-# library(fArma)
-library(strucchange)
-i <- 3
-simi <- simlist[[ i ]]
-simidfs <- simi$sim$df.summary
-par(mfrow=c(3,2))
-for (.effect.type in effect.types) {
-  for (.group in c('treatment','control')) {
-    y <- simidfs$med[simidfs$effect.type==.effect.type & simidfs$group==.group]
-    dat <- data.frame(cbind(y[-1], y[-(length(y))]))
-    colnames(dat) <- c("ylag0", "ylag1")
-    fs <- Fstats(ylag0 ~ ylag1, data = dat)
-    print( breakpoints(fs) ) # where the breakpoint is
-    print( sctest(fs, type = "supF") )  # the significance of this breakpoint
-    plot(fs, main=sprintf('%s %s',.group,.effect.type), ylim=c(0,100)); abline(v=(simi$intpd - 1)/simi$npds)
-  }
-}
-
-
-
-
-
-
-# ## Results comparison table
-# res.tbl <- cbind(bsts.res[ ,c('point.effect','point.effect.lower','point.effect.upper')],
-#                  did.res[ ,c('term','event.time','estimate','point.conf.low','point.conf.high')],
-#                  b3.treat=b3diff$treat,
-#                  b3.ctrl=b3diff$ctrl,
-#                  b3.att=b3diff$diff 
-# )
-# ## ROUND RESULTS TABLE (round numeric columns)
-# # res.tbl <- res.tbl[ ! is.na(res.tbl$estimate), ]
-# num.cols <- names(res.tbl)[ ! names(res.tbl) %in% c('term','event.time') ]
-# res.tbl[ , num.cols] <- round( as.numeric(res.tbl[ , num.cols]), 4)
-# # for (i in 1:length(num.cols)) {
-# #   res.tbl[ , num.cols[i] ] <- round( as.numeric( res.tbl[ , num.cols[i] ] ), 4)
-# # }
-# ## MOVE ID COLUMNS TO FRONT
-# .col.idx <- which(names(res.tbl) %in% c('term','event.time'))
-# res.tbl4 <- cbind(res.tbl[, .col.idx],  res.tbl[, -.col.idx] )
-# # View(res.tbl4)
-
-##PLOT INCLUSION PROBABILITIES
-# png(filename = sprintf('%s_BSTS_inclusion_probs_ss%s_%s_%s_%s.png',
+# 
+# ##=====================================
+# ##  Structural Changes
+# ##-------------------------------------
+# # ## devtools::install_github("KevinKotze/tsm")
+# # ## devtools::install_github("cran/fArma")
+# # library(tsm)
+# # library(fArma)
+# library(strucchange)
+# i <- 3
+# simi <- simlist[[ i ]]
+# simidfs <- simi$sim$df.summary
+# par(mfrow=c(3,2))
+# for (.effect.type in effect.types) {
+#   for (.group in c('treatment','control')) {
+#     y <- simidfs$med[simidfs$effect.type==.effect.type & simidfs$group==.group]
+#     dat <- data.frame(cbind(y[-1], y[-(length(y))]))
+#     colnames(dat) <- c("ylag0", "ylag1")
+#     fs <- Fstats(ylag0 ~ ylag1, data = dat)
+#     print( breakpoints(fs) ) # where the breakpoint is
+#     print( sctest(fs, type = "supF") )  # the significance of this breakpoint
+#     plot(fs, main=sprintf('%s %s',.group,.effect.type), ylim=c(0,100)); abline(v=(simi$intpd - 1)/simi$npds)
+#   }
+# }
+# 
+# 
+# 
+# 
+# 
+# 
+# # ## Results comparison table
+# # res.tbl <- cbind(bsts.res[ ,c('point.effect','point.effect.lower','point.effect.upper')],
+# #                  did.res[ ,c('term','event.time','estimate','point.conf.low','point.conf.high')],
+# #                  b3.treat=b3diff$treat,
+# #                  b3.ctrl=b3diff$ctrl,
+# #                  b3.att=b3diff$diff 
+# # )
+# # ## ROUND RESULTS TABLE (round numeric columns)
+# # # res.tbl <- res.tbl[ ! is.na(res.tbl$estimate), ]
+# # num.cols <- names(res.tbl)[ ! names(res.tbl) %in% c('term','event.time') ]
+# # res.tbl[ , num.cols] <- round( as.numeric(res.tbl[ , num.cols]), 4)
+# # # for (i in 1:length(num.cols)) {
+# # #   res.tbl[ , num.cols[i] ] <- round( as.numeric( res.tbl[ , num.cols[i] ] ), 4)
+# # # }
+# # ## MOVE ID COLUMNS TO FRONT
+# # .col.idx <- which(names(res.tbl) %in% c('term','event.time'))
+# # res.tbl4 <- cbind(res.tbl[, .col.idx],  res.tbl[, -.col.idx] )
+# # # View(res.tbl4)
+# 
+# ##PLOT INCLUSION PROBABILITIES
+# # png(filename = sprintf('%s_BSTS_inclusion_probs_ss%s_%s_%s_%s.png',
+# #                        prefix,h,key.strip,effect.type,sim.id))
+# # plot(impact_amount$model$bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
+# # dev.off()
+# 
+# ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
+# png(filename = sprintf('%s_BSTS_dynamic_treatment_effect_comparison_ss%s_%s_%s_%s.png',
 #                        prefix,h,key.strip,effect.type,sim.id))
-# plot(impact_amount$model$bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
-# dev.off()
-
-## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
-png(filename = sprintf('%s_BSTS_dynamic_treatment_effect_comparison_ss%s_%s_%s_%s.png',
-                       prefix,h,key.strip,effect.type,sim.id))
-res.tbl.filename <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
-                            key.strip, mean(res.tbl$b3.att[intpd:nrow(b3.att)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
+# res.tbl.filename <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
+#                             key.strip, mean(res.tbl$b3.att[intpd:nrow(b3.att)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
 # ################################
 # ### PRE DEBUG ###
 # ################################

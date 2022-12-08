@@ -22,6 +22,7 @@ library(ggpubr)
 library(Boom)
 library(BoomSpikeSlab)
 library(cowplot)
+library(forecast)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
@@ -36,7 +37,7 @@ setwd(dir_proj)
 ##==============================
 ##  file prefix for saving images, writing outputs, etc.
 ##-----------------------------
-prefix <- 'single-interv-st-sp-gs2-conf_'
+prefix <- 'bsts-illustration_'
 
 ##==============================
 ## Load simulation functions
@@ -55,6 +56,142 @@ source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding stat
 # save.items.dir=NA
 # bsts.niter=1000
 # ##----------
+
+###
+## POSTERIOR PREDICTIVE CHECKS
+###
+postPredChecks <- function(causimp, burn=NA, return.val=TRUE) {
+    
+  response <- causimp$series$response
+  y <- response
+  
+  npds <- length(y)
+  
+  intpd <-causimp$model$post.period[1]
+  
+  niter <- nrow(causimp$model$bsts.model$coefficients)
+  
+  if (is.na(burn)) {
+    burn <- round( niter * .2 )
+  }
+  
+  ## Newdata (post-intervention data) to predict via BSTS
+  newdata <- causimp$model$bsts.model$predictors[1:(intpd-1), ]
+  newdata <- cbind(response=response[1:(intpd-1)], newdata)
+  
+  # predict.mbsts()
+  post.pred <- predict.bsts(causimp$model$bsts.model, newdata = newdata , burn = burn)
+  post.pred.dist <- post.pred$distribution
+  post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
+  
+  ## before intervention period bool dummy
+  .ind <- (1:npds) < intpd
+  
+  par(mfrow=c(2,3), mar=c(2,2,2.5,1))
+  
+  ## DENSITIES
+  plot(density(y[.ind]),  main = "Density comparison, Y")
+  lines(density(post.pred.mean), lty=2, col='red')
+  legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
+  
+  ## HISTOGRAMS & BAYESIAN P-VALUES
+  # max.distrib <- apply(post.pred, c(2, 3), max)
+  max.distrib <- apply(post.pred$distribution, 1, max)
+  pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
+  hist(max.distrib, 30, col = "lightblue", border = "grey", 
+       main = paste0("Bayesian p-val (Max Y) = ", round(pvalue, 2)),
+       xlab = "Max. in-sample forecasts")
+  abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
+  
+  
+  # Residual plots
+  y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
+  # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+  res <-  y.rep - t(post.pred.dist)
+  std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
+  # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+  qqnorm(rowMeans(std.res), main = "Std.Residual QQ-plot, Y")
+  qqline(rowMeans(std.res))
+  Acf(rowMeans(std.res), main = "");title(main='Std.Residual ACF, Y')
+  
+  res.tr <- colMeans(std.res)
+  plot(res.tr, type='l', main='Std.Residual MCMC Trace, Y')
+  post.pred.tr <- colMeans(post.pred.dist)
+  plot(post.pred.tr, type='l', main='Posterior Predicted MCMC Trace, Y')
+  
+  if(return.val) {
+    return(list(
+      std.res=std.res, 
+      post.pred.mean=post.pred.mean
+    ))
+  }
+
+}
+
+
+###
+## GGPLOT OF DYNMAIC DID - MODIFIED FROM Callaway & Sant'Anna 2021
+###
+ggdid.mod <- function(object,
+                           ylim=NULL,
+                           xlab=NULL,
+                           ylab=NULL,
+                           title="",
+                           # xgap=NA,
+                           legend=TRUE,
+                           ref_line = 0,
+                           theming = FALSE,
+                           ...) {
+  
+  if ( !(object$type %in% c("dynamic","group","calendar")) ) {
+    stop(paste0("Plot method not available for this type of aggregation"))
+  }
+  
+  post.treat <- 1*(object$egt >= 0)
+  results <- cbind.data.frame(year=object$egt,
+                              att=object$att.egt,
+                              att.se=object$se.egt,
+                              post=as.factor(post.treat))
+  results <- rbind(results[1,], results)
+  results[1, c('att','att.se')] <- NA
+  results$year[1] <- min(results$year, na.rm = T) - 1
+  results$c <- ifelse(is.null(object$crit.val.egt), abs(qnorm(.025)), object$crit.val.egt)
+  
+  npds <- nrow(results)
+  # xgap <- ifelse(is.na(xgap), round(npds/4), xgap)
+  
+  if (title == "") {
+    # get title right depending on which aggregation
+    title <- ifelse(object$type=="group", "Average Effect by Group", ifelse(object$type=="dynamic", "Average Effect by Length of Exposure", "Average Effect by Time Period"))
+  }
+  
+  # p <- gplot(results, ylim, xlab, ylab, title, xgap, legend, ref_line, theming)
+  # 
+  # p
+  
+  p <- ggplot(results,
+              aes(x=as.numeric(year), y=att, ymin=(att-c*att.se),
+                  ymax=(att+c*att.se))) +
+    geom_point(colour='black', size=1.8) +
+    #geom_ribbon(aes(x=as.numeric(year)), alpha=0.2) +
+    geom_errorbar(colour='darkgray', width=0.3) +
+    scale_y_continuous(limits=ylim) +
+    #scale_x_discrete(breaks=dabreaks, labels=as.character(dabreaks)) +
+    # scale_x_continuous(breaks=as.numeric(dabreaks), labels=as.character(dabreaks)) +
+    # scale_color_manual(drop=FALSE, values=c("#e87d72","#56bcc2"), breaks = c(0, 1), labels = c('Pre','Post')) +
+    labs(x = xlab, y = ylab, title = title, color = NULL) +
+    # scale_color_manual(values = c('black','darkgray')) +
+    geom_vline(xintercept= -0.5, lty=2) +  ## -1 to align intervention time
+    geom_hline(yintercept = 0) +
+    ylab('ATT') + xlab('Event Time') +
+    theme_bw() +
+    theme(legend.position='none') +
+    ggtitle(' DiD: Average Effect by Length of Exposure')
+  
+  p
+}
+
+
 
 
 
@@ -106,9 +243,9 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       ## Dynamic treatment effect function parameters
       w0 = 2.0,  ## constant
       w1 = 0.18,  ## linear
-      w2 = -0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
+      w2 = -.1 / sqrt(sim$npds) ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
       ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
-      w2.shift = -round(.07*sim$npds),  ## optimal value here is likely a function of the combination of treatment effect function parameters
+      w2.shift = -round( sqrt(sim$npds) ),  ## optimal value here is likely a function of the combination of treatment effect function parameters
       ##
       nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 
       season.frequency = ifelse(is.null(sim$dgp.freq), NA, sim$dgp.freq),
@@ -138,7 +275,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 ######################################
 runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                     effect.types=c('constant','quadratic','geometric'), 
-                                    sim.id=round(10*as.numeric(Sys.time())),
+                                    sim.id=NA,
                                     save.items.dir=NA, ## save updated simlist items to seprate RDS files
                                     bsts.niter=1e3
                                     ) {
@@ -148,6 +285,14 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
   if (length(simlist) > 0 & length(names(simlist))==0) {
     names(simlist) <- 1:length(simlist)
   }
+  
+  ## Simulation ID
+  if (is.na(sim.id)) {
+    sim.id <- simlist[[1]]$sim$id
+    if (is.null(sim.id) | is.na(sim.id)) {
+      sim.id <- round(10*as.numeric(Sys.time()))
+    } 
+  } 
 
   ## IF save simlist items is NA, then save images to work_dir
   ## else save images to save.items.fir
@@ -227,13 +372,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       agg.es <- aggte(ccattgt, type = "dynamic")
       # summary(agg.es)
       # tidy(agg.es)
-      p.agg.es <- ggdid(agg.es) + 
-        scale_color_manual(values = c('black','darkgray')) +
-        geom_vline(xintercept= 0, lty=2) +  ## -1 to align intervention time
-        ylab('ATT') +
-        theme_bw() +
-        theme(legend.position='none') +
-        ggtitle(' DiD: Average Effect by Length of Exposure')
+      ## PLOT DID DYNAMIC EFFECT
+      p.agg.es <- ggdid.mod(agg.es) 
       ggsave(filename = file.path(save.img.dir,
                                   sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
                                           prefix,h,key.strip,effect.type,sim.id))
@@ -279,11 +419,27 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         dplyr::summarize(
           n_in_pd = n(),
           actors = paste(unique(actor), collapse = '|'),
-          y_mean = mean(y, na.rm=T),
+          y_outcome = mean(y, na.rm=T),
           y_sum = sum(y, na.rm=T),
           y_sd = sd(y, na.rm=T),
           y_min = min(y, na.rm=T),
           y_max = max(y, na.rm=T),
+          # ##
+          # x1_sum = sum(x1, na.rm=T),
+          # x2_sum = sum(x2, na.rm=T),
+          # x3_sum = sum(x3, na.rm=T),
+          # ##
+          # c1_sum = sum(c1, na.rm=T),
+          # c2_sum = sum(c2, na.rm=T),
+          # c3_sum = sum(c3, na.rm=T),
+          # #
+          # b1_sum = sum(b1, na.rm=T),
+          # b2_sum = sum(b2, na.rm=T),
+          # b3_sum = sum(b3, na.rm=T),
+          # #
+          # u_sum = sum(u, na.rm=T),
+          # v_sum = sum(v, na.rm=T),
+          ##
           x1_mean = mean(x1, na.rm=T),
           x2_mean = mean(x2, na.rm=T),
           x3_mean = mean(x3, na.rm=T),
@@ -302,7 +458,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       tsdf$.id <- 1:nrow(tsdf)
       
       ## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
-      val.cols <- c('y_mean','y_sum','y_min','y_max','y_sd',
+      val.cols <- c('y_outcome','y_sum','y_min','y_max','y_sd',
                     'x1_mean','x2_mean','x3_mean',
                     'c1_mean','c2_mean','c3_mean',
                     'b1_mean','b2_mean','b3_mean',
@@ -337,17 +493,17 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      dat <- tsdfw[,c('treatment_y_sum','control_y_sum','control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
+      dat <- tsdfw[,c('treatment_y_outcome','control_y_outcome','control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
                       'control_c1_mean','control_c2_mean','control_c3_mean'#,
                       # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
                       # 'control_u_mean','control_v_mean'
       )]
       ## Train on y pre-treatment but NA's post-treatment
-      y.pre.treat.NAs.post.treat <- c(dat$treatment_y_mean[1:(intpd-1)], rep(NA,npds-intpd+1))
+      y.pre.treat.NAs.post.treat <- c(dat$treatment_y_outcome[1:(intpd-1)], rep(NA,npds-intpd+1))
       ## Then use the post-treatment response for causal impact estimation
-      post.period.response <- dat$treatment_y_mean[intpd:npds]
+      post.period.response <- dat$treatment_y_outcome[intpd:npds]
       ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
-      predictors <- dat[, ! names(dat) %in% 'treatment_y_mean'] ## remove response; convert to matrix
+      predictors <- dat[, ! names(dat) %in% 'treatment_y_outcome'] ## remove response; convert to matrix
       # ## Covariates (predictors) - Dataframe for "data" argument
       # predictors <- as.matrix(predictors) 
       
@@ -392,7 +548,20 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
                    # prior.inclusion.probabilities = NULL,
                    sigma.upper.limit = Inf
                  )
-              } 
+              # }  else if (state.conf.item$name=='AddAutoAr') {
+              #   .lags <- 3
+              #   state.conf$prior <- SpikeSlabArPrior(
+              #     lags = .lags,
+              #     prior.inclusion.probabilities = GeometricSequence(length= .lags, initial.value= 0.9, discount.factor= 0.3),
+              #     prior.mean = rep(0, .lags),
+              #     prior.sd = GeometricSequence(length = .lags, initial.value=0.5, discount.factor=0.1),
+              #     sdy=.5,
+              #     prior.df = 1,
+              #     expected.r2 = .5,
+              #     sigma.upper.limit = Inf,
+              #     truncate = TRUE
+              #   )
+              }
               ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
               st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
                                                                 y.pre.treat.NAs.post.treat,  
@@ -455,6 +624,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         impact_amount <- CausalImpact(bsts.model=bsts.model,
                                       post.period.response = post.period.response,
                                       alpha=0.05, model.args = list(niter = bsts.niter))
+        ## POSTERIOR PREDICTIVE CHECKS
+        postPredChecks(impact_amount)
         # ##
         # summary(impact_amount)
         # summary(impact_amount$model$bsts.model)
@@ -470,9 +641,14 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         )
         # dev.off()
         
-        
-        bsts.res <- impact_amount$series
+        ## DID
         did.res <- tidy(agg.es)
+        ## BSTS
+        bsts.res <- impact_amount$series
+        # .nidx <- which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper'))
+        bsts.res <- bsts.res[ , which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper')) ]
+        names(bsts.res) <- c('bsts.point.effect','bsts.point.effect.lower','bsts.point.effect.upper')
+        
         # plot(did.res)
         
         # ## AVERAGE TREATMENT EFFECT USED IN SIMULATION
@@ -500,13 +676,18 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## time df add empty row at top of event time columns
         time.df <- did.res[ ,c('term','event.time')]
-        time.df <- rbind(time.df,time.df[nrow(time.df),])
-        time.df[nrow(time.df),] <- NA
+        # time.df <- rbind(time.df,time.df[nrow(time.df),])
+        # time.df[nrow(time.df),] <- NA
+        ## add placeholder row at top and set to NAs
+        time.df <- rbind(time.df[1,], time.df)
+        time.df[1,] <- NA
+        time.df$event.time[1] <-  min(time.df$event.time, na.rm = T) - 1
         
         # ## *** FIX MISALIGNED INTERVENTION TIME INDEX BETWEEN DID & BSTS
         # ##     - add empty row on top of DiD (which indexed treatment at t=0) so now treatment is t=1
         # ##       which matches BSTS (treatment at t=1)
         did.res.adj <- did.res[ ,c('estimate','point.conf.low','point.conf.high')]
+        names(did.res.adj) <- c('did.estimate','did.point.conf.low','did.point.conf.high')
         .na.row <- did.res.adj[1, ]
         .na.row[1:nrow(.na.row), ] <- NA
         did.res.adj <- rbind(.na.row, did.res.adj)
@@ -517,7 +698,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         ## Results comparison table
         res.tbl <- cbind(
           time.df,
-          bsts.res[ ,c('point.effect','point.effect.lower','point.effect.upper')],
+          bsts.res,
           did.res.adj,
           b3.treat=b3diff$treat,
           b3.ctrl=b3diff$ctrl,
@@ -545,16 +726,17 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
         dyndf <- rbind(
-          data.frame(event.time=res.tbl$event.time, series='1.BSTS', ATT=res.tbl$point.effect),
-          data.frame(event.time=res.tbl$event.time, series='2.DiD', ATT=res.tbl$estimate),
+          data.frame(event.time=res.tbl$event.time, series='1.BSTS', ATT=res.tbl$bsts.point.effect),
+          data.frame(event.time=res.tbl$event.time, series='2.DiD', ATT=res.tbl$did.estimate),
           data.frame(event.time=res.tbl$event.time, series='3.DGP', ATT=res.tbl$b3.att)
         )
         hue2 <- hue_pal()(2)
         p.err1 <- ggplot(dyndf, aes(x=event.time, y=ATT, color=series,fill=series,linetype=series,shape=series)) + 
-          geom_line(na.rm=T, size=.9) + geom_point(na.rm=T, size=1.9) +
+          geom_line(na.rm=T, size=.9) + geom_point(na.rm=T, size=2) +
           theme_bw() + xlab('Event Time') + 
           ggtitle(sprintf('Mean of Pointwise ATT Estimates: BSTS = %.3f; DiD = %.3f; DGP = %.3f',att.bsts,att.did,att.b3)) + 
-          geom_vline(xintercept=0, linetype='dotted')+
+          geom_vline(xintercept=-0.5, linetype='dotted')+
+          geom_hline(yintercept = 0) +
           scale_color_manual(values=c(hue2[1],hue2[2],'black')) + 
           scale_shape_manual(values=c(17,19,NA)) +
           scale_linetype_manual(values=c(2,3,1))  + 
@@ -573,8 +755,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
         errdf <- rbind(
-          data.frame(method='BSTS', error=(res.tbl$point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])),
-          data.frame(method='DiD', error=(res.tbl$estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]))
+          data.frame(method='BSTS', error=(res.tbl$bsts.point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])),
+          data.frame(method='DiD', error=(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]))
         )
         vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
         p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
@@ -595,8 +777,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         
         ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
         errdf <- rbind(
-          data.frame(method='BSTS', error=(res.tbl$point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
-          data.frame(method='DiD', error=(res.tbl$estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
+          data.frame(method='BSTS', error=(res.tbl$bsts.point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
+          data.frame(method='DiD', error=(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
         )
         vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
         p.err3 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
@@ -604,7 +786,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           geom_vline(xintercept=0, linetype='dotted')+
           geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1) +
           # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
-          ggtitle(sprintf('Post-Intervention Pointwise ATT Error:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
+          ggtitle(sprintf('Post-Intervention ATT Bias:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
                           mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
                           mean(errdf$error[errdf$method=='DiD'],na.rm=T),
                           sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
@@ -639,7 +821,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           geom_line(size=1.05, alpha=0.2) +
           # geom_point(, color=rgb(0.2, 0.2, 0.8, 0.1))+
           geom_hline(yintercept=0)  + # facet_grid( effect.type ~ . ) +
-          geom_vline(xintercept=intpd, linetype='dotted')+
+          geom_vline(xintercept= (intpd - 0.5), linetype='dotted')+
           scale_color_manual(values = c(rgb(.2,.2,.8,.3), rgb(.8,.2,.2,.3))) +
           theme_bw() + theme(legend.position='bottom') #+ ggtitle(plot.main) #+
         # guides(color=guide_legend(nrow=3,byrow=TRUE)) #+
@@ -648,7 +830,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         # ## GROUP SUMMARY TIME SERIES
         bsts.wide <- as.data.frame(impact_amount$series)
         bsts.wide$t <- 1:nrow(bsts.wide)
-        bsts.wide$t0 <- bsts.wide$t - (intpd-1)
+        bsts.wide$t0 <- bsts.wide$t - intpd 
         # bsts.long <- gather(bsts.wide, point, val, point.effect:point.effect.upper, factor_key = T)
         # ##
         # print(bsts.long)
@@ -662,7 +844,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           geom_ribbon(aes(ymin=point.effect.lower,ymax=point.effect.upper), alpha=.25, size=.01, lty=1) +
           geom_line(size=1.1, lty=1) +
           # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
-          geom_hline(yintercept=0) + geom_vline(xintercept=0, lty=2) +
+          geom_hline(yintercept=0) + geom_vline(xintercept=-0.5, lty=2) +
           ylab('ATT') +  xlab('Event Time') + # facet_grid( effect.type ~ . ) +
           theme_bw() + #theme(legend.position='bottom') + 
           ggtitle('BSTS CausalImpact: Pointwise Effect By Length of Exposure')
@@ -725,254 +907,10 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
 }
 
 
-# ##
-# ## Helper function for checking if an AddTrig bsts component is in list
-# ##
-# hasTrig <- function(list.of.state.comps) {
-#   for (i in 1:length(list.of.state.comps)) {
-#     state.comp <- list.of.state.comps[[i]]
-#     # print(i)
-#     # print(state.comp)
-#     if (class(state.comp) == 'list') {
-#       # print('class == list')
-#       if ('name' %in% names(state.comp) ) {
-#         # print('name in names')
-#         if (state.comp$name == 'AddTrig') 
-#           return(TRUE)
-#       }
-#     }
-#   }
-#   return(FALSE)
-# }
-
-# ##
-# ## Get list element of specs for an AddTrig() bsts state component
-# ##  from a list of bsts state components 
-# ##
-# getTrigComp <- function(state.conf.list) {
-#   if (length(state.conf.list)==0) {
-#     return(list())
-#   }
-#   if(length(names(state.conf.list))==0) {
-#     names(state.conf.list) <- 1:length(state.conf.list)
-#   }
-#   if (class(state.conf.list)=='list') {
-#     hasName <- ifelse(is.null(state.conf.list$name), FALSE, TRUE)
-#     isTrig <- ifelse(hasName, state.conf.list$name == 'AddTrig', FALSE)
-#     if (hasName & isTrig) {
-#       ## this list is the trig component
-#       return(state.conf.list)
-#     } else {
-#       ## list of state components to locate trig component
-#       for (i in 1:length(state.conf.list)) {
-#         compi <- state.conf.list[[ i ]]
-#         if (length(compi)>0) {
-#           if (class(compi)=='list') {
-#             if (length(names(compi))>0 & 'name' %in% names(compi) & compi$name=='AddTrig') {
-#               return(compi)
-#             }
-#           }
-#         }
-#       }
-#     }
-#   }
-#   return(list())
-# }
-
-
 ################################################################################################################
 ################################################################################################################
 
 
-
-
-# ##================================
-# ##
-# ## MAIN SIMULATION COMPARISON RUN
-# ##
-# ##_-------------------------------
-# # sim.id <- round(10*as.numeric(Sys.time()))
-# simlist <- runSimBstsDiDComparison(simlist, n, npds, intpd, effect.types, plot.show = T, plot.save = T)
-# 
-# ## Save simulation list as serialized data file
-# simlist.file <- sprintf('%s_SIMLIST_selection_%s_%s.rds',
-#                         prefix, length(simlist), simlist$`1a`$sim$id)
-# saveRDS(simlist, file = file.path(dir_proj, simlist.file))
-
-
-
-# ###############################################
-# ##
-# ## GRIDSEARCH OVER MAIN DIMENSIONS
-# ##   OF SIMULATION / DGP
-# ##
-# ###############################################
-# 
-# ##
-# npds <- 100
-# actor.sizes <- c(100)
-# intpds <- round( c(npds*2/3) )   ### round(c(3*npds/4, npds/2, npds/4))
-# ##
-# noise.levels <- c(1.0, 0.5)
-# ##
-# treat.rules <- c('random', 'below.benchmark')
-# ##
-# autocors <- c(0, .2)
-# ##
-# bsts.nseasons <- c(12, 7) ## correct, incorrect [for DGP_nseasons = 12]
-# seasonalities <- c(FALSE, TRUE)
-# linear.trends <- c(0, .05)
-# ##
-# treat.thresholds <- c(.5, .25)
-# 
-# # g = h = i = ii = j = k = l = m = n = p = 1
-# 
-# ##==================================
-# ## SIMULATION CONFIGURATION BUILDER LOOP
-# ##----------------------------------
-# simlist <- list()
-# # for (l in 1:length(bsts.nseasons)) {
-# #   bsts.nseason <- bsts.nseasons[l]
-# for (j in 1:length(intpds)) {
-#   intpd <- intpds[j]
-#     
-#   for (g in 1:length(actor.sizes)) {
-#     actor.size <- actor.sizes[g]
-#     
-#     for (h in 1:length(noise.levels)) {
-#       noise.level <- noise.levels[h]
-#       
-#       for (k in 1:length(autocors)) {
-#         autocor <- autocors[k]
-#         
-#         for (i in 1:length(treat.rules)) {
-#           treat.rule <- treat.rules[i]
-#           
-#           for (ii in 1:length(treat.thresholds)) {
-#             treat.threshold <- treat.thresholds[ii]
-#               
-#             ##
-#             
-#               for (m in 1:length(seasonalities)) {
-#                 seasonality <- seasonalities[m]
-#                 
-#                 for (n in 1:length(linear.trends)) {
-#                   linear.trend <- linear.trends[n]
-#                   
-# 
-#                   
-#                   key <- sprintf('j%s|g%s|h%s|k%s|i%s|ii%s|m%s|n%s',
-#                                  j,g,h,k,i,ii,m,n)
-#                   cat(sprintf('\n%s\n',key))
-#                   
-#                   ## Skip if 'random' treat.rule and treat.threshold index ii > 0
-#                   ##   (random treat.rule already in simlist; no need to replicate bc treat.threshold not used)
-#                   if (treat.rule=='random' & ii>1) {
-#                     cat(sprintf(' skipping redundant config for treat.rule=random, ii=%s\n',ii))
-#                     next
-#                   }
-#                   
-#                   ## Append simulation configuration to simlist
-#                   simlist[[key]] <- list(
-#                     n = actor.size,    ## Number of firms
-#                     npds = 100,  ## Number of periods
-#                     intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-#                     ##
-#                     noise.level = noise.level, ## stdev of simulated noise terms
-#                     ##
-#                     treat.rule = treat.rule, 
-#                     treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-#                     treat.threshold = ifelse(treat.rule=='random', 1, treat.threshold),
-#                     b4 = 1,   ## seasonal component weight
-#                     b5 = linear.trend, ##
-#                     b9 = autocor  , ## autocorrelation
-#                     dgp.nseasons= ifelse(seasonality,  12,  NA), 
-#                     dgp.freq= ifelse(seasonality,  1,  NA),
-#                     bsts.state.specs=state.configs.list,
-#                     # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-#                     rand.seed = 54321
-#                   )
-# 
-#                   # .debug.sim <- runSimBstsDiDComparison(simlist, plot.show = T, plot.save = T)
-#                   # stop('DEBUG STOP')
-#                     
-#                     
-#                   
-#                 }
-#                 
-#               }
-#       
-#             
-#           }
-#           
-#         }
-#         
-#       }
-#       
-#     }
-#     
-#   }
-#   
-# }
-# 
-# # }
-# 
-# # simlist.files <- runSimUpdateCompareBstsDiD(simlist)  ## D:\\BSTS_external
-# 
-# 
-# ##########################################
-# # ##_-------------------------------
-# # ## Save Main Sim Grid Search Run -- ***SLOW***
-# # ##_-------------------------------
-# ###########################################
-# # sim.id <- round(10*as.numeric(Sys.time()))
-# 
-# ## Generate simulated data for each scenario in simlist
-# simlist <- runSimUpdateSimlist(simlist, plot.show = F, plot.save = F )
-# 
-# ## Run BSTS model versions and compare against DiD estimates
-# ## local.storage=True write each sim to file; returns list of output file paths
-# simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
-
-
-
-# ## Save simulation list as serialized data file
-# simlist.file <- sprintf('%s_SIMLIST_GRIDSEARCH_%s_%s.rds',
-#                         prefix, length(simlist), simlist[[1]]$sim$id)
-# saveRDS(simlist, file = file.path(dir_proj, simlist.file))
-
-
-
-# simlist[[key]] <- list(
-#   n = actor.size,    ## Number of firms
-#   npds = 100,  ## Number of periods
-#   intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-#   ##
-#   noise.level = noise.level, ## stdev of simulated noise terms
-#   ##
-#   treat.rule = treat.rule, 
-#   treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-#   treat.threshold = ifelse(treat.rule=='random', 1, treat.threshold),
-#   b4 = 1,   ## seasonal component weight
-#   b5 = linear.trend, ##
-#   b9 = autocor  , ## autocorrelation
-#   dgp.nseasons= ifelse(states.have.trig, state.conf$dgp.neasons, NA), 
-#   freq= ifelse(states.have.trig, state.conf$freq, NA),
-#   bsts.state.specs=state.conf, 
-#   rand.seed = 54321,
-# )
-
-
-
-# key
-# state.configs.list <- list(
-#   list(
-#     AddSemilocalLinearTrend
-#   ),
-#   list(
-#     AddAutoAr
-#   )
-# )
 
 
 
@@ -984,9 +922,10 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
 ##
 ##=======================================
 
+
 ## Static Defaults
 n <- 100
-npds <- 100
+npds <- 30 #100
 intpd <- round( npds * 2/3 )
 noise.level <- 1.2
 # treat.rule <- 'random' # 'below.benchmark' ## 'random'
@@ -996,92 +935,48 @@ b4 <- 1
 b5 <- 0.04
 dgp.nseasons= 12
 dgp.freq= 1
-
-
-
 ## Scenarios
 # lags = list(c(1),c(2),c(3)) 
-lags <- list( c(1) ) ##list(NULL)
-
-
+# lags <- list( c(1) ) ##list(NULL)
 ## 
-treat.rules <- c('random','below.benchmark')
-seasonalities <- c(TRUE, FALSE)
-prior.sd.scenarios <- c('sd.low', 'sd.high')
-# sigma.priors <- list(NULL)
-# sigma.priors = list(
-#   SdPrior(0.5, sample.size = .01, initial.value = 0.5, fixed = FALSE, upper.limit = Inf), 
-#   SdPrior(1.9, sample.size = .1, initial.value = 1.0, fixed = FALSE, upper.limit = Inf)
-# ) ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
-# initial.state.prior.ms <-list(NULL) ##list(c(0.3, 0.3), c(0.9, 0.9))
-# initial.state.prior.vs <-list(NULL)  ##list(matrix(c(0.5,0.1, 0.1,0.5), nrow = 2, byrow=TRUE),
-                             # matrix(c(0.9,0.3, 0.3,0.9), nrow = 2, byrow=TRUE) ) ## or use a Boom::MvnPrior(mean, variance)
-# sdy = NULL
-# st.sp.autoar.lists <- list(
-#   ## ## LEVEL
-#   `1`=c('AddLocalLevel'),
-#   ## ## TREND
-#   `2`=c('AddLocalLinearTrend'),
-#   `3`=c('AddStudentLocalLinearTrend'),
-#   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-#   `4`=c('AddSemilocalLinearTrend'),
-#   ## ## SEASONAL
-#   `5`=c('AddTrig'),
-#   ## ## AUTOCORRELATION
-#   # list('AddAr'),
-#   `6`=c('AddAutoAr'),
-#   ##------ COMBINATIONS --------------
-#   ## AR & SEASONALITY
-#   `7`=c('AddTrig','AddAutoAr'),
-#   ## LEVEL + ...
-#   `8`=c('AddLocalLevel','AddTrig'),
-#   `9`=c('AddLocalLevel','AddAutoAr'),
-#   `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-#   ## (LEVEL + SLOPE) + ...
-#   `12`=c('AddLocalLinearTrend','AddTrig'),
-#   `13`=c('AddLocalLinearTrend','AddAutoAr'),
-#   `14`=c('AddLocalLinearTrend','AddTrig','AddAutoAr'),
-#   `15`=c('AddStudentLocalLinearTrend','AddTrig'),
-#   `16`=c('AddStudentLocalLinearTrend','AddAutoAr'),
-#   `17`=c('AddStudentLocalLinearTrend','AddTrig','AddAutoAr'),
-#   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-#   `18`=c('AddTrig','AddSemilocalLinearTrend')#,
-# )
+treat.rules <- c('random')  ## 'below.benchmark'
+seasonalities <- c(TRUE)   ## c(TRUE,  FALSE )
+prior.sd.scenarios <- c('sd.low','sd.high')  ## sd.low
 ## 
 st.sp.lists <- list(
   ## ## LEVEL
-  `1`=c('AddLocalLevel'),
+  `1`=c('AddLocalLevel')#,
   ## ## TREND
-  `2`=c('AddLocalLinearTrend'),
-  `3`=c('AddStudentLocalLinearTrend'),
+  # `2`=c('AddLocalLinearTrend')#,
+  # `3`=c('AddStudentLocalLinearTrend')#,
   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  `4`=c('AddSemilocalLinearTrend'),
+  # `4`=c('AddSemilocalLinearTrend')#,
   ## ## SEASONAL
-  `5`=c('AddTrig'),
+  # `5`=c('AddTrig')#,
   ## ## AUTOCORRELATION
   # list('AddAr'),
-  `6`=c('AddAr'),
+  # `6`=c('AddAr')#,
   ##------ COMBINATIONS --------------
   ## AR & SEASONALITY
-  `7`=c('AddTrig','AddAr'),
+  # `7`=c('AddTrig','AddAr')#,
   ## LEVEL + ...
-  `8`=c('AddLocalLevel','AddTrig'),
-  `9`=c('AddLocalLevel','AddAr'),
-  `10`=c('AddLocalLevel','AddTrig','AddAr'),
-  ## (LEVEL + SLOPE) + ...
-  `11`=c('AddLocalLinearTrend','AddTrig'),
-  `12`=c('AddLocalLinearTrend','AddAr'),
-  # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
-  `13`=c('AddStudentLocalLinearTrend','AddTrig'),
-  `14`=c('AddStudentLocalLinearTrend','AddAr'),
-  # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
+  # `8`=c('AddLocalLevel','AddTrig')#,
+  # `9`=c('AddLocalLevel','AddAr'),
+  # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
+  # ## (LEVEL + SLOPE) + ...
+  # `11`=c('AddLocalLinearTrend','AddTrig'),
+  # `12`=c('AddLocalLinearTrend','AddAr'),
+  # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
+  # `13`=c('AddStudentLocalLinearTrend','AddTrig'),
+  # `14`=c('AddStudentLocalLinearTrend','AddAr'),
+  # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `15`=c('AddTrig','AddSemilocalLinearTrend')#,
+  # `15`=c('AddTrig','AddSemilocalLinearTrend')#,
 )
 
 
 ## FOCAL CONSTRUCT
-dgp.ars <- list(0,.1,.2,.4)  ## 0.6
+dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ##
 simlist <- list()
 ## AUTOCORRELATION VALUES
@@ -1154,12 +1049,127 @@ for (g in 1:length(dgp.ars)) {
   
 } ## // end ARs loop
 
+effect.types = c('quadratic')
 
-simlist <- runSimUpdateSimlist(simlist, plot.show = TRUE, plot.save = FALSE )
+simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+                               plot.show = FALSE, plot.save = FALSE )
 
 
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, save.items.dir= dir_ext)  ## D:\\BSTS_external
+simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=200)  ## D:\\BSTS_external
 
+key <- sprintf('g%sh%si%sj%s', 1,1,1,1)
+simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
+
+simx$compare$did$quadratic$attgt$Wpval
+
+
+
+
+pp <- postPredChecks(simx$compare$bsts$quadratic[[1]]$CausalImpact)
+std.res <- pp$std.res
+
+qqnorm(rowMeans(std.res), main = "Std.Residual QQ-plot, Y")
+qqline(rowMeans(std.res))
+Acf(rowMeans(std.res), main = "");title(main='Std.Residual ACF, Y')
+
+
+causimp <- simx$compare$bsts$quadratic[[1]]$CausalImpact
+p.posterior <- causimp$summary$p[1]
+
+hist(causimp$model$bsts.model$sigma.obs)
+
+causimp$model$bsts.model$one.step.prediction.errors
+
+predictors <- causimp$model$bsts.model$predictors
+
+response <- causimp$series$response
+y <- response
+
+niter <- nrow(causimp$model$bsts.model$coefficients)
+burn <- round( niter * .2 )
+
+## Newdata (post-intervention data) to predict via BSTS
+newdata <- causimp$model$bsts.model$predictors[1:(intpd-1), ]
+newdata <- cbind(response=response[1:(intpd-1)], newdata)
+
+# predict.mbsts()
+post.pred <- predict.bsts(causimp$model$bsts.model, newdata = newdata , burn = burn)
+post.pred.dist <- post.pred$distribution
+post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
+
+## before intervention period bool dummy
+.ind <- (1:npds) < intpd
+
+par(mfrow=c(2,2), mar=c(2,2,2.5,1))
+
+## DENSITIES
+plot(density(y[.ind]),  main = "Density comparison, Y")
+lines(density(post.pred.mean), col='blue')
+
+## HISTOGRAMS & BAYESIAN P-VALUES
+# max.distrib <- apply(post.pred, c(2, 3), max)
+max.distrib <- apply(post.pred$distribution, 1, max)
+pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
+hist(max.distrib, 30, col = "lightblue", border = "grey", 
+     main = paste0("Bayesian p-val (Max Y) = ", round(pvalue, 2)),
+     xlab = "Max. in-sample forecasts")
+abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
+
+
+# Residual plots
+y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
+# res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+res <-  y.rep - t(post.pred.dist)
+std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
+# std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+qqnorm(rowMeans(std.res), main = "Std.Residual QQ-plot, Y")
+qqline(rowMeans(std.res))
+Acf(rowMeans(std.res), main = "");title(main='Std.Residual ACF, Y')
+
+# par(mfrow=c(2,2))
+# for (i in 1:4) hist(pred$distribution[,i])
+
+
+#########################################
+## Posterior Predictive Checks
+########################################
+
+
+
+
+plotChecks <- function(CausalMBSTS, int.date) {
+  dates <- CausalMBSTS$dates
+  ind <- dates < int.date
+  y <- CausalMBSTS$y
+  post.pred <- CausalMBSTS$predict$post.pred.0
+  post.pred.mean <- apply(post.pred, c(1, 2), mean)
+  
+  for (i in 1:dim(y)[2]) {
+    # Density of posterior mean vs density of the data before intervention
+    plot(density(y[ind, i]), xlab = "", ylab = "",
+         main = paste0("Density comparison, Y", i))
+    lines(density(post.pred.mean[, i]), col = "blue")
+    
+    # Histograms & Bayesian p-value
+    max.distrib <- apply(post.pred, c(2, 3), max)
+    pvalue <- sum(max.distrib[i, ] >= max(y[ind, i]))/ncol(max.distrib)
+    hist(max.distrib[i, ], 30, col = "lightblue", border = "grey", main = paste0("Bayesian p-value = ",
+                                                                                 round(pvalue, 2), ", Y", i), xlab = "Max. in-sample forecasts")
+    abline(v = max(y[ind, i]), col = "darkblue", lwd = 3)
+    
+    # Residual plots
+    y.rep <- matrix(y[ind, i], nrow(y[ind, ]), (CausalMBSTS$mcmc$niter - CausalMBSTS$mcmc$burn),
+                    byrow = FALSE)
+    res <- (y.rep - (post.pred[, i, ] - CausalMBSTS$mcmc$eps.samples[, i, ]))
+    std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+    qqnorm(rowMeans(std.res), main = paste0("Residual QQ-plot, Y", i))
+    qqline(rowMeans(std.res))
+    Acf(rowMeans(std.res), main = paste0("Residual ACF, Y", i))
+  }
+}
 
 
 

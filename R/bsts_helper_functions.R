@@ -421,6 +421,8 @@ getStateSpaceConfBySimScenario <- function(name, scenario, ## c('sd.high','sd.lo
   args <- list(...)
   
   ## Default params
+  # lags.hi <- 3
+  # lags.lo <- 1
   lags.hi <- 3
   lags.lo <- 1
   ## Prior SD
@@ -431,7 +433,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario, ## c('sd.high','sd.lo
   sig.init.val.lo <- .01
   ## Mean of prior distributions
   mu.hi <- .01
-  mu.lo <- 0
+  mu.lo <- .001
   ## Autoregressive component
   ar.mu.hi <- .1
   ar.mu.lo <- .01
@@ -455,7 +457,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario, ## c('sd.high','sd.lo
   expected.r2.lo <- .1
   ## Latent factors (e.g., AddSharedLocalLevel() )
   n.latent.factors.hi <- 3
-  n.latent.factors.lo <- 2
+  n.latent.factors.lo <- 1
   ## SpikeSlabPrior
   diag.shrinkage.hi <- .5
   diag.shrinkage.lo <- 0 ## set=0 --> gives Zellner's G-prior @see spike.slab.prior {BoomSpikeSlab}
