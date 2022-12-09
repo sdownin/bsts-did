@@ -58,6 +58,57 @@ source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding stat
 # bsts.niter=1000
 # ##----------
 
+##
+#
+##
+heidel.diag.mod <- function (x, eps = 0.1, pvalue=0.05) 
+{
+  if (is.mcmc.list(x))
+    return(lapply(x, heidel.diag.mod, eps))
+  x <- as.mcmc(as.matrix(x))
+  HW.mat0 <- matrix(0, ncol = 7, nrow = nvar(x))
+  dimnames(HW.mat0) <- list(varnames(x),
+                            c("stest", "start", "CMV.stat", "pvalue", "htest",
+                              "mean", "halfwidth"))
+  HW.mat <- HW.mat0
+  for (j in 1:nvar(x)) {
+    start.vec <- seq(from=start(x), to = end(x)/2, by=niter(x)/10)
+    Y <- x[, j, drop = TRUE]    
+    n1 <- length(Y)
+    ## Schruben's test for convergence, applied sequentially
+    ##
+    S0 <- spectrum0.ar(window(Y, start=end(Y)/2))$spec
+    converged <- FALSE
+    for (i in seq(along = start.vec)) {
+      Y <- window(Y, start = start.vec[i])
+      n <- niter(Y)
+      ybar <- mean(Y)
+      B <- cumsum(Y) - ybar * (1:n)
+      Bsq <- (B * B)/(n * S0)
+      I <- sum(Bsq)/n
+      if(converged <- !is.na(I) && pcramer(I) < 1 - pvalue)
+        break
+    }
+    ## Recalculate S0 using section of chain that passed convergence test
+    S0ci <- spectrum0.ar(Y)$spec
+    halfwidth <- 1.96 * sqrt(S0ci/n)
+    passed.hw <- !is.na(halfwidth) & (abs(halfwidth/ybar) <= eps)
+    if (!converged || is.na(I) || is.na(halfwidth)) {
+      nstart <- NA
+      passed.hw <- NA
+      halfwidth <- NA
+      ybar <- NA
+    }
+    else {
+      nstart <- start(Y)
+    }
+    HW.mat[j, ] <- c(converged, nstart, I, 1 - pcramer(I), 
+                     passed.hw, ybar, halfwidth)
+  }
+  # class(HW.mat) <- "heidel.diag"
+  return(HW.mat)
+}
+
 ###
 ## POSTERIOR PREDICTIVE CHECKS
 ###
@@ -98,7 +149,7 @@ postPredChecks <- function(causimp, filename=NA,
 
   png(filename = ppcheck.filename, width = 15, height = 10, units = 'in', res = 400)
   ##----------- INSIDE PNG PLOT --------------------------------------
-    par(mfrow=c(2,3), mar=c(2,2,2.5,1))
+    par(mfrow=c(2,3), mar=c(2.5,2.5,2.5,1))
   
     ## DENSITIES
     plot(density(y[.ind]),  main = "A. Density comparison, Y")
@@ -122,7 +173,8 @@ postPredChecks <- function(causimp, filename=NA,
     gd.p <- pnorm(q = gd.z, mean = 0, sd = 1, lower.tail = F)
     gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
     ##
-    hd <- heidel.diag(post.pred.tr)
+    hd <- heidel.diag.mod(post.pred.tr)
+    hd.st.cmv <- hd[1,'CMV.stat']
     hd.st.p <- hd[1,'pvalue']
     hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
     hd.st.start <- hd[1,'start']
@@ -136,9 +188,9 @@ postPredChecks <- function(causimp, filename=NA,
     plot(post.pred.tr, type='l', main='C. Posterior Predicted MCMC Trace, Y' ,
          ylim=ylims
          )
-    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
                          gd.result,gd.z,gd.p,
-                         hd.st.result, hd.st.p,
+                         hd.st.result, hd.st.cmv, hd.st.p,
                          hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
           side = 3, line=-4.5, outer = F)
     
@@ -160,7 +212,8 @@ postPredChecks <- function(causimp, filename=NA,
     gd.p <- pnorm(q = gd.z, mean = 0, sd = 1, lower.tail = F)
     gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
     ##
-    hd <- heidel.diag(res.tr)
+    hd <- heidel.diag.mod(res.tr)
+    hd.st.cmv <- hd[1,'CMV.stat']
     hd.st.p <- hd[1,'pvalue']
     hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
     hd.st.start <- hd[1,'start']
@@ -173,9 +226,9 @@ postPredChecks <- function(causimp, filename=NA,
     ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
     plot(res.tr, type='l', main='F. Std.Residual MCMC Trace, Y',
          ylim=ylims)
-    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
                          gd.result,gd.z,gd.p,
-                         hd.st.result, hd.st.p,
+                         hd.st.result, hd.st.cmv, hd.st.p,
                          hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
           side = 3, line=-4.5, outer = F)
   ##----------- end PNG PLOT --------------------------------------
@@ -264,7 +317,7 @@ ggdid.agg.es <- function(attgt,
     ylab('ATT') + xlab('Event Time') +
     theme_bw() +
     theme(legend.position='none') +
-    annotate('text', x=an.x, y=an.y, label=sprintf('Parallel Trends Pretest: %s (W=%.2f, p=%.2f)',W.result,W,Wpval)) +
+    annotate('text', x=an.x, y=an.y, label=sprintf('Parallel Trends Pretest: %s (Wald Chisq=%.2f, p=%.2f)',W.result,W,Wpval)) +
     ggtitle(' DiD: Average Effect by Length of Exposure')
   
   p
@@ -1010,7 +1063,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
 
 ## Static Defaults
 n <- 100
-npds <- 60 #100
+# npds <- 60 #100
 intpd <- round( npds * 2/3 )
 noise.level <- 1.2
 # treat.rule <- 'random' # 'below.benchmark' ## 'random'
@@ -1024,9 +1077,10 @@ dgp.freq= 1
 # lags = list(c(1),c(2),c(3)) 
 # lags <- list( c(1) ) ##list(NULL)
 ## 
-treat.rules <- c('random')  ## 'below.benchmark'
-seasonalities <- c(TRUE)   ## c(TRUE,  FALSE )
-prior.sd.scenarios <- c('sd.low')  ## sd.low
+sim.lengths <- list(6,24,92)
+treat.rules <- list('random')  ## 'below.benchmark'
+seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
+prior.sd.scenarios <- list('sd.low')  ## sd.low
 ## 
 st.sp.lists <- list(
   ## ## LEVEL
@@ -1064,75 +1118,80 @@ st.sp.lists <- list(
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ##
 simlist <- list()
-## AUTOCORRELATION VALUES
-for (g in 1:length(dgp.ars)) {
-  dgp.ar <- dgp.ars[[ g ]]
-  
-  ## SEASONALITY
-  for (h in 1:length(seasonalities)) {
-    seasonality <- seasonalities[[ h ]]
+## SIMULATION LENGTHS - NUMBER OF PERIODS
+for (f in 1:length(sim.lengths)) {
+  npds <- sim.lengths[[ f ]]
+  ## AUTOCORRELATION VALUES
+  for (g in 1:length(dgp.ars)) {
+    dgp.ar <- dgp.ars[[ g ]]
     
-    ## ENDOGENEITY (SELF-SELECTION)
-    for (i in 1:length(treat.rules)) {
-      treat.rule <- treat.rules[[ i ]]
+    ## SEASONALITY
+    for (h in 1:length(seasonalities)) {
+      seasonality <- seasonalities[[ h ]]
       
-      ##--------------------------------------------
-      ## Setup state space configurations
-      ##--------------------------------------------
-      bsts.state.specs <- list()
-      ## PRIOR NOISE / UNCERTAINTY (PRIOR STDEV)
-      for (j in 1:length(prior.sd.scenarios)) {
-        prior.sd.scenario <- prior.sd.scenarios[[ j ]]
+      ## ENDOGENEITY (SELF-SELECTION)
+      for (i in 1:length(treat.rules)) {
+        treat.rule <- treat.rules[[ i ]]
         
-        ## STATE SPACE COMPONENTS CONFIGURATION
-        for (k in 1:length(st.sp.lists)) {
-          st.sp.vec <- st.sp.lists[[ k ]]
+        ##--------------------------------------------
+        ## Setup state space configurations
+        ##--------------------------------------------
+        bsts.state.specs <- list()
+        ## PRIOR NOISE / UNCERTAINTY (PRIOR STDEV)
+        for (j in 1:length(prior.sd.scenarios)) {
+          prior.sd.scenario <- prior.sd.scenarios[[ j ]]
           
-          bsts.state.config <- list()
-          for (kk in 1:length(st.sp.vec)) {
-            ## SKIP AddSharedLocalLevel() for now...
-            .id <- length(bsts.state.config)+1
-            bsts.state.config[[ .id ]] <- getStateSpaceConfBySimScenario(st.sp.vec[ kk ], prior.sd.scenario)#, ## c('sd.high','sd.low')
-            # x.spikslab.prior=x.spikslab.prior, ## X  values for Boom::SpikeSlabPrior()
-            # y.spikslab.prior=y.spikslab.prior)
-            # .id <- .id + 1
+          ## STATE SPACE COMPONENTS CONFIGURATION
+          for (k in 1:length(st.sp.lists)) {
+            st.sp.vec <- st.sp.lists[[ k ]]
+            
+            bsts.state.config <- list()
+            for (kk in 1:length(st.sp.vec)) {
+              ## SKIP AddSharedLocalLevel() for now...
+              .id <- length(bsts.state.config)+1
+              bsts.state.config[[ .id ]] <- getStateSpaceConfBySimScenario(st.sp.vec[ kk ], prior.sd.scenario)#, ## c('sd.high','sd.low')
+              # x.spikslab.prior=x.spikslab.prior, ## X  values for Boom::SpikeSlabPrior()
+              # y.spikslab.prior=y.spikslab.prior)
+              # .id <- .id + 1
+            }
+            bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
           }
-          bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
-        }
+          
+          ##--------------------------------------------
+          ## Append simulation configuration to simlist
+          ##--------------------------------------------
+          key <- sprintf('f%s|g%s|h%s|i%s|j%s', f,g,h,i,j)
+          cat(sprintf('\n%s\n',key))
+          # .idx <- sprintf('ar%s',dgp.ar)
+          simlist[[ key ]] <- list(
+            n = n,    ## Number of firms
+            npds = npds,  ## Number of periods
+            intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
+            noise.level = noise.level, ## stdev of simulated noise terms
+            prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+            treat.rule = treat.rule, 
+            treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+            treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+            b4 = b4,   ## seasonal component weight
+            b5 = b5, ##
+            b9 = dgp.ar  , ## autocorrelation
+            seasonality = seasonality,
+            dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+            dgp.freq= ifelse(seasonality, dgp.freq, NA),
+            bsts.state.specs=bsts.state.specs,
+            # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+            rand.seed = 12345
+          )
+          
+        } ## // end prior.sd.scenarios loop
         
-        ##--------------------------------------------
-        ## Append simulation configuration to simlist
-        ##--------------------------------------------
-        key <- sprintf('g%s|h%s|i%s|j%s', g,h,i,j)
-        cat(sprintf('\n%s\n',key))
-        # .idx <- sprintf('ar%s',dgp.ar)
-        simlist[[ key ]] <- list(
-          n = n,    ## Number of firms
-          npds = npds,  ## Number of periods
-          intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-          noise.level = noise.level, ## stdev of simulated noise terms
-          prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
-          treat.rule = treat.rule, 
-          treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-          treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-          b4 = b4,   ## seasonal component weight
-          b5 = b5, ##
-          b9 = dgp.ar  , ## autocorrelation
-          seasonality = seasonality,
-          dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
-          dgp.freq= ifelse(seasonality, dgp.freq, NA),
-          bsts.state.specs=bsts.state.specs,
-          # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-          rand.seed = 12345
-        )
-        
-      } ## // end prior.sd.scenarios loop
+      } ## // end treat.rules loop
       
-    } ## // end treat.rules loop
+    } ## // end seasonalities loop
     
-  } ## // end seasonalities loop
-  
-} ## // end ARs loop
+  } ## // end ARs loop
+}
+
 
 effect.types = c('quadratic')
 
