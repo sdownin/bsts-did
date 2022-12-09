@@ -23,6 +23,7 @@ library(Boom)
 library(BoomSpikeSlab)
 library(cowplot)
 library(forecast)
+library(coda)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
@@ -60,8 +61,15 @@ source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding stat
 ###
 ## POSTERIOR PREDICTIVE CHECKS
 ###
-postPredChecks <- function(causimp, burn=NA, return.val=TRUE) {
-    
+postPredChecks <- function(causimp, filename=NA, 
+                           burn=NA, return.val=FALSE, conv.alpha=0.05) {
+  
+  ppcheck.filename <- if (is.na(filename)){
+    sprintf('bsts_post_pred_checks_%s.png', round(10*as.numeric(Sys.time())) )
+  }  else {
+    filename
+  }
+  
   response <- causimp$series$response
   y <- response
   
@@ -87,42 +95,97 @@ postPredChecks <- function(causimp, burn=NA, return.val=TRUE) {
   ## before intervention period bool dummy
   .ind <- (1:npds) < intpd
   
-  par(mfrow=c(2,3), mar=c(2,2,2.5,1))
+
+  png(filename = ppcheck.filename, width = 15, height = 10, units = 'in', res = 400)
+  ##----------- INSIDE PNG PLOT --------------------------------------
+    par(mfrow=c(2,3), mar=c(2,2,2.5,1))
   
-  ## DENSITIES
-  plot(density(y[.ind]),  main = "Density comparison, Y")
-  lines(density(post.pred.mean), lty=2, col='red')
-  legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
-  
-  ## HISTOGRAMS & BAYESIAN P-VALUES
-  # max.distrib <- apply(post.pred, c(2, 3), max)
-  max.distrib <- apply(post.pred$distribution, 1, max)
-  pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
-  hist(max.distrib, 30, col = "lightblue", border = "grey", 
-       main = paste0("Bayesian p-val (Max Y) = ", round(pvalue, 2)),
-       xlab = "Max. in-sample forecasts")
-  abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
-  
-  
-  # Residual plots
-  y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
-  # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
-  res <-  y.rep - t(post.pred.dist)
-  std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
-  # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
-  qqnorm(rowMeans(std.res), main = "Std.Residual QQ-plot, Y")
-  qqline(rowMeans(std.res))
-  Acf(rowMeans(std.res), main = "");title(main='Std.Residual ACF, Y')
-  
-  res.tr <- colMeans(std.res)
-  plot(res.tr, type='l', main='Std.Residual MCMC Trace, Y')
-  post.pred.tr <- colMeans(post.pred.dist)
-  plot(post.pred.tr, type='l', main='Posterior Predicted MCMC Trace, Y')
-  
+    ## DENSITIES
+    plot(density(y[.ind]),  main = "A. Density comparison, Y")
+    lines(density(post.pred.mean), lty=2, col='red')
+    legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
+    
+    ## HISTOGRAMS & BAYESIAN P-VALUES
+    # max.distrib <- apply(post.pred, c(2, 3), max)
+    max.distrib <- apply(post.pred$distribution, 1, max)
+    pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
+    hist(max.distrib, 30, col = "lightblue", border = "grey", 
+         main = paste0("B. Bayesian p-val (Max Y) = ", round(pvalue, 2)),
+         xlab = "Max. in-sample forecasts")
+    abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
+    
+    ## Trace plot of Posterior Predictive distribution Markov Chain 
+    post.pred.tr <- rowMeans(post.pred.dist)
+    ##----------
+    gd <- geweke.diag(post.pred.tr, .1, .5)
+    gd.z <- gd$z ## f statistic
+    gd.p <- pnorm(q = gd.z, mean = 0, sd = 1, lower.tail = F)
+    gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
+    ##
+    hd <- heidel.diag(post.pred.tr)
+    hd.st.p <- hd[1,'pvalue']
+    hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
+    hd.st.start <- hd[1,'start']
+    hd.hw.eps <- 0.1 ## default 0.1
+    hd.hw <- hd[1,'halfwidth']
+    hd.hw.mean <- hd[1,'mean']
+    hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
+    ##----------
+    rng <- range(post.pred.tr)
+    ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
+    plot(post.pred.tr, type='l', main='C. Posterior Predicted MCMC Trace, Y' ,
+         ylim=ylims
+         )
+    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+                         gd.result,gd.z,gd.p,
+                         hd.st.result, hd.st.p,
+                         hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
+          side = 3, line=-4.5, outer = F)
+    
+    # Residual plots
+    y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
+    # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+    res <-  y.rep - t(post.pred.dist)
+    std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
+    # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+    qqnorm(rowMeans(std.res), main = "D. Std.Residual QQ-plot, Y")
+    qqline(rowMeans(std.res))
+    Acf(rowMeans(std.res), main = "");title(main='E. Std.Residual ACF, Y')
+    
+    ## Trace plot of Posterior Predictive distribution Markov Chain 
+    res.tr <- colMeans(std.res)
+    ##----------
+    gd <- geweke.diag(res.tr, .1, .5)
+    gd.z <- gd$z ## f statistic
+    gd.p <- pnorm(q = gd.z, mean = 0, sd = 1, lower.tail = F)
+    gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
+    ##
+    hd <- heidel.diag(res.tr)
+    hd.st.p <- hd[1,'pvalue']
+    hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
+    hd.st.start <- hd[1,'start']
+    hd.hw.eps <- 0.1 ## default 0.1
+    hd.hw <- hd[1,'halfwidth']
+    hd.hw.mean <- hd[1,'mean']
+    hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
+    ##----------
+    rng <- range(res.tr)
+    ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
+    plot(res.tr, type='l', main='F. Std.Residual MCMC Trace, Y',
+         ylim=ylims)
+    mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+                         gd.result,gd.z,gd.p,
+                         hd.st.result, hd.st.p,
+                         hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
+          side = 3, line=-4.5, outer = F)
+  ##----------- end PNG PLOT --------------------------------------
+  dev.off()
+    
+  ##
   if(return.val) {
     return(list(
       std.res=std.res, 
-      post.pred.mean=post.pred.mean
+      post.pred.dist=post.pred.dist
     ))
   }
 
@@ -130,23 +193,34 @@ postPredChecks <- function(causimp, burn=NA, return.val=TRUE) {
 
 
 ###
-## GGPLOT OF DYNMAIC DID - MODIFIED FROM Callaway & Sant'Anna 2021
+## GGPLOT OF DYNMAIC DID from ATTGT object
+##  - MODIFIED FROM Callaway & Sant'Anna 2021
 ###
-ggdid.mod <- function(object,
-                           ylim=NULL,
-                           xlab=NULL,
-                           ylab=NULL,
-                           title="",
-                           # xgap=NA,
-                           legend=TRUE,
-                           ref_line = 0,
-                           theming = FALSE,
-                           ...) {
+ggdid.agg.es <- function(attgt,
+                         ylim=NULL,
+                         xlab=NULL,
+                         ylab=NULL,
+                         title="",
+                         # xgap=NA,
+                         legend=TRUE,
+                         ref_line = 0,
+                         theming = FALSE,
+                         alpha=0.05,
+                         ...) {
+  
+  ## DiD pre-test parallel trends Wald Chi-Sq  test stat and p-val
+  W <- attgt$W[1]
+  Wpval <- attgt$Wpval[1]
+  W.result <- ifelse(Wpval < alpha, 'FAIL', 'PASS')
+  
+  ## DYNAMIC EFFECTS AND EVENT STUDIES
+  object <- aggte(attgt, type = "dynamic")
   
   if ( !(object$type %in% c("dynamic","group","calendar")) ) {
     stop(paste0("Plot method not available for this type of aggregation"))
   }
-  
+
+  ##
   post.treat <- 1*(object$egt >= 0)
   results <- cbind.data.frame(year=object$egt,
                               att=object$att.egt,
@@ -168,6 +242,10 @@ ggdid.mod <- function(object,
   # p <- gplot(results, ylim, xlab, ylab, title, xgap, legend, ref_line, theming)
   # 
   # p
+  rng.y <- range(results$att, na.rm = T)
+  rng.x <- range(results$year, na.rm=T)
+  an.y <- max(results$att, na.rm = T) + 0.1*diff(rng.y)
+  an.x <- min(as.numeric(results$year), na.rm=T) + 0.2*diff(rng.x)
   
   p <- ggplot(results,
               aes(x=as.numeric(year), y=att, ymin=(att-c*att.se),
@@ -186,6 +264,7 @@ ggdid.mod <- function(object,
     ylab('ATT') + xlab('Event Time') +
     theme_bw() +
     theme(legend.position='none') +
+    annotate('text', x=an.x, y=an.y, label=sprintf('Parallel Trends Pretest: %s (W=%.2f, p=%.2f)',W.result,W,Wpval)) +
     ggtitle(' DiD: Average Effect by Length of Exposure')
   
   p
@@ -243,7 +322,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       ## Dynamic treatment effect function parameters
       w0 = 2.0,  ## constant
       w1 = 0.18,  ## linear
-      w2 = -.1 / sqrt(sim$npds) ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
+      w2 = -.2 / sqrt(sim$npds) ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
       ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
       w2.shift = -round( sqrt(sim$npds) ),  ## optimal value here is likely a function of the combination of treatment effect function parameters
       ##
@@ -277,7 +356,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
                                     effect.types=c('constant','quadratic','geometric'), 
                                     sim.id=NA,
                                     save.items.dir=NA, ## save updated simlist items to seprate RDS files
-                                    bsts.niter=1e3
+                                    bsts.niter=5e3
                                     ) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
@@ -361,6 +440,14 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       )
       # ccattgt
       
+      ## PLOT DID DYNAMIC EFFECT from ATTGT object
+      p.agg.es <- ggdid.agg.es(ccattgt) 
+      ggsave(filename = file.path(save.img.dir,
+                                  sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
+                                          prefix,h,key.strip,effect.type,sim.id))
+      )
+      
+      
       ## Get first treatment group actor
       tr.actor.1 <- simdf$actor[which(simdf$group=='treatment')[1]]
       
@@ -372,13 +459,6 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       agg.es <- aggte(ccattgt, type = "dynamic")
       # summary(agg.es)
       # tidy(agg.es)
-      ## PLOT DID DYNAMIC EFFECT
-      p.agg.es <- ggdid.mod(agg.es) 
-      ggsave(filename = file.path(save.img.dir,
-                                  sprintf('%s_did_dynamic_effect_ss%s_%s_%s_%s.png',
-                                          prefix,h,key.strip,effect.type,sim.id))
-      )
-      
       
       ##-----------------------------
       
@@ -625,7 +705,11 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
                                       post.period.response = post.period.response,
                                       alpha=0.05, model.args = list(niter = bsts.niter))
         ## POSTERIOR PREDICTIVE CHECKS
-        postPredChecks(impact_amount)
+        ppcheck.filename <- file.path(save.img.dir,
+                                      sprintf('%s_bsts_post_pred_checks_ss%s_niter%s_%s_%s_%s.png',
+                                              prefix,h,bsts.niter,key.strip,effect.type,sim.id))
+        postPredChecks(impact_amount, filename=ppcheck.filename)
+        
         # ##
         # summary(impact_amount)
         # summary(impact_amount$model$bsts.model)
@@ -636,8 +720,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         #                         key,effect.type,sim.id))
         p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
         ggsave(filename = file.path(save.img.dir,
-                                    sprintf('%s_bsts_CausalImpact_plot_ss%s_%s_%s_%s.png',
-                                            prefix,h,key.strip,effect.type,sim.id))
+                                    sprintf('%s_bsts_CausalImpact_plot_ss%s_niter%s_%s_%s_%s.png',
+                                            prefix,h,bsts.niter,key.strip,effect.type,sim.id))
         )
         # dev.off()
         
@@ -861,8 +945,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
           draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
                           x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
         ggsave(filename = file.path(save.img.dir,
-                                    sprintf('%s_ATT_pointwise_error_distribution_compare_ss%s_%s_%s_%s.png',
-                                            prefix,h,key.strip,effect.type,sim.id)),
+                                    sprintf('%s_ATT_pointwise_error_distribution_compare_ss%s_niter%s_%s_%s_%s.png',
+                                            prefix,h,bsts.niter,key.strip,effect.type,sim.id)),
                height=15, width=9, units = 'in', dpi = 300)
         
         ##===============================================================
@@ -904,7 +988,8 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
   } ## // end simlist loop i   ##  #; dev.off()
   
   return(simlist)
-}
+
+  }
 
 
 ################################################################################################################
@@ -925,7 +1010,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
 
 ## Static Defaults
 n <- 100
-npds <- 30 #100
+npds <- 60 #100
 intpd <- round( npds * 2/3 )
 noise.level <- 1.2
 # treat.rule <- 'random' # 'below.benchmark' ## 'random'
@@ -941,18 +1026,18 @@ dgp.freq= 1
 ## 
 treat.rules <- c('random')  ## 'below.benchmark'
 seasonalities <- c(TRUE)   ## c(TRUE,  FALSE )
-prior.sd.scenarios <- c('sd.low','sd.high')  ## sd.low
+prior.sd.scenarios <- c('sd.low')  ## sd.low
 ## 
 st.sp.lists <- list(
   ## ## LEVEL
-  `1`=c('AddLocalLevel')#,
+  # `1`=c('AddLocalLevel')#,
   ## ## TREND
   # `2`=c('AddLocalLinearTrend')#,
   # `3`=c('AddStudentLocalLinearTrend')#,
   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
   # `4`=c('AddSemilocalLinearTrend')#,
   ## ## SEASONAL
-  # `5`=c('AddTrig')#,
+  `5`=c('AddTrig')#,
   ## ## AUTOCORRELATION
   # list('AddAr'),
   # `6`=c('AddAr')#,
@@ -1038,7 +1123,7 @@ for (g in 1:length(dgp.ars)) {
           dgp.freq= ifelse(seasonality, dgp.freq, NA),
           bsts.state.specs=bsts.state.specs,
           # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-          rand.seed = 54321
+          rand.seed = 12345
         )
         
       } ## // end prior.sd.scenarios loop
@@ -1058,14 +1143,27 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
                                             effect.types = effect.types,
                                             save.items.dir= dir_ext,
-                                            bsts.niter=200)  ## D:\\BSTS_external
+                                            bsts.niter=5000)  ## D:\\BSTS_external
 
 key <- sprintf('g%sh%si%sj%s', 1,1,1,1)
 simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
 
-simx$compare$did$quadratic$attgt$Wpval
 
 
+
+simx$compare$did$quadratic$attgt$W[1]
+simx$compare$did$quadratic$attgt$Wpval[1]
+
+
+
+
+## CODA DIAGNOSTICS
+
+geweke.diag(rowMeans(err5 ^ 2), .1, .5)
+geweke.diag(coefmc5, .1, .5)
+
+heidel.diag(rowMeans(err5 ^ 2))
+heidel.diag(coefmc5)
 
 
 pp <- postPredChecks(simx$compare$bsts$quadratic[[1]]$CausalImpact)
