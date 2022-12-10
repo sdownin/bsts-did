@@ -38,7 +38,7 @@ setwd(dir_proj)
 ##==============================
 ##  file prefix for saving images, writing outputs, etc.
 ##-----------------------------
-prefix <- 'bsts-illustration_'
+prefix <- 'bsts-illustr_'
 
 ##==============================
 ## Load simulation functions
@@ -149,7 +149,7 @@ getAggregatedSimPanelDf <- function(tmpdf, pd.agg,
 ###
 ## Update Simlist configurations and simulated panel dataframes for aggregated periods
 ###
-updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
+updateSimlistAggregateSimDfPd <- function(simlist, pd.agg, na.rm=TRUE) {
   
   for (i in 1:length(simlist)) 
   {
@@ -545,7 +545,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 ##  - 3. comparison of DiD & BSTS performance
 ##   returns full simlist
 ######################################
-runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
+runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                     effect.types=c('constant','quadratic','geometric'), 
                                     sim.id=NA,
                                     save.items.dir=NA, ## save updated simlist items to seprate RDS files
@@ -1372,44 +1372,115 @@ for (d in 1:length(ns)) {
 } ## // end ns loop (number of actors)
 
 
+##
 effect.types = c('quadratic')
+##
+bsts.niter <- 1e4
 
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                plot.show = FALSE, plot.save = FALSE )
 
 
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
-                                            effect.types = effect.types,
-                                            save.items.dir= dir_ext,
-                                            bsts.niter=1000)  ## D:\\BSTS_external
+simlist.files <- runSimCompareBstsDiD(simlist, 
+                                      effect.types = effect.types,
+                                      save.items.dir= dir_ext,
+                                      bsts.niter=bsts.niter*6)  ## D:\\BSTS_external
 
 
-## LOAD INDIVIDUAL SIMULATION COMPARISON LIST
-key <- sprintf('d%sf%sg%sh%si%sj%s', 1,1,1,1,1,1)
-simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
+# ## LOAD INDIVIDUAL SIMULATION COMPARISON LIST
+# key <- sprintf('d%sf%sg%sh%si%sj%s', 1,1,1,1,1,1)
+# simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
 
 
 ####################################################
-## ORIGINAL DATA 120 pds = Monthly data over 10 years
+## ORIGINAL DATA 120 pds  (Monthly data,  10 years)
 ##----------------------
-## Aggregate at 4 periods (quarterly)
+## Aggregate every 2 periods (bimonthly)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
-simlist <- runSimUpdateSimlist(simlist, effect.types=effect.types, plot.show=F, plot.save=F)
-simlist <- updateSimlistAggregatePd(simlist, pd.agg = 4 )
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
-                                            effect.types = effect.types,
-                                            save.items.dir= dir_ext,
-                                            bsts.niter=1000) 
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 2 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       bsts.niter=bsts.niter*2) 
 ##----------------------
-## Aggregate at 12 periods (yearly)
+## Aggregate every 3 periods (quarterly)
 ##---------------------
-simlist <- updateSimlistAggregatePd(simlist, pd.agg = 12 )
-simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 3 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                             effect.types = effect.types,
                                             save.items.dir= dir_ext,
-                                            bsts.niter=30000) 
+                                            bsts.niter=bsts.niter) 
+##----------------------
+## Aggregate every 4 periods (third-yearly?)
+##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 4 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       bsts.niter=bsts.niter) 
+##----------------------
+## Aggregate every 5 periods (5-monthly?)
+##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 5 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       bsts.niter=bsts.niter)
+##----------------------
+## Aggregate every 6 periods (half-yearly)
+##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 6 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       bsts.niter=bsts.niter) 
+##----------------------
+## Aggregate every 12 periods (yearly)
+##---------------------
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 12 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=bsts.niter*2) 
+##----------------------
+## Aggregate every 24 periods (biyearly)
+##---------------------
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 24 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       bsts.niter=bsts.niter*2) 
+
+
+
+
+
+
+
 
 
 
@@ -1504,7 +1575,7 @@ actors <- sort(unique(simdf$actor[!is.na(simdf$match_id)]))
 # ###
 # ## Update Simlist configurations and simulated panel dataframes for aggregated periods
 # ###
-# updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
+# updateSimlistAggregateSimDfPd <- function(simlist, pd.agg, na.rm=TRUE) {
 #   
 #   for (i in 1:length(simlist)) 
 #   {
