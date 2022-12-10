@@ -70,7 +70,7 @@ getAggregatedSimPanelDf <- function(tmpdf, pd.agg,
   ##
   ts <- sort(unique(tmpdf$t))
   npds.orig <- length(ts)
-  npds.new <- npds.orig / pd.agg
+  npds.new <- round( npds.orig / pd.agg )
   actors <- sort(unique(tmpdf$actor[!is.na(tmpdf$match_id)]))
   
   aggmap <- data.frame(t.old=1:npds.orig,
@@ -85,7 +85,7 @@ getAggregatedSimPanelDf <- function(tmpdf, pd.agg,
   tmpdf$match_pd[tmpdf$match_pd == intpd.old] <- intpd.new
   
   
-  tmpdf$t.agg <- NA
+  tmpdf$t.agg <- rep(NA, nrow(tmpdf))
   for (i in 1:nrow(aggmap)) {
     idx <- which( tmpdf$t==aggmap$t.old[i] )
     tmpdf$t.agg[idx] <- aggmap$t.new[i]
@@ -133,6 +133,9 @@ getAggregatedSimPanelDf <- function(tmpdf, pd.agg,
   ## Match names for call in simulation comparison function for DiD vs. BSTS
   aggdf$t <- aggdf$t.agg
   aggdf$t.post.intpd <- aggdf$t.agg.post.intpd
+  ## remove unnecessary columns
+  aggdf$t.agg <- NULL
+  aggdf$t.agg.post.intpd <- NULL
   
   # ##
   # aggdf$gname <- 0
@@ -158,8 +161,8 @@ updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
     
     aggdf <- getAggregatedSimPanelDf(simx$sim$df, pd.agg=pd.agg, na.rm=na.rm)
     simlist[[i]]$sim$df <- aggdf
-    simlist[[i]]$npds <- length(unique(aggdf$t.agg))
-    simlist[[i]]$intpd <- unique(aggdf$t.agg[which(aggdf$t.agg.post.intpd==1)])[1]
+    simlist[[i]]$npds <- length(unique(aggdf$t))
+    simlist[[i]]$intpd <- unique(aggdf$t[which(aggdf$t.post.intpd==1)])[1]
   }
   
   return(simlist)
@@ -260,24 +263,15 @@ postPredChecks <- function(causimp, filename=NA,
   }
   ##----------- INSIDE PNG PLOT --------------------------------------
     par(mfrow=c(2,3), mar=c(2.5,2.5,2.5,1))
+    
+    ##===================
+    ## Posterior Predictive (Y) plots 
+    ##-------------------
   
-    ## DENSITIES
-    plot(density(y[.ind]),  main = "A. Density comparison, Y")
-    lines(density(post.pred.mean), lwd=2, lty=2, col='red')
-    legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
-    
-    ## HISTOGRAMS & BAYESIAN P-VALUES
-    # max.distrib <- apply(post.pred, c(2, 3), max)
-    max.distrib <- apply(post.pred$distribution, 1, max)
-    pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
-    hist(max.distrib, 30, col = "lightblue", border = "grey", 
-         main = paste0("B. Bayesian p-val (Max Y) = ", round(pvalue, 2)),
-         xlab = "Max. in-sample forecasts")
-    abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
-    
+    ##-----------
     ## Trace plot of Posterior Predictive distribution Markov Chain 
     post.pred.tr <- rowMeans(post.pred.dist)
-    ##----------
+    ##
     gd <- geweke.diag(post.pred.tr, .1, .5)
     gd.z <- abs(gd$z) ## z statistic
     gd.p <- 2*pnorm(gd.z, mean = 0, sd = 1, lower.tail = F)  ## P-value for 2-sided test
@@ -292,31 +286,50 @@ postPredChecks <- function(causimp, filename=NA,
     hd.hw <- hd[1,'halfwidth']
     hd.hw.mean <- hd[1,'mean']
     hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
-    ##----------
+    ##
     rng <- range(post.pred.tr)
     ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
-    plot(post.pred.tr, type='l', main='C. Posterior Predicted MCMC Trace, Y' ,
+    plot(post.pred.tr, type='l', main='A. Posterior Predicted MCMC Trace, Y' ,
          ylim=ylims
-         )
+    )
     mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
                          gd.result,gd.z,gd.p,
                          hd.st.result, hd.st.cmv, hd.st.p,
                          hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
           side = 3, line=-4.5, outer = F)
+    ##-----------
+  
+    ##-----------
+    ## DENSITIES
+    plot(density(y[.ind]),  main = "B. Density comparison, Y")
+    lines(density(post.pred.mean), lwd=2, lty=2, col='red')
+    legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
+    ##-----------
     
-    # Residual plots
+    ##-----------
+    ## HISTOGRAMS & BAYESIAN P-VALUES
+    # max.distrib <- apply(post.pred, c(2, 3), max)
+    max.distrib <- apply(post.pred$distribution, 1, max)
+    pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
+    hist(max.distrib, 30, col = "lightblue", border = "grey", 
+         main = paste0("C. Bayesian p-val (Max Y) = ", round(pvalue, 2)),
+         xlab = "Max. in-sample forecasts")
+    abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
+    ##-----------
+    
+    ##===================
+    ## Std. Residual plots
+    ##-------------------
     y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
     # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
     res <-  y.rep - t(post.pred.dist)
     std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
     # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
-    qqnorm(rowMeans(std.res), main = "D. Std.Residual QQ-plot, Y")
-    qqline(rowMeans(std.res))
-    Acf(rowMeans(std.res), main = "");title(main='E. Std.Residual ACF, Y')
     
+    ##-----------
     ## Trace plot of Posterior Predictive distribution Markov Chain 
     res.tr <- colMeans(std.res)
-    ##----------
+    ##
     gd <- geweke.diag(res.tr, .1, .5)
     gd.z <- abs(gd$z) ## z statistic
     gd.p <- 2*pnorm(gd.z, mean = 0, sd = 1, lower.tail = F)  ## P-value for 2-sided test
@@ -331,16 +344,29 @@ postPredChecks <- function(causimp, filename=NA,
     hd.hw <- hd[1,'halfwidth']
     hd.hw.mean <- hd[1,'mean']
     hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
-    ##----------
+    ##
     rng <- range(res.tr)
     ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
-    plot(res.tr, type='l', main='F. Std.Residual MCMC Trace, Y',
+    plot(res.tr, type='l', main='D. Std.Residual MCMC Trace, Y',
          ylim=ylims)
     mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
                          gd.result,gd.z,gd.p,
                          hd.st.result, hd.st.cmv, hd.st.p,
                          hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
           side = 3, line=-4.5, outer = F)
+    ##-----------
+    
+    ##-----------
+    # Std. Residual Normality plot
+    qqnorm(rowMeans(std.res), main = "E. Std.Residual QQ-plot, Y")
+    qqline(rowMeans(std.res))
+    ##-----------
+    
+    ##-----------
+    ## Std Residual ACF
+    Acf(rowMeans(std.res), main = "");title(main='F. Std.Residual ACF, Y')
+    ##-----------
+    
   ##----------- end PNG PLOT --------------------------------------
   if (save.plot) {
     dev.off()
@@ -928,8 +954,16 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
         co.actors <- unique(simdf$actor[which(simdf$group=='control')])
         
         b3diff <- data.frame(
-          treat=simdf %>% dplyr::filter(group=='treatment' & actor==tr.actors[1]) %>% mutate(treat=b3) %>% dplyr::select(treat),
-          ctrl=simdf %>% dplyr::filter(group=='control' & actor==co.actors[1]) %>% mutate(ctrl=b3) %>% dplyr::select(ctrl),
+          treat=simdf %>% 
+            dplyr::filter(group=='treatment' & actor==tr.actors[1]) %>% 
+            ungroup() %>%
+            dplyr::mutate(treat=b3) %>% 
+            dplyr::select(treat),  ##ungroup() %>% 
+          ctrl=simdf %>% 
+            dplyr::filter(group=='control' & actor==co.actors[1]) %>% 
+            ungroup() %>%
+            dplyr::mutate(ctrl=b3) %>% 
+            dplyr::select(ctrl),
           diff=NA
         )
         b3diff$diff <- b3diff$treat - b3diff$ctrl
@@ -1177,7 +1211,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
   
   return(simlist)
 
-  }
+}
 
 
 ################################################################################################################
@@ -1354,12 +1388,15 @@ simlist.files <- runSimUpdateCompareBstsDiD(simlist,
 key <- sprintf('d%sf%sg%sh%si%sj%s', 1,1,1,1,1,1)
 simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
 
+
+####################################################
 ## ORIGINAL DATA 120 pds = Monthly data over 10 years
 ##----------------------
 ## Aggregate at 4 periods (quarterly)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
+simlist <- runSimUpdateSimlist(simlist, effect.types=effect.types, plot.show=F, plot.save=F)
 simlist <- updateSimlistAggregatePd(simlist, pd.agg = 4 )
 simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
                                             effect.types = effect.types,
