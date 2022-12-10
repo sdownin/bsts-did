@@ -423,14 +423,14 @@ getStateSpaceConfBySimScenario <- function(name, scenario, ## c('sd.high','sd.lo
   ## Default params
   # lags.hi <- 3
   # lags.lo <- 1
-  lags.hi <- 5
+  lags.hi <- 4
   lags.lo <- 2
   ## Prior SD
   sig.hi <- .1
-  sig.lo <- .02
+  sig.lo <- .015
   ## prior SD initial value
   sig.init.val.hi <- .1
-  sig.init.val.lo <- .02
+  sig.init.val.lo <- .015
   ## Mean of prior distributions
   mu.hi <- .01
   mu.lo <- .001
@@ -440,18 +440,19 @@ getStateSpaceConfBySimScenario <- function(name, scenario, ## c('sd.high','sd.lo
   ar.forc.sta <- FALSE
   ar.forc.pos <- FALSE
   ## Weight given to sigma.guess (interpretable as a prior observation count)
-  samp.size.prop.hi <- .2
-  samp.size.prop.lo <- .02
+  samp.size.prop.hi <- .1
+  samp.size.prop.lo <- .015
   ##
   upper.limit <- Inf
   ## Spike and Slab priors on the AddAutoAr (Automatically selected Autoregressive lags)
-  spikslab.init.val.hi <- .5
-  spikslab.init.val.lo <- .1
+  spikslab.init.val.hi <- .1
+  spikslab.init.val.lo <- .015
+  ##
   spikslab.disc.fac.hi <- .5
   spikslab.disc.fac.lo <- .25
   ##
-  spikslab.exp.mod.size.hi <- 2
-  spikslab.exp.mod.size.lo <- 1
+  # spikslab.exp.mod.size.hi <- 3
+  # spikslab.exp.mod.size.lo <- 2
   ##
   expected.r2.hi <- .5
   expected.r2.lo <- .1

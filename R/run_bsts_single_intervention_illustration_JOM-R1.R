@@ -58,6 +58,114 @@ source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding stat
 # bsts.niter=1000
 # ##----------
 
+
+###
+## Aggregate Aggregated Timeseries Simulation Panel Dataframe
+###
+getAggregatedSimPanelDf <- function(tmpdf, pd.agg, 
+                                    na.rm=TRUE) {
+  if (is.na(pd.agg) | pd.agg <= 1) {
+    cat(sprintf('\npd.agg=%s is either NA or <= 1. Try setting pd.agg >= 2.\n',pd.agg))
+  }
+  ##
+  ts <- sort(unique(tmpdf$t))
+  npds.orig <- length(ts)
+  npds.new <- npds.orig / pd.agg
+  actors <- sort(unique(tmpdf$actor[!is.na(tmpdf$match_id)]))
+  
+  aggmap <- data.frame(t.old=1:npds.orig,
+                       t.new=rep(1:npds.new, each=pd.agg))
+  
+  ##
+  intpd.old <- unique(tmpdf$t[which(tmpdf$t.post.intpd==1)])[1]
+  intpd.new <- aggmap$t.new[which(aggmap$t.old == intpd.old)]
+  
+  ##
+  tmpdf$match_pd <- as.numeric(tmpdf$match_pd)
+  tmpdf$match_pd[tmpdf$match_pd == intpd.old] <- intpd.new
+  
+  
+  tmpdf$t.agg <- NA
+  for (i in 1:nrow(aggmap)) {
+    idx <- which( tmpdf$t==aggmap$t.old[i] )
+    tmpdf$t.agg[idx] <- aggmap$t.new[i]
+  }
+  
+  if (na.rm) {
+    tmpdf <- tmpdf[ !is.na(tmpdf$match_id), ]
+  }
+  
+  aggdf <- tmpdf %>% 
+    group_by(effect.type, t.agg, actor) %>% 
+    summarize(
+      n_actors = n(),
+      group = paste(unique(group), collapse = '|'), 
+      group.color = paste(unique(group.color), collapse = '|'),
+      match_id = paste(unique(match_id), collapse = '|'), 
+      match_pd = paste(unique(match_pd), collapse = '|'), 
+      ##
+      y = mean(y, na.rm=T),
+      ##
+      x1 = mean(x1, na.rm=T),
+      x2 = mean(x2, na.rm=T),
+      x3 = mean(x3, na.rm=T),
+      #
+      b1 = mean(b1, na.rm=T),
+      b2 = mean(b2, na.rm=T),
+      b3 = mean(b3, na.rm=T),
+      ##
+      c1 = mean(c1, na.rm=T),
+      c2 = mean(c2, na.rm=T),
+      c3 = mean(c3, na.rm=T),
+      ##
+      season.val = mean(season.val, na.rm=T),
+      u = mean(u, na.rm=T),
+      v = mean(v, na.rm=T)
+    )
+  
+  t.aggs <- sort(unique(aggdf$t.agg))
+  aggdf$t.agg.post.intpd <- NA
+  for (i in 1:length(t.aggs)) {
+    t.new <- t.aggs[ i ]
+    aggdf$t.agg.post.intpd[which(aggdf$t.agg==t.new)] <- ( t.new - (intpd.new - 1) )
+  }
+  
+  ## Match names for call in simulation comparison function for DiD vs. BSTS
+  aggdf$t <- aggdf$t.agg
+  aggdf$t.post.intpd <- aggdf$t.agg.post.intpd
+  
+  # ##
+  # aggdf$gname <- 0
+  # aggdf$gname[aggdf$group=='treatment'] <- aggdf$match_pd[aggdf$group=='treatment']
+  # aggdf$gname <- as.numeric(aggdf$gname)
+  
+  ##
+  return(aggdf)
+}
+
+###
+## Update Simlist configurations and simulated panel dataframes for aggregated periods
+###
+updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
+  
+  for (i in 1:length(simlist)) 
+  {
+    simx <- simlist[[ i ]]
+    
+    if (is.null(simx$sim)) {
+      cat(sprintf('\nsimlist item i=%s is missing "sim" object. First call runSimUpdateSimlist().\n',i))
+    }
+    
+    aggdf <- getAggregatedSimPanelDf(simx$sim$df, pd.agg=pd.agg, na.rm=na.rm)
+    simlist[[i]]$sim$df <- aggdf
+    simlist[[i]]$npds <- length(unique(aggdf$t.agg))
+    simlist[[i]]$intpd <- unique(aggdf$t.agg[which(aggdf$t.agg.post.intpd==1)])[1]
+  }
+  
+  return(simlist)
+}
+
+
 ##
 #
 ##
@@ -332,7 +440,7 @@ ggdid.agg.es <- function(attgt,
 
 
 ####################################
-##  MAIN COMPARISON FUNCTION
+##  RUN SIMULATION IN LOOP OVER EFFECT TYPES
 ##  - 1. runSimSingleInterventionEffectComparison() on simlist
 ##  - 2. DiD & BSTS results
 ##  - 3. comparison of DiD & BSTS performance
@@ -399,6 +507,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 # simlist.file <- sprintf('single_intervention_SIMLIST_selection_endog_%s_%s.rds',
 #                         length(simlist), sim.id)
 # saveRDS(simlist, file = file.path(dir_plot, simlist.file))
+
+
 
 
 
@@ -486,6 +596,7 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       ##------------------------------
       # simdf <- simdf[simdf$effect.type==effect.type, ]
       ## Set group name 'gname' field, where 0 = control, # = period of treatment
+      simdf$match_pd <- as.numeric(simdf$match_pd)
       simdf$gname <- 0
       simdf$gname[simdf$group=='treatment'] <- simdf$match_pd[simdf$group=='treatment']
       
@@ -514,6 +625,9 @@ runSimUpdateCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into
       ## SIMPLE AGGREGATION (OVERALL EFFECT) ATT
       agg.simple <- aggte(ccattgt, type='simple', bstrap = TRUE)
       # summary(agg.simple)
+      
+      ## GROUP EFFECT AGGREGATION (for reporting overall confidence intervals)
+      agg.group <- aggte(ccattgt, type = "group", bstrap = TRUE)
       
       ## DYNAMIC EFFECTS AND EVENT STUDIES
       agg.es <- aggte(ccattgt, type = "dynamic", bstrap = TRUE)
@@ -1098,7 +1212,7 @@ dgp.freq= 1
 # lags = list(c(1),c(2),c(3)) 
 # lags <- list( c(1) ) ##list(NULL)
 ## 
-ns <- list(100, 300)
+ns <- list(100) ## 400
 sim.lengths <- list(120)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
@@ -1121,7 +1235,8 @@ st.sp.lists <- list(
   # `6`=c('AddAutoAr'),
   ##------ COMBINATIONS --------------
   ## AR & SEASONALITY
-  `7`=c('AddAr','AddTrig'),
+  `7`=c('AddAr','AddTrig')#,
+  # `7a`=c('AddAutoAr','AddTrig')#,
   ## LEVEL + ...
   # `8`=c('AddLocalLevel','AddTrig')#,
   # `9`=c('AddLocalLevel','AddAr'),
@@ -1134,7 +1249,7 @@ st.sp.lists <- list(
   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `15`=c('AddTrig','AddSemilocalLinearTrend')#,
+  # `15`=c('AddTrig','AddSemilocalLinearTrend')#,
 )
 
 
@@ -1232,12 +1347,32 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
                                             effect.types = effect.types,
                                             save.items.dir= dir_ext,
-                                            bsts.niter=30000)  ## D:\\BSTS_external
+                                            bsts.niter=1000)  ## D:\\BSTS_external
 
 
 ## LOAD INDIVIDUAL SIMULATION COMPARISON LIST
 key <- sprintf('d%sf%sg%sh%si%sj%s', 1,1,1,1,1,1)
 simx <- readRDS(file.path(dir_ext,sprintf('__GRIDSEARCH_output__%s_%s.rds',simlist[[1]]$sim$id, key )))
+
+## ORIGINAL DATA 120 pds = Monthly data over 10 years
+##----------------------
+## Aggregate at 4 periods (quarterly)
+##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlist <- updateSimlistAggregatePd(simlist, pd.agg = 4 )
+simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=1000) 
+##----------------------
+## Aggregate at 12 periods (yearly)
+##---------------------
+simlist <- updateSimlistAggregatePd(simlist, pd.agg = 12 )
+simlist.files <- runSimUpdateCompareBstsDiD(simlist, 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=30000) 
 
 
 
@@ -1260,96 +1395,96 @@ actors <- sort(unique(simdf$actor[!is.na(simdf$match_id)]))
 # ## FUNCTION FOR AGGREGATING DATA TO DIFFERENT PERIOD
 # tmpdf <- simdf
 # pd.agg <- 4
-
-###
-## Aggregate Aggregated Timeseries Simulation Panel Dataframe
-###
-getAggregatedSimPanelDf <- function(tmpdf, pd.agg, 
-                                    na.rm=TRUE) {
-  if (is.na(pd.agg) | pd.agg <= 1) {
-    cat(sprintf('\npd.agg=%s is either NA or <= 1. Try setting pd.agg >= 2.\n',pd.agg))
-  }
-  ##
-  ts <- sort(unique(tmpdf$t))
-  npds.orig <- length(ts)
-  npds.new <- npds.orig / pd.agg
-  actors <- sort(unique(simdf$actor[!is.na(simdf$match_id)]))
-  
-  aggmap <- data.frame(t.old=1:npds.orig,
-                       t.new=rep(1:npds.new, each=pd.agg))
-  
-  intpd.old <- unique(simdf$t[which(simdf$t.post.intpd==1)])[1]
-  intpd.new <- aggmap$t.new[which(aggmap$t.old == intpd.old)]
-  
-  
-  tmpdf$t.agg <- NA
-  for (i in 1:nrow(aggmap)) {
-    idx <- which( tmpdf$t==aggmap$t.old[i] )
-    tmpdf$t.agg[idx] <- aggmap$t.new[i]
-  }
-  
-  if (na.rm) {
-    tmpdf <- tmpdf[ !is.na(tmpdf$match_id), ]
-  }
-  
-  aggdf <- tmpdf %>% 
-    group_by(effect.type, t.agg, actor) %>% 
-    summarize(
-      n_actors = n(),
-      group = paste(unique(group), collapse = '|'), 
-      match_id = paste(unique(match_id), collapse = '|'), 
-      match_pd = paste(unique(match_pd), collapse = '|'), 
-      ##
-      y = mean(y, na.rm=T),
-      ##
-      x1 = mean(x1, na.rm=T),
-      x2 = mean(x2, na.rm=T),
-      x3 = mean(x3, na.rm=T),
-      #
-      b1 = mean(b1, na.rm=T),
-      b2 = mean(b2, na.rm=T),
-      b3 = mean(b3, na.rm=T),
-      ##
-      c1 = mean(c1, na.rm=T),
-      c2 = mean(c2, na.rm=T),
-      c3 = mean(c3, na.rm=T),
-      ##
-      season.val = mean(season.val, na.rm=T),
-      u = mean(u, na.rm=T),
-      v = mean(v, na.rm=T)
-    )
-  
-  t.aggs <- sort(unique(aggdf$t.agg))
-  aggdf$t.agg.post.intpd <- NA
-  for (i in 1:length(t.aggs)) {
-    t.new <- t.aggs[ i ]
-    aggdf$t.agg.post.intpd[which(aggdf$t.agg==t.new)] <- ( t.new - (intpd.new - 1) )
-  }
-  
-  return(aggdf)
-}
-
-###
-## Update Simlist configurations and simulated panel dataframes for aggregated periods
-###
-updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
-  
-  for (i in 1:length(simlist)) 
-  {
-    simx <- simlist[[ i ]]
-    
-    if (is.null(simx$sim)) {
-      cat(sprintf('\nsimlist item i=%s is missing "sim" object. First call runSimUpdateSimlist().\n',i))
-    }
-    
-    aggdf <- getAggregatedSimPanelDf(simx$sim$df, pd.agg=pd.agg, na.rm=na.rm)
-    simlist[[i]]$sim <- aggdf
-    simlist[[i]]$npds <- length(unique(aggdf$t.agg))
-    simlist[[i]]$intpd <- unique(aggdf$t.agg[which(aggdf$t.agg.post.intpd==1)])[1]
-  }
-    
-  return(simlist)
-}
+# 
+# ###
+# ## Aggregate Aggregated Timeseries Simulation Panel Dataframe
+# ###
+# getAggregatedSimPanelDf <- function(tmpdf, pd.agg, 
+#                                     na.rm=TRUE) {
+#   if (is.na(pd.agg) | pd.agg <= 1) {
+#     cat(sprintf('\npd.agg=%s is either NA or <= 1. Try setting pd.agg >= 2.\n',pd.agg))
+#   }
+#   ##
+#   ts <- sort(unique(tmpdf$t))
+#   npds.orig <- length(ts)
+#   npds.new <- npds.orig / pd.agg
+#   actors <- sort(unique(simdf$actor[!is.na(simdf$match_id)]))
+#   
+#   aggmap <- data.frame(t.old=1:npds.orig,
+#                        t.new=rep(1:npds.new, each=pd.agg))
+#   
+#   intpd.old <- unique(simdf$t[which(simdf$t.post.intpd==1)])[1]
+#   intpd.new <- aggmap$t.new[which(aggmap$t.old == intpd.old)]
+#   
+#   
+#   tmpdf$t.agg <- NA
+#   for (i in 1:nrow(aggmap)) {
+#     idx <- which( tmpdf$t==aggmap$t.old[i] )
+#     tmpdf$t.agg[idx] <- aggmap$t.new[i]
+#   }
+#   
+#   if (na.rm) {
+#     tmpdf <- tmpdf[ !is.na(tmpdf$match_id), ]
+#   }
+#   
+#   aggdf <- tmpdf %>% 
+#     group_by(effect.type, t.agg, actor) %>% 
+#     summarize(
+#       n_actors = n(),
+#       group = paste(unique(group), collapse = '|'), 
+#       match_id = paste(unique(match_id), collapse = '|'), 
+#       match_pd = paste(unique(match_pd), collapse = '|'), 
+#       ##
+#       y = mean(y, na.rm=T),
+#       ##
+#       x1 = mean(x1, na.rm=T),
+#       x2 = mean(x2, na.rm=T),
+#       x3 = mean(x3, na.rm=T),
+#       #
+#       b1 = mean(b1, na.rm=T),
+#       b2 = mean(b2, na.rm=T),
+#       b3 = mean(b3, na.rm=T),
+#       ##
+#       c1 = mean(c1, na.rm=T),
+#       c2 = mean(c2, na.rm=T),
+#       c3 = mean(c3, na.rm=T),
+#       ##
+#       season.val = mean(season.val, na.rm=T),
+#       u = mean(u, na.rm=T),
+#       v = mean(v, na.rm=T)
+#     )
+#   
+#   t.aggs <- sort(unique(aggdf$t.agg))
+#   aggdf$t.agg.post.intpd <- NA
+#   for (i in 1:length(t.aggs)) {
+#     t.new <- t.aggs[ i ]
+#     aggdf$t.agg.post.intpd[which(aggdf$t.agg==t.new)] <- ( t.new - (intpd.new - 1) )
+#   }
+#   
+#   return(aggdf)
+# }
+# 
+# ###
+# ## Update Simlist configurations and simulated panel dataframes for aggregated periods
+# ###
+# updateSimlistAggregatePd <- function(simlist, pd.agg, na.rm=TRUE) {
+#   
+#   for (i in 1:length(simlist)) 
+#   {
+#     simx <- simlist[[ i ]]
+#     
+#     if (is.null(simx$sim)) {
+#       cat(sprintf('\nsimlist item i=%s is missing "sim" object. First call runSimUpdateSimlist().\n',i))
+#     }
+#     
+#     aggdf <- getAggregatedSimPanelDf(simx$sim$df, pd.agg=pd.agg, na.rm=na.rm)
+#     simlist[[i]]$sim <- aggdf
+#     simlist[[i]]$npds <- length(unique(aggdf$t.agg))
+#     simlist[[i]]$intpd <- unique(aggdf$t.agg[which(aggdf$t.agg.post.intpd==1)])[1]
+#   }
+#     
+#   return(simlist)
+# }
 
 
 
