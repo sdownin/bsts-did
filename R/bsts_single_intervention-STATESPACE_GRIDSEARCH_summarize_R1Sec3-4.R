@@ -3,7 +3,7 @@
 ##   Dynamic Causal Inference Simulations
 ##
 ##    Run script for simulations of
-##     - internal intervention (self-selection) endogeneity
+##     - internal 
 ##     - ...
 ##
 #####################################################

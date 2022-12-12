@@ -1186,13 +1186,6 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$cumu.pred.error <-  cumsum(colSums(abs(bsts.pred.er)))
         ##
-        simlist[[key]]$compare$att.b3 <- att.b3
-        simlist[[key]]$compare$att.did <- att.did
-        simlist[[key]]$compare$att.bsts <- att.bsts
-        simlist[[key]]$compare$bias.bsts<- att.bsts - att.b3
-        simlist[[key]]$compare$bias.did <- att.did - att.b3
-        simlist[[key]]$compare$perf.adv.bsts <- abs(att.did - att.b3) / abs(att.bsts - att.b3)
-        ##
         simlist[[key]]$compare$res.tbl[[effect.type]][[ h ]] <- res.tbl
         simlist[[key]]$compare$att.err.tbl[[effect.type]][[ h ]] <- errdf
         simlist[[key]]$compare$att.err.mean.bsts[[effect.type]][[ h ]] <- mean(errdf$error[errdf$method=='BSTS'],na.rm = T)
@@ -1208,7 +1201,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     
     if ( ! is.na(save.items.dir) ) {
       ## Save simulation list as serialized data file
-      simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
+      simlist.file <- sprintf('__GRIDSEARCH_output__%s_%s.rds', sim.id, key.strip)
       save.file.path <-  file.path(save.items.dir, simlist.file)
       saveRDS(simlist[[key]], file = save.file.path)
       ## FREE UP MEMORY
@@ -1256,7 +1249,7 @@ dgp.freq= 1
 # lags <- list( c(1) ) ##list(NULL)
 ## 
 ns <- list(50, 100, 200, 400, 800, 1600) ## 400
-sim.lengths <- list(120, 240, 480)
+sim.lengths <- list(120)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
 prior.sd.scenarios <- list('sd.low')  ## sd.low
@@ -1386,33 +1379,14 @@ effect.types = c('quadratic')
 ##
 bsts.niter <- 1e4
 
-sim.id <- round(10*as.numeric(Sys.time()))
-
-
-
-# # ##-
-# (simlist,     ## n, npds, intpd moved into simlist elements
-#   effect.types=c('constant','quadratic','geometric'), 
-#   sim.id=round(10*as.numeric(Sys.time())),
-#   plot.show=F, plot.save=F) {
-#   
-# # ##---
-
-
-## RUN SIMULATION -  SIMULATE TIME SERIES
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-                               sim.id = sim.id,
                                plot.show = FALSE, plot.save = FALSE )
 
-## RUN BSTS and compare to DID
+
 simlist.files <- runSimCompareBstsDiD(simlist, 
                                       effect.types = effect.types,
-                                      sim.id = sim.id,
                                       save.items.dir= dir_ext,
-                                      bsts.niter=bsts.niter*12
-                                      )  ## D:\\BSTS_external
-
-
+                                      bsts.niter=bsts.niter*10)  ## D:\\BSTS_external
 
 
 # ## LOAD INDIVIDUAL SIMULATION COMPARISON LIST
@@ -1421,431 +1395,87 @@ simlist.files <- runSimCompareBstsDiD(simlist,
 
 
 ####################################################
-##---------------------
 ## ORIGINAL DATA 120 pds  (Monthly data,  10 years)
-##---------------------
 ##----------------------
-## Aggregate every 2 periods (bimonthly) == 60
+## Aggregate every 2 periods (bimonthly)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 2 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
-                                       sim.id = sim.id,
-                                       bsts.niter=bsts.niter*10) 
+                                       bsts.niter=bsts.niter*5) 
 ##----------------------
-## Aggregate every 3 periods (quarterly) == 40
+## Aggregate every 3 periods (quarterly)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 3 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
-                                        effect.types = effect.types,
-                                        save.items.dir= dir_ext,
-                                        sim.id = sim.id,
-                                        bsts.niter=bsts.niter*5) 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=bsts.niter*3) 
 ##----------------------
-## Aggregate every 4 periods (third-yearly?) == 30
+## Aggregate every 4 periods (third-yearly?)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 4 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
-                                       sim.id = sim.id,
                                        bsts.niter=bsts.niter) 
 ##----------------------
-## Aggregate every 5 periods (5-monthly?) == 24
+## Aggregate every 5 periods (5-monthly?)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 5 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
-                                       sim.id = sim.id,
                                        bsts.niter=bsts.niter)
 ##----------------------
-## Aggregate every 6 periods (half-yearly) == 20
+## Aggregate every 6 periods (half-yearly)
 ##---------------------
 # simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 #                                plot.show = F, plot.save = F )
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 6 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
-                                       sim.id = sim.id,
                                        bsts.niter=bsts.niter) 
 ##----------------------
-## Aggregate every 12 periods (yearly) == 10
+## Aggregate every 12 periods (yearly)
 ##---------------------
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 12 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
-                                        effect.types = effect.types,
-                                        save.items.dir= dir_ext,
-                                        sim.id = sim.id,
-                                        bsts.niter=bsts.niter*2) 
+                                            effect.types = effect.types,
+                                            save.items.dir= dir_ext,
+                                            bsts.niter=bsts.niter*2) 
 ##----------------------
-## Aggregate every 24 periods (biyearly) == 5
+## Aggregate every 24 periods (biyearly)
 ##---------------------
 simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, plot.show=F, plot.save=F)
 simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 24 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
-                                       sim.id = sim.id,
                                        bsts.niter=bsts.niter*3) 
-
-
-
-library(RColorBrewer)
-library(scico)
-########################################
-##  PERIOD AGGREGATION - SUMMARIZE
-##   N=50,100,200,400,800,1600
-##   T=5,10,20,24,30,40,60,120
-########################################
-gsdir  <-  'D:\\BSTS_external\\bsts_did_aggregation_comparison'  ## 'D:\\BSTS_external\\bsts_did_comparison_summary_gridsearch'
-files <- dir(gsdir, pattern = '\\.rds$')
-suml <- list()
-cdf <- data.frame(stringsAsFactors = F)
-for (i in 1:length(files)) {
-  cat(sprintf('i=%s %s\n',i,files[i]))
-  x <- readRDS(file.path(gsdir, files[i]))
-  intpd <- x$intpd
-  npds <- x$npds
-  n <- x$n
-  p <- x$compare$did$quadratic$attgt$Wpval
-  W <- x$compare$did$quadratic$attgt$W
-  
-  b3.bsts<-  x$compare$bsts$quadratic[[1]]$CausalImpact$summary$AbsEffect[1]
-  b3.tot.bsts <-  x$compare$bsts$quadratic[[1]]$CausalImpact$summary$AbsEffect[2]
-  
-  b3.did <- x$compare$did$quadratic$agg.es$overall.att
-  
-  b3.dgp <- mean( x$compare$res.tbl$quadratic[[1]]$b3.att[intpd:npds], na.rm = T)
-  
-  idf <- data.frame(file=files[i], intpd=intpd, npds=npds, n=n,
-                    parallel.p=p, parallel.W=W, b3.bsts=b3.bsts,
-                    b3.tot.bsts=b3.tot.bsts, b3.did=b3.did, 
-                    bias.bsts=(b3.bsts - b3.dgp), bias.did=(b3.did - b3.dgp),
-                    bsts.advantage=(abs(b3.did - b3.dgp) / abs(b3.bsts - b3.dgp))
-                    )
-  cdf <- rbind(cdf, idf)
-}
-write.csv(cdf, file=file.path(gsdir,'bsts_did_period_aggregation_summary.csv'))
-# att.did <- agg.es$overall.att
-# att.bsts <- impact_amount$summary$AbsEffect[1]
-
-cdf$bsts.advantage.b <- cdf$bsts.advantage > 1
-
-########################################
-########################################
-
-
-ggplot(data=cdf, aes(x=npds/n, y=parallel.p)) + 
-  geom_point(aes(colour=bsts.advantage.b), size=10) + 
-  # scale_colour_gradient2(low='red',mid='white',high='blue',midpoint=1) +
-  # scale_color_brewer(palette = "RdYlBu") +
-  geom_smooth(method = "lm") +
-  scale_y_log10() +
-  theme_bw() 
-
-
-ggplot(data=cdf, aes(x=npds, y=n, fill=log(parallel.p))) + 
-  geom_tile() + 
-  # scale_colour_gradient2(low='red',mid='white',high='blue',midpoint=1) +
-  # scale_color_brewer(palette = "RdYlBu") +
-  # geom_smooth(method = "lm") +
-  scale_fill_viridis_c() +
-  scale_y_log10() + scale_x_log10() +
-  theme_bw()
-
-
-
-
-
-
-
-
-
-
-
-########################################
-##
-##
-##  3.2.4. SENSITIVITY ANALYSIS
-##         
-##
-##  PRIOR DISTRIBUTIONS COMPARISON
-##
-##
-##
-########################################
-
-## Static Defaults
-# n <- 100  ## NUmber of actors (i.e., number of timeseries)
-# npds <- 60 #100
-# intpd <- round( npds * 2/3 )
-noise.level <- 1.5
-# treat.rule <- 'random' # 'below.benchmark' ## 'random'
-# treat.prob <-  0.5
-# treat.threshold <- NA
-b4 <- 1
-b5 <- 0.04
-dgp.nseasons= 12
-dgp.freq= 1
-## Scenarios
-# lags = list(c(1),c(2),c(3)) 
-# lags <- list( c(1) ) ##list(NULL)
-## 
-ns <- list(200) ## 400
-sim.lengths <- list(120)
-treat.rules <- list('random', 'below.benchmark')  ## 'below.benchmark'
-seasonalities <- list(TRUE, FALSE)   ## c(TRUE,  FALSE )
-prior.sd.scenarios <- list('sd.low','sd.high')  ## sd.low
-## FOCAL CONSTRUCT
-dgp.ars <- list(0, 0.1, 0.2, 0.3, 0.4)  ## 0.6  ## .1,.2,.4
-## STATE SPACE CONFIGURATIONS
-st.sp.lists <- list(
-  ## ## LEVEL
-  # `1`=c('AddLocalLevel'),
-  ## ## TREND
-  # `2`=c('AddLocalLinearTrend'),
-  # `3`=c('AddStudentLocalLinearTrend'),
-  ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  # `4`=c('AddSemilocalLinearTrend'),
-  ## ## SEASONAL
-  # `5`=c('AddTrig')#,
-  ## ## AUTOCORRELATION
-  # list('AddAr'),
-  # `6`=c('AddAutoAr'),
-  ##------ COMBINATIONS --------------
-  ## AR & SEASONALITY
-  `7`=c('AddAr','AddTrig')#,
-  # `7a`=c('AddAutoAr','AddTrig')#,
-  ## LEVEL + ...
-  # `8`=c('AddLocalLevel','AddTrig')#,
-  # `9`=c('AddLocalLevel','AddAr'),
-  # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-  # ## (LEVEL + SLOPE) + ...
-  # `11`=c('AddLocalLinearTrend','AddTrig')#,
-  # `12`=c('AddLocalLinearTrend','AddAr'),
-  # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
-  # `13`=c('AddStudentLocalLinearTrend','AddTrig'),
-  # `14`=c('AddStudentLocalLinearTrend','AddAr'),
-  # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
-  ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  # `15`=c('AddTrig','AddSemilocalLinearTrend')#,
-)
-
-
-
-##
-simlist <- list()
-## NUMBER OF ACTORS (number of timeseries)
-for (d in 1:length(ns)) {
-  n <- ns[[ d ]]
-  ## SIMULATION LENGTHS - NUMBER OF PERIODS
-  for (f in 1:length(sim.lengths)) {
-    npds <- sim.lengths[[ f ]]
-    intpd <-  round( npds * 2/3 )
-    ## AUTOCORRELATION VALUES
-    for (g in 1:length(dgp.ars)) {
-      dgp.ar <- dgp.ars[[ g ]]
-      
-      ## SEASONALITY
-      for (h in 1:length(seasonalities)) {
-        seasonality <- seasonalities[[ h ]]
-        
-        ## ENDOGENEITY (SELF-SELECTION)
-        for (i in 1:length(treat.rules)) {
-          treat.rule <- treat.rules[[ i ]]
-          
-          ##--------------------------------------------
-          ## Setup state space configurations
-          ##--------------------------------------------
-          bsts.state.specs <- list()
-          ## PRIOR NOISE / UNCERTAINTY (PRIOR STDEV)
-          for (j in 1:length(prior.sd.scenarios)) {
-            prior.sd.scenario <- prior.sd.scenarios[[ j ]]
-            
-            ## STATE SPACE COMPONENTS CONFIGURATION
-            for (k in 1:length(st.sp.lists)) {
-              st.sp.vec <- st.sp.lists[[ k ]]
-              
-              bsts.state.config <- list()
-              for (kk in 1:length(st.sp.vec)) {
-                ## SKIP AddSharedLocalLevel() for now...
-                .id <- length(bsts.state.config)+1
-                bsts.state.config[[ .id ]] <- getStateSpaceConfBySimScenario(st.sp.vec[ kk ], prior.sd.scenario)#, ## c('sd.high','sd.low')
-                # x.spikslab.prior=x.spikslab.prior, ## X  values for Boom::SpikeSlabPrior()
-                # y.spikslab.prior=y.spikslab.prior)
-                # .id <- .id + 1
-              }
-              bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
-            }
-            
-            ##--------------------------------------------
-            ## Append simulation configuration to simlist
-            ##--------------------------------------------
-            key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s', d,f,g,h,i,j)
-            cat(sprintf('\n%s\n',key))
-            # .idx <- sprintf('ar%s',dgp.ar)
-            simlist[[ key ]] <- list(
-              n = n,    ## Number of firms
-              npds = npds,  ## Number of periods
-              intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-              noise.level = noise.level, ## stdev of simulated noise terms
-              prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
-              treat.rule = treat.rule, 
-              treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-              treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-              b4 = b4,   ## seasonal component weight
-              b5 = b5, ##
-              b9 = dgp.ar  , ## autocorrelation
-              seasonality = seasonality,
-              dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
-              dgp.freq= ifelse(seasonality, dgp.freq, NA),
-              bsts.state.specs=bsts.state.specs,
-              # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-              rand.seed = 7531
-            )
-            
-          } ## // end prior.sd.scenarios loop
-          
-        } ## // end treat.rules loop
-        
-      } ## // end seasonalities loop
-      
-    } ## // end ARs loop
-    
-  } ## // end nps loop  (sim lengths)
-  
-} ## // end ns loop (number of actors)
-
-
-##
-effect.types = c('quadratic')
-##
-bsts.niter <- 1e4
-##
-sim.id <- round(10*as.numeric(Sys.time()))
-
-
-## RUN SIMULATION -  SIMULATE TIME SERIES
-simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-                               sim.id = sim.id,
-                               plot.show = FALSE, plot.save = FALSE )
-
-## RUN BSTS and compare to DID
-simlist.files <- runSimCompareBstsDiD(simlist, 
-                                      effect.types = effect.types,
-                                      sim.id = sim.id,
-                                      save.items.dir= dir_ext,
-                                      bsts.niter=bsts.niter*5
-)  ## D:\\BSTS_external
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
