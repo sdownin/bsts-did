@@ -99,13 +99,13 @@ st.sp.lists <- list(
   ## ## LEVEL
   # `1`=c('AddLocalLevel'),
   ## ## TREND
-  `2`=c('AddLocalLinearTrend'),
+  # `2`=c('AddLocalLinearTrend'),
   # `3`=c('AddStudentLocalLinearTrend'),
   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
   # `4`=c('AddSemilocalLinearTrend'),
   ## ## SEASONAL
-  `5`= c('AddTrig'),
-  `5b`=c('AddSeasonal'),
+  # `5`= c('AddTrig'),
+  # `5b`=c('AddSeasonal'),
   ## ## AUTOCORRELATION
   # list('AddAr'),
   # `6`=c('AddAr'),
@@ -118,16 +118,17 @@ st.sp.lists <- list(
   # `9`=c('AddLocalLevel','AddAr'),
   # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
   # ## (LEVEL + SLOPE) + ...
-  `11`= c('AddLocalLinearTrend','AddTrig'),
-  `11b`=c('AddLocalLinearTrend','AddSeasonal'),
+  # `11`= c('AddLocalLinearTrend','AddTrig'),
+  # `11b`=c('AddLocalLinearTrend','AddSeasonal'),
   # `12`=c('AddLocalLinearTrend','AddAr'),
   # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
-  `13`= c('AddStudentLocalLinearTrend','AddTrig'),
-  `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
+  # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
+  # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  # `15`=c('AddTrig','AddSemilocalLinearTrend')#,
+  `15`=c('AddSemilocalLinearTrend','AddTrig'),
+  `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
 )
 
 

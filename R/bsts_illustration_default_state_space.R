@@ -96,7 +96,7 @@ st.sp.lists <- list(
   `2`=c('AddLocalLinearTrend'),
   # `3`=c('AddStudentLocalLinearTrend'),
   ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  # `4`=c('AddSemilocalLinearTrend'),
+  `4`=c('AddSemilocalLinearTrend'),
   ## ## SEASONAL
   `5`= c('AddTrig'),
   `5b`=c('AddSeasonal'),
@@ -116,12 +116,13 @@ st.sp.lists <- list(
   `11b`=c('AddLocalLinearTrend','AddSeasonal'),
   # `12`=c('AddLocalLinearTrend','AddAr'),
   # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
-  `13`= c('AddStudentLocalLinearTrend','AddTrig'),
-  `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
+  # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
+  # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  # `15`=c('AddTrig','AddSemilocalLinearTrend')#,
+  `15`=c('AddSemilocalLinearTrend','AddTrig'),
+  `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
 )
 
 
