@@ -228,10 +228,10 @@ b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
 ## 
 ##=================================
 runSimSingleIntervention <- function(
-    n = 100, ## NUMBER OF actors  
-    npds = 100, ## NUMBER OF PERIODS
-    intpd = 60,
-    ystart = 0,
+    n = 200, ## NUMBER OF actors  
+    npds = 520, ## NUMBER OF PERIODS
+    intpd = round( 520 * (5/6) ),
+    ystart = 0.1,
     effect.type = 'constant',  ## c('constant','quadratic','geometric'), ## treatment effect shapes
     treat.rule = 'below.benchmark',
     treat.prob = 0.5, ## probability of self-selecting into treatment, if below treat.threshold 
@@ -247,7 +247,7 @@ runSimSingleIntervention <- function(
     b1 = .001, ## treatment dummy
     b2 = .001, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
-    b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
+    b4 = 0, ## Weight of seasonality effect
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates
     b6 = 1, ## Age [1,2,3,...]
@@ -455,6 +455,11 @@ runSimSingleIntervention <- function(
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
                                      noise.mean=0, noise.sd=noise.level)
       season.val <- season.vals[t]
+      ## Scale linear growth to equal b5 value for every completed seasonal cycle (e.g., 1 year)
+      season.frequency <- ifelse(season.frequency == 0, 1, season.frequency)
+      nseasons <- ifelse( nseasons == 0 , 1, nseasons )
+      growth.scale <-  npds /  ( nseasons * season.frequency )
+      b5 <- b5 / growth.scale
     }
     
     ## PERFORMANCE
