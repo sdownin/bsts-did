@@ -91,40 +91,42 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
   ## ## LEVEL
-  # `1`=c('AddLocalLevel'),
+  `1`=c('AddLocalLevel'),
   ## ## TREND
   `2`=c('AddLocalLinearTrend'),
-  # `3`=c('AddStudentLocalLinearTrend'),
-  ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
+  # # `3`=c('AddStudentLocalLinearTrend'),
+  # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
   `4`=c('AddSemilocalLinearTrend'),
-  ## ## SEASONAL
+  # ## ## SEASONAL
   `5`= c('AddTrig'),
   `5b`=c('AddSeasonal'),
-  ## ## AUTOCORRELATION
-  # list('AddAr'),
-  # `6`=c('AddAr'),
-  ##------ COMBINATIONS --------------
-  ## AR & SEASONALITY
-  # `7`=c('AddAr','AddTrig')#,
-  # `7a`=c('AddAutoAr','AddTrig')#,
-  ## LEVEL + ...
-  # `8`=c('AddLocalLevel','AddTrig')#,
-  # `9`=c('AddLocalLevel','AddAr'),
-  # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-  # ## (LEVEL + SLOPE) + ...
+  # ## ## AUTOCORRELATION
+  # # list('AddAr'),
+  `6`=c('AddAr'),
+  # ##------ COMBINATIONS --------------
+  # ## AR & SEASONALITY
+  `7`= c('AddAr','AddTrig'),
+  `7b`=c('AddAr','AddSeasonal'),
+  # # `7a`=c('AddAutoAr','AddTrig')#,
+  # ## LEVEL + ...
+  `8`= c('AddLocalLevel','AddTrig'),
+  `8b`=c('AddLocalLevel','AddSeasonal'),
+  # # `9`=c('AddLocalLevel','AddAr'),
+  # # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
+  # # ## (LEVEL + SLOPE) + ...
   `11`= c('AddLocalLinearTrend','AddTrig'),
   `11b`=c('AddLocalLinearTrend','AddSeasonal'),
   # `12`=c('AddLocalLinearTrend','AddAr'),
-  # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
+  # `12`= c('AddLocalLinearTrend','AddAr','AddTrig'),
+  # `12b`=c('AddLocalLinearTrend','AddAr','AddSeasonal'),
   # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
   # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `15`=c('AddSemilocalLinearTrend','AddTrig'),
+  `15`= c('AddSemilocalLinearTrend','AddTrig'),
   `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
 )
-
 
 
 ##
@@ -245,23 +247,123 @@ simlist.files <- runSimCompareBstsDiD(simlist,
 
 
 
+# 'D:\\BSTS_external'
+
+filename <- '__GRIDSEARCH_output__n200_pd520_niter50000_16724204820_d1f1g1h1i1j1l1.rds'
+simlist <- readRDS( file.path( dir_ext, filename ) )
+
+
+x <- simlist$compare$bsts$constant
+sslist <- lapply(1:length(x), function(i) x[[i]]$CausalImpact$model$bsts.model )
+CompareBstsModels( sslist )
+
+z <- rowSums(abs(sslist[[1]]$one.step.prediction.errors[,1:(intpd-1)]))
+
+res <- t( sapply(1:length(x), function(i) summary(rowSums(abs(sslist[[i]]$one.step.prediction.errors[,1:(intpd-1)]))) ) )
+print(round(res, 3))
+
+sscomp <- abs(as.data.frame(res))
+sscomp$ss.id <- 1:nrow(sscomp)
+sscomp$ss.comps <- sapply(1:nrow(sscomp), function(i) paste(st.sp.lists[[i]], collapse = '|') )
+
+res.tbl <- simlist$compare$res.tbl$constant
+
+## PRE ----
+x <- simlist$compare$bsts$constant
+ss.fits <- lapply(1:length(st.sp.lists), function(i){
+  cat(sprintf(' %s ',i))
+  idx <- 1:(intpd-1)
+  mod <- x[[i]]$CausalImpact$model$bsts.model
+  newdata <- cbind(treatment_y_outcome=mod$original.series[idx], mod$predictors[idx,])
+  burn <- round( .2 * mod$niter )
+  fit <- predict(mod, newdata=newdata, horizon = 1, burn = burn) ## one-step ahead prediction
+  yhat.t <- fit$mean
+  y.t <- fit$original.series[idx]
+  return(list(yhat.t=yhat.t, y.t=y.t, fit=fit, mod=mod))
+})
+saveRDS(ss.fits, file=file.path(dir_ext, 'bsts_default_state_space_comparison_sMAPE.rds'))
+## alias for constant MCC curve shape state space list
+x <- simlist$compare$bsts$constant
+## sMAPE - symmetric MAPE
+sscomp$bsts.pre.onestep.smape <- lapply(1:length(ss.fits), function(l){
+  yhat.t <- l['yhat.t']
+  y.t <- l['y.t']
+  100 * mean( abs(yhat.t - y.t) / (abs(y.t) - abs(yhat.t))  , na.rm=T)
+})
+sscomp$bsts.pre.onestep.mape <- lapply(1:length(ss.fits), function(l){
+  yhat.t <- l['yhat.t']
+  y.t <- l['y.t']
+  100 * mean( abs( (yhat.t - y.t) / y.t ), na.rm=T )
+})
+sscomp$bsts.pre.onestep.mae <- lapply(1:length(ss.fits), function(l){
+  err <- l['yhat.t'] - l['y.t']
+  mean( abs( err, na.rm=T ) )
+})
+sscomp$bsts.pre.onestep.mse <- lapply(1:length(ss.fits), function(l){
+  err <- l['yhat.t'] - l['y.t']
+  mean( err^2, na.rm=T )
+})
+sscomp$bsts.pre.onestep.rmse <- lapply(1:length(ss.fits), function(l){
+  err <- l['yhat.t'] - l['y.t']
+  sqrt( mean( err^2, na.rm=T ) )
+})
+# ## MAPE - Mean Absolute Percentage Error
+# sscomp$bsts.pre.onestep.mape <- sapply(1:nrow(sscomp), function(i){
+#   # idx <- 1:(intpd-1)
+#   # # eps.mat <- sslist[[i]]$one.step.prediction.errors[,idx]
+#   # ## pointwise mean of pre-intervention 1-step ahead prediction error
+#   # eps.t <- colMeans( sslist[[i]]$one.step.prediction.errors[,idx], na.rm=T )
+#   # ## pointwise observations pre-intervention
+#   # y.t <-  sslist[[i]]$original.series[idx] 
+#   # ## mean absolute percentage error
+#   # 100 * mean( abs(eps.t / y.t), na.rm=T)
+# })
+## RMSE - Root Mean Square Error
+sscomp$bsts.pre.onestep.rmse <- sapply(1:nrow(sscomp), function(i){
+  idx <- 1:(intpd-1)
+  att <- res.tbl[[i]]$b3.att[idx]
+  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
+  sqrt( mean( eps^2, na.rm=T) )
+})
+
+## POST --
+
+## MAPE - Mean Absolute Percentage Error
+sscomp$bsts.post.mape <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  att <- res.tbl[[i]]$b3.att[idx]
+  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
+  mean( abs(eps / att), na.rm=T)
+})
+## RMSE - Root Mean Square Error
+sscomp$bsts.post.rmse <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  att <- res.tbl[[i]]$b3.att[idx]
+  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
+  sqrt( mean( eps^2, na.rm=T) )
+})
 
 
 
+sscomp <- sscomp[order(sscomp$bsts.pre.onestep.mape, decreasing = F),]
+sscomp$bsts.pre.onestep.mape.rank <- 1:nrow(sscomp)
+print(sscomp)
+
+sscomp <- sscomp[order(sscomp$bsts.post.mape, decreasing = F),]
+sscomp$bsts.post.mape.rank <- 1:nrow(sscomp)
+print(sscomp)
+
+sscomp <- sscomp[order(sscomp$bsts.pre.onestep.rmse, decreasing = F),]
+sscomp$bsts.pre.onestep.rmse.rank <- 1:nrow(sscomp)
+print(sscomp)
+
+sscomp <- sscomp[order(sscomp$bsts.post.rmse, decreasing = F),]
+sscomp$bsts.post.rmse.rank <- 1:nrow(sscomp)
+print(sscomp)
 
 
+# sscomp$rank.diff <- sscomp$pre.rank - sscomp$post.rank
+# print(sscomp)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+write.csv(sscomp, file = file.path(dir_ext,'bsts_default_state_space_14config_summary_pre-post.csv'))
 # ########################## END ##########################################
