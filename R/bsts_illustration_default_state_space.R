@@ -1,6 +1,6 @@
 #####################################################
 ##
-##   Dynamic Causal Inference Simulations
+##   BSTS - FINDING DEFAULT STATE SPACE
 ##
 ##    Run script for simulations of
 ##     - ...
@@ -44,10 +44,15 @@ prefix <- 'bsts-illus_default-st-sp_'
 ##==============================
 ## Load simulation functions
 ##------------------------------
-# source(file.path(dir_r,'internal_intervention_sim.R'))
-source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## Actor index vectorized simulation
-##
-source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding state space components to state.space list
+## source(file.path(dir_r,'internal_intervention_sim.R')) ## previous version
+
+## Actor index vectorized simulation
+source(file.path(dir_r,'single_intervention_sim_vec.R')) 
+## Setting up and adding state space components to state.space list
+source(file.path(dir_r,'bsts_helper_functions.R')) 
+## BSTS vs. DiD comparison and sensitivity analysis
+source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
+
 
 
 # ## DEBUG ###
@@ -257,7 +262,7 @@ x <- simlist$compare$bsts$constant
 sslist <- lapply(1:length(x), function(i) x[[i]]$CausalImpact$model$bsts.model )
 CompareBstsModels( sslist )
 
-z <- rowSums(abs(sslist[[1]]$one.step.prediction.errors[,1:(intpd-1)]))
+# z <- rowSums(abs(sslist[[1]]$one.step.prediction.errors[,1:(intpd-1)]))
 
 res <- t( sapply(1:length(x), function(i) summary(rowSums(abs(sslist[[i]]$one.step.prediction.errors[,1:(intpd-1)]))) ) )
 print(round(res, 3))
@@ -266,10 +271,11 @@ sscomp <- abs(as.data.frame(res))
 sscomp$ss.id <- 1:nrow(sscomp)
 sscomp$ss.comps <- sapply(1:nrow(sscomp), function(i) paste(st.sp.lists[[i]], collapse = '|') )
 
-res.tbl <- simlist$compare$res.tbl$constant
+
 
 ## PRE ----
 x <- simlist$compare$bsts$constant
+## ***SLOW*** [10 - 15 minutes]
 ss.fits <- lapply(1:length(st.sp.lists), function(i){
   cat(sprintf(' %s ',i))
   idx <- 1:(intpd-1)
@@ -279,87 +285,105 @@ ss.fits <- lapply(1:length(st.sp.lists), function(i){
   fit <- predict(mod, newdata=newdata, horizon = 1, burn = burn) ## one-step ahead prediction
   yhat.t <- fit$mean
   y.t <- fit$original.series[idx]
-  return(list(yhat.t=yhat.t, y.t=y.t, fit=fit, mod=mod))
+  return(list(yhat.t=yhat.t, 
+              y.t=y.t#, 
+              # fit=fit, 
+              # mod=mod
+              ))
 })
-saveRDS(ss.fits, file=file.path(dir_ext, 'bsts_default_state_space_comparison_sMAPE.rds'))
+
+## Save comparison list (slow to run)
+saveRDS(ss.fits, file=file.path(dir_ext, 'bsts_default_state_space_comparison_1step-pred-err_list.rds'))
+
+
 ## alias for constant MCC curve shape state space list
 x <- simlist$compare$bsts$constant
 ## sMAPE - symmetric MAPE
-sscomp$bsts.pre.onestep.smape <- lapply(1:length(ss.fits), function(l){
-  yhat.t <- l['yhat.t']
-  y.t <- l['y.t']
+sscomp$bsts.pre.onestep.smape <- laply(ss.fits, function(l){
+  yhat.t <- l$yhat.t
+  y.t <- l$y.t
   100 * mean( abs(yhat.t - y.t) / (abs(y.t) - abs(yhat.t))  , na.rm=T)
 })
-sscomp$bsts.pre.onestep.mape <- lapply(1:length(ss.fits), function(l){
-  yhat.t <- l['yhat.t']
-  y.t <- l['y.t']
+sscomp$bsts.pre.onestep.asmape <- abs( sscomp$bsts.pre.onestep.smape )
+sscomp$bsts.pre.onestep.mape <- laply(ss.fits, function(l){
+  yhat.t <- l$yhat.t
+  y.t <- l$y.t
   100 * mean( abs( (yhat.t - y.t) / y.t ), na.rm=T )
 })
-sscomp$bsts.pre.onestep.mae <- lapply(1:length(ss.fits), function(l){
-  err <- l['yhat.t'] - l['y.t']
-  mean( abs( err, na.rm=T ) )
+sscomp$bsts.pre.onestep.mae <- laply(ss.fits, function(l){
+  err <- l$yhat.t - l$y.t
+  mean( abs( err ), na.rm=T ) 
 })
-sscomp$bsts.pre.onestep.mse <- lapply(1:length(ss.fits), function(l){
-  err <- l['yhat.t'] - l['y.t']
+sscomp$bsts.pre.onestep.mse <- laply(ss.fits, function(l){
+  err <- l$yhat.t - l$y.t
   mean( err^2, na.rm=T )
 })
-sscomp$bsts.pre.onestep.rmse <- lapply(1:length(ss.fits), function(l){
-  err <- l['yhat.t'] - l['y.t']
+sscomp$bsts.pre.onestep.rmse <- laply(ss.fits, function(l){
+  err <- l$yhat.t - l$y.t
   sqrt( mean( err^2, na.rm=T ) )
 })
-# ## MAPE - Mean Absolute Percentage Error
-# sscomp$bsts.pre.onestep.mape <- sapply(1:nrow(sscomp), function(i){
-#   # idx <- 1:(intpd-1)
-#   # # eps.mat <- sslist[[i]]$one.step.prediction.errors[,idx]
-#   # ## pointwise mean of pre-intervention 1-step ahead prediction error
-#   # eps.t <- colMeans( sslist[[i]]$one.step.prediction.errors[,idx], na.rm=T )
-#   # ## pointwise observations pre-intervention
-#   # y.t <-  sslist[[i]]$original.series[idx] 
-#   # ## mean absolute percentage error
-#   # 100 * mean( abs(eps.t / y.t), na.rm=T)
-# })
-## RMSE - Root Mean Square Error
-sscomp$bsts.pre.onestep.rmse <- sapply(1:nrow(sscomp), function(i){
-  idx <- 1:(intpd-1)
-  att <- res.tbl[[i]]$b3.att[idx]
-  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
-  sqrt( mean( eps^2, na.rm=T) )
-})
+
 
 ## POST --
-
-## MAPE - Mean Absolute Percentage Error
+res.tbl <- simlist$compare$res.tbl$constant
+## 
+sscomp$bsts.post.smape <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  100 * mean( abs(bsts - dgp) / (abs(dgp) - abs(bsts))  , na.rm=T)
+})
+sscomp$bsts.post.asmape <- abs( sscomp$bsts.post.smape )
 sscomp$bsts.post.mape <- sapply(1:nrow(sscomp), function(i){
   idx <- intpd:npds
-  att <- res.tbl[[i]]$b3.att[idx]
-  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
-  mean( abs(eps / att), na.rm=T)
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  eps <- bsts - dgp
+  100 * mean( abs( eps / dgp), na.rm=T)
 })
 ## RMSE - Root Mean Square Error
 sscomp$bsts.post.rmse <- sapply(1:nrow(sscomp), function(i){
   idx <- intpd:npds
-  att <- res.tbl[[i]]$b3.att[idx]
-  eps <- res.tbl[[i]]$bsts.point.effect[idx] - att
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  eps <- bsts - dgp
   sqrt( mean( eps^2, na.rm=T) )
+})
+sscomp$bsts.post.mse <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  eps <- bsts - dgp
+  mean( eps^2, na.rm=T)
+})
+sscomp$bsts.post.mae <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  eps <- bsts - dgp
+  mean( abs( eps ), na.rm=T)
 })
 
 
+sscomp$has.season <- sapply(1:nrow(sscomp),function(i) 1*grepl(pattern = '(AddTrig|AddSeasonal)', x = sscomp$ss.comps[i], ignore.case = T, perl = T))
 
-sscomp <- sscomp[order(sscomp$bsts.pre.onestep.mape, decreasing = F),]
-sscomp$bsts.pre.onestep.mape.rank <- 1:nrow(sscomp)
-print(sscomp)
 
-sscomp <- sscomp[order(sscomp$bsts.post.mape, decreasing = F),]
-sscomp$bsts.post.mape.rank <- 1:nrow(sscomp)
-print(sscomp)
-
-sscomp <- sscomp[order(sscomp$bsts.pre.onestep.rmse, decreasing = F),]
-sscomp$bsts.pre.onestep.rmse.rank <- 1:nrow(sscomp)
-print(sscomp)
-
-sscomp <- sscomp[order(sscomp$bsts.post.rmse, decreasing = F),]
-sscomp$bsts.post.rmse.rank <- 1:nrow(sscomp)
-print(sscomp)
+# 
+# sscomp <- sscomp[order(sscomp$bsts.pre.onestep.mape, decreasing = F),]
+# sscomp$bsts.pre.onestep.mape.rank <- 1:nrow(sscomp)
+# print(sscomp)
+# 
+# sscomp <- sscomp[order(sscomp$bsts.post.mape, decreasing = F),]
+# sscomp$bsts.post.mape.rank <- 1:nrow(sscomp)
+# print(sscomp)
+# 
+# sscomp <- sscomp[order(sscomp$bsts.pre.onestep.rmse, decreasing = F),]
+# sscomp$bsts.pre.onestep.rmse.rank <- 1:nrow(sscomp)
+# print(sscomp)
+# 
+# sscomp <- sscomp[order(sscomp$bsts.post.rmse, decreasing = F),]
+# sscomp$bsts.post.rmse.rank <- 1:nrow(sscomp)
+# print(sscomp)
 
 
 # sscomp$rank.diff <- sscomp$pre.rank - sscomp$post.rank

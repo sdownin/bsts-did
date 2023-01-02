@@ -1,6 +1,6 @@
 #####################################################
 ##
-##   Dynamic Causal Inference Simulations
+##   PERIOD AGGREGATION - GRANULARITY 
 ##
 ##    Run script for simulations of
 ##     - ...
@@ -44,20 +44,16 @@ prefix <- 'bsts-illus_pd-agg_'
 ##==============================
 ## Load simulation functions
 ##------------------------------
-# source(file.path(dir_r,'internal_intervention_sim.R'))
-source(file.path(dir_r,'single_intervention_sim_vec.R'))  ## Actor index vectorized simulation
-##
-source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding state space components to state.space list
+# source(file.path(dir_r,'internal_intervention_sim.R'))  ## previous version
+
+## Actor index vectorized simulation
+source(file.path(dir_r,'single_intervention_sim_vec.R')) 
+## Setting up and adding state space components to state.space list
+source(file.path(dir_r,'bsts_helper_functions.R')) 
+## BSTS vs. DiD comparison and sensitivity analysis
+source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
 
 
-# ## DEBUG ###
-# effect.types=c('constant','quadratic','geometric')
-# sim.id=round(10*as.numeric(Sys.time()))
-# plot.show=F
-# plot.save=F
-# save.items.dir=NA
-# bsts.niter=1000
-# ##----------
 
 
 ################################################################################################################
@@ -80,13 +76,13 @@ source(file.path(dir_r,'bsts_helper_functions.R')) ## Setting up and adding stat
 
 ## Static defaults
 noise.level <- 1.5
-b4 <- 1  ## seasonal component weight
+b4 <- 2.0  ## seasonal component weight
 b5 <- 0.04 ## linear growth trend
 dgp.nseasons= 52
 dgp.freq= 1
 
 ## Variables Ranges to grid search (optional)
-ns <- list(200) ## 400
+ns <- list(100, 200) ## list( 100, 200 ) ## ** INTERACT SIZE (N) with GRANULARITY
 sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
@@ -100,36 +96,40 @@ st.sp.lists <- list(
   # `1`=c('AddLocalLevel'),
   ## ## TREND
   # `2`=c('AddLocalLinearTrend'),
-  # `3`=c('AddStudentLocalLinearTrend'),
-  ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
+  # # `3`=c('AddStudentLocalLinearTrend'),
+  # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
   # `4`=c('AddSemilocalLinearTrend'),
-  ## ## SEASONAL
+  # ## ## SEASONAL
   # `5`= c('AddTrig'),
   # `5b`=c('AddSeasonal'),
-  ## ## AUTOCORRELATION
-  # list('AddAr'),
+  # ## ## AUTOCORRELATION
+  # # list('AddAr'),
   # `6`=c('AddAr'),
-  ##------ COMBINATIONS --------------
-  ## AR & SEASONALITY
-  # `7`=c('AddAr','AddTrig')#,
-  # `7a`=c('AddAutoAr','AddTrig')#,
-  ## LEVEL + ...
-  # `8`=c('AddLocalLevel','AddTrig')#,
-  # `9`=c('AddLocalLevel','AddAr'),
-  # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-  # ## (LEVEL + SLOPE) + ...
+  # ##------ COMBINATIONS --------------
+  # ## AR & SEASONALITY
+  # `7`= c('AddAr','AddTrig'),
+  # `7b`=c('AddAr','AddSeasonal'),
+  # # `7a`=c('AddAutoAr','AddTrig')#,
+  # ## LEVEL + ...
+  # `8`= c('AddLocalLevel','AddTrig'),
+  `8b`=c('AddLocalLevel','AddSeasonal')#,
+  # # `9`=c('AddLocalLevel','AddAr'),
+  # # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
+  # # ## (LEVEL + SLOPE) + ...
   # `11`= c('AddLocalLinearTrend','AddTrig'),
   # `11b`=c('AddLocalLinearTrend','AddSeasonal'),
   # `12`=c('AddLocalLinearTrend','AddAr'),
-  # # `12`=c('AddLocalLinearTrend','AddTrig','AddAr'),
+  # `12`= c('AddLocalLinearTrend','AddAr','AddTrig'),
+  # `12b`=c('AddLocalLinearTrend','AddAr','AddSeasonal'),
   # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
   # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `15`=c('AddSemilocalLinearTrend','AddTrig'),
-  `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
+  # `15`= c('AddSemilocalLinearTrend','AddTrig'),
+  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
 )
+
 
 
 
@@ -178,31 +178,44 @@ for (d in 1:length(ns)) {
               bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
             }
             
-            ##--------------------------------------------
-            ## Append simulation configuration to simlist
-            ##--------------------------------------------
-            key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s', d,f,g,h,i,j)
-            cat(sprintf('\n%s\n',key))
-            # .idx <- sprintf('ar%s',dgp.ar)
-            simlist[[ key ]] <- list(
-              n = n,    ## Number of firms
-              npds = npds,  ## Number of periods
-              intpd = intpd, ## 60% pre-intervention training / 40% post-intervention
-              noise.level = noise.level, ## stdev of simulated noise terms
-              prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
-              treat.rule = treat.rule, 
-              treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-              treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-              b4 = b4,   ## seasonal component weight
-              b5 = b5, ##
-              b9 = dgp.ar  , ## autocorrelation
-              seasonality = seasonality,
-              dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
-              dgp.freq= ifelse(seasonality, dgp.freq, NA),
-              bsts.state.specs=bsts.state.specs,
-              # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-              rand.seed = 7531
-            )
+            ## EXPECTED MODEL SIZES
+            for (l in 1:length(expect.mod.sizes)) {
+              expect.mod.size <- expect.mod.sizes[[ l ]]
+              
+              ##--------------------------------------------
+              ## Append simulation configuration to simlist
+              ##--------------------------------------------
+              key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
+              cat(sprintf('\n%s\n',key))
+              # .idx <- sprintf('ar%s',dgp.ar)
+              simlist[[ key ]] <- list(
+                n = n,    ## Number of firms
+                npds = npds,  ## Number of periods
+                intpd = intpd, ## 60% pre-intervention training / 40% post-interventihttp://127.0.0.1:37489/graphics/plot_zoom_png?width=1200&height=900on
+                noise.level = noise.level, ## stdev of simulated noise terms
+                prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+                treat.rule = treat.rule, 
+                treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+                treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+                ## Dynamic treatment effect  (quadratic polynomial)
+                w0 = 1.5,  ## constant
+                w1 = 0.13, ## linear
+                w2 = -.05 / sqrt(npds), ## quadratic
+                w2.shift = -round( sqrt(npds)*.7 ),
+                ##
+                b4 = b4,   ## seasonal component weight
+                b5 = b5, ##
+                b9 = dgp.ar  , ## autocorrelation
+                seasonality = seasonality,
+                dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+                dgp.freq= ifelse(seasonality, dgp.freq, NA),
+                bsts.state.specs=bsts.state.specs,
+                expect.mod.size=expect.mod.size,
+                # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+                rand.seed = 13579
+              )
+              
+            }
             
           } ## // end prior.sd.scenarios loop
           
@@ -217,22 +230,16 @@ for (d in 1:length(ns)) {
 } ## // end ns loop (number of actors)
 
 
+
+
 ##
-effect.types = c('constant','geometric','quadratic')
+effect.types =  c('constant','geometric','quadratic') ## c('quadratic')  
 ## Scale bsts iterations by 10k increments (more iterations for models that converge more slowly)
-bsts.niter <- 1e4
+bsts.niter <- 1e4  ## 1e4
 
 sim.id <- round(10*as.numeric(Sys.time()))
 
 
-
-# # ##-
-# (simlist,     ## n, npds, intpd moved into simlist elements
-#   effect.types=c('constant','quadratic','geometric'), 
-#   sim.id=round(10*as.numeric(Sys.time())),
-#   plot.show=F, plot.save=F) {
-#   
-# # ##---
 
 
 ## RUN SIMULATION -  SIMULATE TIME SERIES
@@ -379,7 +386,14 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*8 )
+                                       bsts.niter=bsts.niter*5 )
+
+
+
+
+
+
+
 
 
 
