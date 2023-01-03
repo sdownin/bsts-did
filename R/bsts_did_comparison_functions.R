@@ -202,6 +202,9 @@ postPredChecks <- function(causimp, filename=NA,
     filename
   }
   
+  ## output list of convergence checks (booleans) and residual dataframes
+  checklist <- list()
+  
   response <- causimp$series$response
   y <- response
   
@@ -247,13 +250,13 @@ postPredChecks <- function(causimp, filename=NA,
   gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
   ##
   hd <- heidel.diag.mod(post.pred.tr)
-  hd.st.cmv <- hd[1,'CMV.stat']
-  hd.st.p <- hd[1,'pvalue']
+  hd.st.cmv <- hd[1,'CMV.stat'][1]
+  hd.st.p <- hd[1,'pvalue'][1]
   hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
-  hd.st.start <- hd[1,'start']
+  hd.st.start <- hd[1,'start'][1]
   hd.hw.eps <- 0.1 ## default 0.1
-  hd.hw <- hd[1,'halfwidth']
-  hd.hw.mean <- hd[1,'mean']
+  hd.hw <- hd[1,'halfwidth'][1]
+  hd.hw.mean <- hd[1,'mean'][1]
   hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
   ##
   rng <- range(post.pred.tr)
@@ -261,11 +264,17 @@ postPredChecks <- function(causimp, filename=NA,
   plot(post.pred.tr, type='l', main='A. Posterior Predicted MCMC Trace, Y' ,
        ylim=ylims
   )
-  mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
-                       gd.result,gd.z,gd.p,
-                       hd.st.result, hd.st.cmv, hd.st.p,
-                       hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
-        side = 3, line=-4.5, outer = F)
+  mtext.postpred <- sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+                            gd.result,gd.z,gd.p,
+                            hd.st.result, hd.st.cmv, hd.st.p,
+                            hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
+  mtext(text = mtext.postpred, side = 3, line=-4.5, outer = F)
+  ##
+  checklist$ck.postpred <- list(
+    geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
+    hw.st  = list(check=(hd.st.p >= conv.alpha), cmv=hd.st.cmv, p=hd.st.p),
+    hw.hw  = list(check=(abs(hd.hw/hd.hw.mean) < hd.hw.eps), hw.mean=abs(hd.hw/hd.hw.mean), hw.eps=hd.hw.eps)
+  )
   ##-----------
   
   ##-----------
@@ -305,24 +314,30 @@ postPredChecks <- function(causimp, filename=NA,
   gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
   ##
   hd <- heidel.diag.mod(res.tr)
-  hd.st.cmv <- hd[1,'CMV.stat']
-  hd.st.p <- hd[1,'pvalue']
+  hd.st.cmv <- hd[1,'CMV.stat'][1]
+  hd.st.p <- hd[1,'pvalue'][1]
   hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
-  hd.st.start <- hd[1,'start']
+  hd.st.start <- hd[1,'start'][1]
   hd.hw.eps <- 0.1 ## default 0.1
-  hd.hw <- hd[1,'halfwidth']
-  hd.hw.mean <- hd[1,'mean']
+  hd.hw <- hd[1,'halfwidth'][1]
+  hd.hw.mean <- hd[1,'mean'][1]
   hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
   ##
   rng <- range(res.tr)
   ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
   plot(res.tr, type='l', main='D. Std.Residual MCMC Trace, Y',
        ylim=ylims)
-  mtext(text = sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
-                       gd.result,gd.z,gd.p,
-                       hd.st.result, hd.st.cmv, hd.st.p,
-                       hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps), 
-        side = 3, line=-4.5, outer = F)
+  mtext.residual <- sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+                            gd.result,gd.z,gd.p,
+                            hd.st.result, hd.st.cmv, hd.st.p,
+                            hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
+  mtext(text = mtext.residual, side = 3, line=-4.5, outer = F)
+  ##
+  checklist$ck.residual <- list(
+    geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
+    hw.st  = list(check=(hd.st.p >= conv.alpha), cmv=hd.st.cmv, p=hd.st.p),
+    hw.hw  = list(check=(abs(hd.hw/hd.hw.mean) < hd.hw.eps), hw.mean=abs(hd.hw/hd.hw.mean), hw.eps=hd.hw.eps)
+  )
   ##-----------
   
   ##-----------
@@ -343,10 +358,37 @@ postPredChecks <- function(causimp, filename=NA,
   
   ##
   if(return.val) {
-    return(list(
-      std.res=std.res, 
-      post.pred.dist=post.pred.dist
-    ))
+    checklist$std.residual <- std.res
+    checklist$postpred.dist <- post.pred.dist
+    checklist$summary <- sprintf('\nPosterior Predictive:-----\n%s\nStd. Residuals:-----\n%s\n\n', mtext.postpred, mtext.residual)
+    
+    ## ALL CONVERGENCE CHECKS
+    c1 <- unname( checklist$ck.residual$geweke$check )
+    c2 <- unname( checklist$ck.residual$hw.st$check )
+    c3 <- unname( checklist$ck.residual$hw.hw$check )
+    c4 <- unname( checklist$ck.postpred$geweke$check )
+    c5 <- unname( checklist$ck.postpred$hw.st$check )
+    c6 <- unname( checklist$ck.postpred$hw.hw$check )
+    ##
+    ck1 <- ifelse(is.na(c1) | is.nan(c1), FALSE, c1)
+    ck2 <- ifelse(is.na(c2) | is.nan(c2), FALSE, c2)
+    ck3 <- ifelse(is.na(c3) | is.nan(c3), FALSE, c3)
+    ck4 <- ifelse(is.na(c4) | is.nan(c4), FALSE, c4)
+    ck5 <- ifelse(is.na(c5) | is.nan(c5), FALSE, c5)
+    ck6 <- ifelse(is.na(c6) | is.nan(c6), FALSE, c6)
+    ##
+    checklist$converged <- c(
+      pp.ge = ck1, 
+      pp.st = ck2, 
+      pp.hw = ck3, 
+      r.ge  = ck4, 
+      r.st  = ck5, 
+      r.hw  = ck6
+    )
+    checklist$converged.all <- all( checklist$converged )
+    checklist$converged.prop <- sum(checklist$converged) / length(checklist$converged)
+    
+    return(checklist)
   }
   
 }
@@ -517,8 +559,11 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
                                  effect.types=c('constant','quadratic','geometric'), 
                                  sim.id=NA,
                                  save.items.dir=NA, ## save updated simlist items to seprate RDS files
-                                 bsts.niter=5e3
+                                 bsts.niter=5000,
+                                 bsts.max.iter=8e4 ## 80000
 ) {
+  ## cache original bsts.niter for dynamic niter updating if MCMC convergence failed
+  bsts.niter.orig <- bsts.niter
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
   # print(simlist)
@@ -857,35 +902,84 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         
         cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
         
-        ## BSTS model
-        bsts.model <- tryCatch(expr = {
-          bsts(y.pre.treat.NAs.post.treat ~ . ,
-               state.specification = st.sp,
-               data = predictors,
-               expected.model.size = expect.mod.size,
-               niter = bsts.niter)
-        },
-        error=function(e) {
-          message(sprintf('bsts() error: %s', as.character(e)))
-          # message(cond)
-          # # Choose a return value in case of error
-          # return(NA)
-        },
-        warning=function(w) {
-          message(sprintf('bsts() warning: %s', as.character(w)))
-          # message(paste("URL caused a warning:", url))
-          # return(NA)
-        },
-        finally={
-          ##PASS
-        })
-        # bsts.model <- bsts(y.pre.treat.NAs.post.treat ~ . ,
-        #                    state.specification = st.sp,
-        #                    data = predictors,
-        #                    niter = bsts.niter)
-        if ( class(bsts.model) != 'bsts' ) {
+        
+        ##---------------------------------------------------------
+        ## RUN BSTS WITH DYNAMIC niter BASED ON CONVERGENCE 
+        isConverged <- FALSE
+        isMaxIter <- FALSE
+        hasBstsError <- FALSE
+        bsts.niter <- bsts.niter.orig  ## reset to original bsts.niter input value
+        while ( !isConverged  &  !isMaxIter & !hasBstsError  ) {
+          
+          ## BSTS model
+          bsts.model <- tryCatch(expr = {
+            bsts(y.pre.treat.NAs.post.treat ~ . ,
+                 state.specification = st.sp,
+                 data = predictors,
+                 expected.model.size = expect.mod.size,
+                 niter = bsts.niter)
+          },
+          error=function(e) {
+            message(sprintf('bsts() error: %s', as.character(e)))
+          },
+          warning=function(w) {
+            message(sprintf('bsts() warning: %s', as.character(w)))
+          },
+          finally={
+            ##PASS
+          })
+          
+          
+          ## skip if bsts() function threw an error (not return 'bsts' object)
+          if ( class(bsts.model) == 'bsts' ) {
+            ## Use BSTS prediction of counterfactual to estimate CausalImpact
+            impact_amount <- CausalImpact(bsts.model=bsts.model,
+                                          post.period.response = post.period.response,
+                                          alpha=0.05, model.args = list(niter = bsts.niter))
+            ## POSTERIOR PREDICTIVE CHECKS
+            ppcheck.filename <- file.path(save.img.dir,
+                                          sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+                                                  prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+            convcheck <- postPredChecks(impact_amount, filename=ppcheck.filename, return.val = T)
+            ##
+            # print(convcheck)
+            ##
+            cat(sprintf('\nBSTS niter = %s',bsts.niter))
+            cat(convcheck$summary)
+            ## UPDATE CONVERGENCE CHECK FLAG - ELSE RERUN WITH INCREASED bsts.niter
+            # isConverged <- convcheck$converged.all
+            conv.tol <- 0.8
+            conv.min.iter.thresh <- 4e4 ## 40k
+            # isConverged <- convcheck$converged.prop >= conv.tol
+            isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter > conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
+            print(convcheck$converged)
+            cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nIs Converged = %s\n\n',
+                        convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
+          } else {
+            hasBstsError <- TRUE
+          }
+          
+
+          ## UPDATE niter --> increase by factor of 2
+          if ( !isConverged ) {
+            # .niter <- round( bsts.niter * (2 - convcheck$converged.prop) ) ## scale niter increment by proportion of failed checks
+            bsts.niter.new <- round( (bsts.niter * 2) / 10) * 10  ## double niter and make divisible by 10 (for bsts ping=10 to divide evenly into niter)
+            if ( bsts.niter.new <= bsts.max.iter ) {
+              bsts.niter <- bsts.niter.new  
+            } else {
+              isMaxIter <- TRUE
+            }
+          }
+
+       
+        }
+        
+        if (hasBstsError) {
           next
         }
+        ##-------------------------------------------------------------
+        
+        
         ##
         plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
         PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
@@ -895,21 +989,10 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
         PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
         ##
-        
         # ## BSTS model for Dynamic Regression
         # bsts.model <- bsts(y.pre.treat.NAs.post.treat,
         #                    state.specification = st.sp,
         #                    niter = 5000)
-        
-        ## Use BSTS prediction of counterfactual to estimate CausalImpact
-        impact_amount <- CausalImpact(bsts.model=bsts.model,
-                                      post.period.response = post.period.response,
-                                      alpha=0.05, model.args = list(niter = bsts.niter))
-        ## POSTERIOR PREDICTIVE CHECKS
-        ppcheck.filename <- file.path(save.img.dir,
-                                      sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
-        postPredChecks(impact_amount, filename=ppcheck.filename)
         
         # ##
         # summary(impact_amount)
@@ -1206,12 +1289,33 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     
     
     if ( ! is.na(save.items.dir) ) {
-      ## Save simulation list as serialized data file
-      simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
-      save.file.path <-  file.path(save.items.dir, simlist.file)
-      saveRDS(simlist[[key]], file = save.file.path)
-      ## FREE UP MEMORY
-      simlist[[key]] <- list(file = save.file.path)
+      maxGb <- 10
+      # maxGb <- .001  ## **DEBUG**
+      if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
+        ## IF SMALL ENOUGH, Save simulation list as serialized data file
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
+        save.file.path <-  file.path(save.items.dir, simlist.file)
+        saveRDS(simlist[[key]], file = save.file.path)
+        ## FREE UP MEMORY
+        simlist[[key]] <- list(file = save.file.path)
+      } else { 
+        ## IF TOO LARGE (> 10GB), then save BSTS object (with MCMC samples) separately from rest of simulation
+        save.file.paths <- c()
+        ## Save simulation list as serialized data file
+        ## 1.  BSTS
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s_simlist-compare-bsts.rds', n, npds, bsts.niter, sim.id, key.strip)
+        save.file.path <-  file.path(save.items.dir, simlist.file)
+        saveRDS(simlist[[key]]$compare$bsts, file = save.file.path)
+        simlist[[key]]$compare$bsts <- NULL ## save space
+        save.file.paths[1] <- save.file.path
+        ## 2. rest of simulation object
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s_simlist-MAIN.rds', n, npds, bsts.niter, sim.id, key.strip)
+        save.file.path <-  file.path(save.items.dir, simlist.file)
+        saveRDS(simlist[[key]], file = save.file.path)
+        save.file.paths[2] <- save.file.path
+        ## FREE UP MEMORY
+        simlist[[key]] <- list(file = save.file.paths)
+      }
     } 
     
     

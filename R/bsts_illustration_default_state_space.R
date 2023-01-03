@@ -72,14 +72,14 @@ source(file.path(dir_r,'bsts_did_comparison_functions.R'))
 ##=======================================
 ##
 ##
-##  0.  FIND OPTIONAL STATE SPACE CONFIG 
+##  1.  FIND OPTIONAL STATE SPACE CONFIG 
 ##      TO SERVE AS DEFAULT 
 ##
 ##
 ##=======================================
 ## Static defaults
-noise.level <- 1.5
-b4 <- 1  ## seasonal component weight
+noise.level <- 1.3
+b4 <- 1.0  ## seasonal component weight
 b5 <- 0.04 ## linear growth trend
 dgp.nseasons= 52
 dgp.freq= 1
@@ -96,22 +96,22 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
   ## ## LEVEL
-  `1`=c('AddLocalLevel'),
+  # `1`=c('AddLocalLevel'),
   ## ## TREND
-  `2`=c('AddLocalLinearTrend'),
+  # `2`=c('AddLocalLinearTrend'),
   # # `3`=c('AddStudentLocalLinearTrend'),
   # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  `4`=c('AddSemilocalLinearTrend'),
+  # `4`=c('AddSemilocalLinearTrend'),
   # ## ## SEASONAL
   `5`= c('AddTrig'),
   `5b`=c('AddSeasonal'),
   # ## ## AUTOCORRELATION
   # # list('AddAr'),
-  `6`=c('AddAr'),
+  # `6`=c('AddAr'),
   # ##------ COMBINATIONS --------------
   # ## AR & SEASONALITY
-  `7`= c('AddAr','AddTrig'),
-  `7b`=c('AddAr','AddSeasonal'),
+  # `7`= c('AddAr','AddTrig'),
+  # `7b`=c('AddAr','AddSeasonal'),
   # # `7a`=c('AddAutoAr','AddTrig')#,
   # ## LEVEL + ...
   `8`= c('AddLocalLevel','AddTrig'),
@@ -192,12 +192,18 @@ for (d in 1:length(ns)) {
               simlist[[ key ]] <- list(
                 n = n,    ## Number of firms
                 npds = npds,  ## Number of periods
-                intpd = intpd, ## 60% pre-intervention training / 40% post-interventihttp://127.0.0.1:37489/graphics/plot_zoom_png?width=1200&height=900on
+                intpd = intpd, ## #intervention period
                 noise.level = noise.level, ## stdev of simulated noise terms
                 prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
                 treat.rule = treat.rule, 
                 treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
                 treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+                ## Dynamic treatment effect  (quadratic polynomial)
+                w0 = 1.5,  ## constant
+                w1 = 0.13, ## linear
+                w2 = -.05 / sqrt(npds), ## quadratic
+                w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
+                ##
                 b4 = b4,   ## seasonal component weight
                 b5 = b5, ##
                 b9 = dgp.ar  , ## autocorrelation
@@ -207,7 +213,7 @@ for (d in 1:length(ns)) {
                 bsts.state.specs=bsts.state.specs,
                 expect.mod.size=expect.mod.size,
                 # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                rand.seed = 7531
+                rand.seed = 13579
               )
               
             }
@@ -225,10 +231,13 @@ for (d in 1:length(ns)) {
 } ## // end ns loop (number of actors)
 
 
+
+
 ##
 effect.types = c('constant') #c('geometric','quadratic')
 ##
-bsts.niter <- 1e4
+bsts.niter.start <-  5000
+bsts.niter.max   <-  8e4
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -236,14 +245,183 @@ sim.id <- round(10*as.numeric(Sys.time()))
 ## RUN SIMULATION -  SIMULATE TIME SERIES
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
-                               plot.show = T, plot.save = T )
+                               plot.show = F, plot.save = F )
 
 ## RUN BSTS and compare to DID
 simlist.files <- runSimCompareBstsDiD(simlist, 
                                       effect.types = effect.types,
                                       sim.id = sim.id,
                                       save.items.dir= dir_ext,
-                                      bsts.niter=bsts.niter * 5
+                                      bsts.niter = bsts.niter.start,
+                                      bsts.max.iter= bsts.niter.max
+)  ## D:\\BSTS_external
+
+
+
+
+
+
+# ########################## END ##########################################
+
+
+
+
+
+##=======================================
+##
+##
+##  2.  FIND ALTERNATIVE STATE SPACE CONFIG 
+##      FOR COMPARISON 
+##
+##
+##=======================================
+## Static defaults
+noise.level <- 1.3
+b4 <- 1.0  ## seasonal component weight
+b5 <- 0.04 ## linear growth trend
+dgp.nseasons= 52
+dgp.freq= 1
+
+## Variables Ranges to grid search (optional)
+ns <- list(200) ## 400
+sim.lengths <- list(520)
+treat.rules <- list('random')  ## 'below.benchmark'
+seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
+prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
+expect.mod.sizes <- list(2)
+## FOCAL CONSTRUCT
+dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
+## STATE SPACE CONFIGURATIONS
+st.sp.lists <- list(
+  `1`=c('AddLocalLevel'),
+  `2`=c('AddLocalLinearTrend'),
+  `4`=c('AddSemilocalLinearTrend'),
+  `6`= c('AddAr'),
+  `7`= c('AddAr','AddTrig'),
+  `7b`=c('AddAr','AddSeasonal')
+)
+
+##
+simlist <- list()
+## NUMBER OF ACTORS (number of timeseries)
+for (d in 1:length(ns)) {
+  n <- ns[[ d ]]
+  ## SIMULATION LENGTHS - NUMBER OF PERIODS
+  for (f in 1:length(sim.lengths)) {
+    npds <- sim.lengths[[ f ]]
+    intpd <-  round( npds * 5/6 ) 
+    ## AUTOCORRELATION VALUES
+    for (g in 1:length(dgp.ars)) {
+      dgp.ar <- dgp.ars[[ g ]]
+      
+      ## SEASONALITY
+      for (h in 1:length(seasonalities)) {
+        seasonality <- seasonalities[[ h ]]
+        
+        ## ENDOGENEITY (SELF-SELECTION)
+        for (i in 1:length(treat.rules)) {
+          treat.rule <- treat.rules[[ i ]]
+          
+          ##--------------------------------------------
+          ## Setup state space configurations
+          ##--------------------------------------------
+          bsts.state.specs <- list()
+          ## PRIOR NOISE / UNCERTAINTY (PRIOR STDEV)
+          for (j in 1:length(prior.sd.scenarios)) {
+            prior.sd.scenario <- prior.sd.scenarios[[ j ]]
+            
+            ## STATE SPACE COMPONENTS CONFIGURATION
+            for (k in 1:length(st.sp.lists)) {
+              st.sp.vec <- st.sp.lists[[ k ]]
+              
+              bsts.state.config <- list()
+              for (kk in 1:length(st.sp.vec)) {
+                ## SKIP AddSharedLocalLevel() for now...
+                .id <- length(bsts.state.config)+1
+                bsts.state.config[[ .id ]] <- getStateSpaceConfBySimScenario(st.sp.vec[ kk ], prior.sd.scenario)#, ## c('sd.high','sd.low')
+                # x.spikslab.prior=x.spikslab.prior, ## X  values for Boom::SpikeSlabPrior()
+                # y.spikslab.prior=y.spikslab.prior)
+                # .id <- .id + 1
+              }
+              bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
+            }
+            
+            ## EXPECTED MODEL SIZES
+            for (l in 1:length(expect.mod.sizes)) {
+              expect.mod.size <- expect.mod.sizes[[ l ]]
+              
+              ##--------------------------------------------
+              ## Append simulation configuration to simlist
+              ##--------------------------------------------
+              key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
+              cat(sprintf('\n%s\n',key))
+              # .idx <- sprintf('ar%s',dgp.ar)
+              simlist[[ key ]] <- list(
+                n = n,    ## Number of firms
+                npds = npds,  ## Number of periods
+                intpd = intpd, ## #intervention period
+                noise.level = noise.level, ## stdev of simulated noise terms
+                prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+                treat.rule = treat.rule, 
+                treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+                treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+                ## Dynamic treatment effect  (quadratic polynomial)
+                w0 = 1.5,  ## constant
+                w1 = 0.13, ## linear
+                w2 = -.05 / sqrt(npds), ## quadratic
+                w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
+                ##
+                b4 = b4,   ## seasonal component weight
+                b5 = b5, ##
+                b9 = dgp.ar  , ## autocorrelation
+                seasonality = seasonality,
+                dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+                dgp.freq= ifelse(seasonality, dgp.freq, NA),
+                bsts.state.specs=bsts.state.specs,
+                expect.mod.size=expect.mod.size,
+                # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+                rand.seed = 13579
+              )
+              
+            }
+            
+          } ## // end prior.sd.scenarios loop
+          
+        } ## // end treat.rules loop
+        
+      } ## // end seasonalities loop
+      
+    } ## // end ARs loop
+    
+  } ## // end nps loop  (sim lengths)
+  
+} ## // end ns loop (number of actors)
+
+
+
+
+##
+# effect.types = c('constant') #c('geometric','quadratic')
+
+# # ## BSTS MCMC iterations
+# # bsts.niter <- 2e4
+# ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
+# if ( ! 'sim.id' %in% ls())
+#   sim.id <- round(10*as.numeric(Sys.time()))
+
+
+## RUN SIMULATION -  SIMULATE TIME SERIES
+simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+                               sim.id = sim.id,
+                               plot.show = F, plot.save = F )
+
+## RUN BSTS and compare to DID
+simlist.files <- runSimCompareBstsDiD(simlist, 
+                                      effect.types = effect.types,
+                                      sim.id = sprintf('_%s-ALT_', sim.id),
+                                      save.items.dir= dir_ext,
+                                      bsts.niter = bsts.niter.start,
+                                      bsts.max.iter= bsts.niter.max
 )  ## D:\\BSTS_external
 
 
@@ -252,9 +430,19 @@ simlist.files <- runSimCompareBstsDiD(simlist,
 
 
 
+
+
+###############################################################
+###############################################################
+
+
+
+
+
 # 'D:\\BSTS_external'
 
-filename <- '__GRIDSEARCH_output__n200_pd520_niter50000_16724204820_d1f1g1h1i1j1l1.rds'
+# filename <- '__GRIDSEARCH_output__n200_pd520_niter50000_16724204820_d1f1g1h1i1j1l1.rds'
+filename <- '__GRIDSEARCH_output__n200_pd520_niter1e+05_16726555451_d1f1g1h1i1j1l1.rds'
 simlist <- readRDS( file.path( dir_ext, filename ) )
 
 
@@ -289,7 +477,7 @@ ss.fits <- lapply(1:length(st.sp.lists), function(i){
               y.t=y.t#, 
               # fit=fit, 
               # mod=mod
-              ))
+  ))
 })
 
 ## Save comparison list (slow to run)
@@ -391,3 +579,6 @@ sscomp$has.season <- sapply(1:nrow(sscomp),function(i) 1*grepl(pattern = '(AddTr
 
 write.csv(sscomp, file = file.path(dir_ext,'bsts_default_state_space_14config_summary_pre-post.csv'))
 # ########################## END ##########################################
+
+
+

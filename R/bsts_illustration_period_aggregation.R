@@ -75,14 +75,14 @@ source(file.path(dir_r,'bsts_did_comparison_functions.R'))
 
 
 ## Static defaults
-noise.level <- 1.5
-b4 <- 2.0  ## seasonal component weight
+noise.level <- 1.3
+b4 <- 1.0  ## seasonal component weight
 b5 <- 0.04 ## linear growth trend
 dgp.nseasons= 52
 dgp.freq= 1
 
 ## Variables Ranges to grid search (optional)
-ns <- list(100, 200) ## list( 100, 200 ) ## ** INTERACT SIZE (N) with GRANULARITY
+ns <- list(200, 400) ## 200 ## list( 100, 200 ) ## ** INTERACT SIZE (N) with GRANULARITY
 sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
@@ -92,42 +92,7 @@ expect.mod.sizes <- list(2)
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
-  ## ## LEVEL
-  # `1`=c('AddLocalLevel'),
-  ## ## TREND
-  # `2`=c('AddLocalLinearTrend'),
-  # # `3`=c('AddStudentLocalLinearTrend'),
-  # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  # `4`=c('AddSemilocalLinearTrend'),
-  # ## ## SEASONAL
-  # `5`= c('AddTrig'),
-  # `5b`=c('AddSeasonal'),
-  # ## ## AUTOCORRELATION
-  # # list('AddAr'),
-  # `6`=c('AddAr'),
-  # ##------ COMBINATIONS --------------
-  # ## AR & SEASONALITY
-  # `7`= c('AddAr','AddTrig'),
-  # `7b`=c('AddAr','AddSeasonal'),
-  # # `7a`=c('AddAutoAr','AddTrig')#,
-  # ## LEVEL + ...
-  # `8`= c('AddLocalLevel','AddTrig'),
-  `8b`=c('AddLocalLevel','AddSeasonal')#,
-  # # `9`=c('AddLocalLevel','AddAr'),
-  # # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-  # # ## (LEVEL + SLOPE) + ...
-  # `11`= c('AddLocalLinearTrend','AddTrig'),
-  # `11b`=c('AddLocalLinearTrend','AddSeasonal'),
-  # `12`=c('AddLocalLinearTrend','AddAr'),
-  # `12`= c('AddLocalLinearTrend','AddAr','AddTrig'),
-  # `12b`=c('AddLocalLinearTrend','AddAr','AddSeasonal'),
-  # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
-  # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
-  # `14`=c('AddStudentLocalLinearTrend','AddAr'),
-  # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
-  ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  # `15`= c('AddSemilocalLinearTrend','AddTrig'),
-  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
+  `8b`=c('AddLocalLevel','AddSeasonal')
 )
 
 
@@ -191,7 +156,7 @@ for (d in 1:length(ns)) {
               simlist[[ key ]] <- list(
                 n = n,    ## Number of firms
                 npds = npds,  ## Number of periods
-                intpd = intpd, ## 60% pre-intervention training / 40% post-interventihttp://127.0.0.1:37489/graphics/plot_zoom_png?width=1200&height=900on
+                intpd = intpd, ## #intervention period
                 noise.level = noise.level, ## stdev of simulated noise terms
                 prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
                 treat.rule = treat.rule, 
@@ -201,7 +166,7 @@ for (d in 1:length(ns)) {
                 w0 = 1.5,  ## constant
                 w1 = 0.13, ## linear
                 w2 = -.05 / sqrt(npds), ## quadratic
-                w2.shift = -round( sqrt(npds)*.7 ),
+                w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
                 ##
                 b4 = b4,   ## seasonal component weight
                 b5 = b5, ##
@@ -231,12 +196,12 @@ for (d in 1:length(ns)) {
 
 
 
-
 ##
-effect.types =  c('constant','geometric','quadratic') ## c('quadratic')  
-## Scale bsts iterations by 10k increments (more iterations for models that converge more slowly)
-bsts.niter <- 1e4  ## 1e4
-
+effect.types <- c('constant','geometric','quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
+## Scale bsts iterations in increments (doubling) starting at 10k (more iterations for models that converge more slowly)
+bsts.niter.start <- 5000  ## 10k
+bsts.niter.max   <- 8e4  ## 80k
+##
 sim.id <- round(10*as.numeric(Sys.time()))
 
 
@@ -245,15 +210,17 @@ sim.id <- round(10*as.numeric(Sys.time()))
 ## RUN SIMULATION -  SIMULATE TIME SERIES
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
-                               plot.show = T, plot.save = FALSE )
+                               plot.show = F, plot.save = FALSE )
 
 ## RUN BSTS and compare to DID
 simlist.files <- runSimCompareBstsDiD(simlist, 
                                       effect.types = effect.types,
                                       sim.id = sim.id,
                                       save.items.dir= dir_ext,
-                                      bsts.niter=bsts.niter * 10
+                                      bsts.niter = bsts.niter.start,
+                                      bsts.max.iter= bsts.niter.max
                                       )  ## D:\\BSTS_external
+
 
 
 
@@ -268,57 +235,53 @@ simlist.files <- runSimCompareBstsDiD(simlist,
 ## ORIGINAL DATA 520 pds  (Weekly data,  10 years)
 ##---------------------
 ##----------------------
-## Aggregate every 2 periods (biweekly, every 2 weeks) == 260
+## Aggregate every 52 periods (yearly) == 10
 ##---------------------
-# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-#                                plot.show = F, plot.save = F )
 simlistx <- simlist
 simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 2 )
-simlistx.files <- runSimCompareBstsDiD(simlistx,
-                                       effect.types = effect.types,
-                                       save.items.dir= dir_ext,
-                                       sim.id = sim.id,
-                                       bsts.niter=bsts.niter*10)
-##----------------------
-## Aggregate every 4 periods (monthly, every 4 weeks) == 130
-##---------------------
-# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-#                                plot.show = F, plot.save = F )
-simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 4 )
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 52 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
-                                        effect.types = effect.types,
-                                        save.items.dir= dir_ext,
-                                        sim.id = sim.id,
-                                        bsts.niter=bsts.niter*6) 
-##----------------------
-## Aggregate every 5 periods (every 5 weeks) == 104
-##---------------------
-# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-#                                plot.show = F, plot.save = F )
-simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 5 )
-simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*3)
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max) 
 ##----------------------
-## Aggregate every 8 periods (bi-monthly, every 2 months) == 65
+## Aggregate every 40 periods (every 40 weeks) == 13
 ##---------------------
-# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-#                                plot.show = F, plot.save = F )
 simlistx <- simlist
 simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 8 )
-simlistx.files <- runSimCompareBstsDiD(simlistx,
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 40 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*3)
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max ) 
+##----------------------
+## Aggregate every 26 periods (half-yearly or semi-yearly) == 20
+##---------------------
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 26 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       sim.id = sim.id,
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max ) 
+##----------------------
+## Aggregate every 20 periods (every 20 weeks) == 26
+##---------------------
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 20 )
+simlistx.files <- runSimCompareBstsDiD(simlistx, 
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       sim.id = sim.id,
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max) 
 ##----------------------
 ## Aggregate every 10 periods (every 10 weeks) == 52
 ##---------------------
@@ -331,51 +294,66 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*3 ) 
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max) 
 ##----------------------
-## Aggregate every 20 periods (every 20 weeks) == 26
+## Aggregate every 8 periods (bi-monthly, every 2 months) == 65
 ##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
 simlistx <- simlist
 simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 20 )
-simlistx.files <- runSimCompareBstsDiD(simlistx, 
-                                        effect.types = effect.types,
-                                        save.items.dir= dir_ext,
-                                        sim.id = sim.id,
-                                        bsts.niter=bsts.niter*3) 
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 8 )
+simlistx.files <- runSimCompareBstsDiD(simlistx,
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       sim.id = sim.id,
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max)
 ##----------------------
-## Aggregate every 26 periods (half-yearly or semi-yearly) == 20
+## Aggregate every 5 periods (every 5 weeks) == 104
 ##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
 simlistx <- simlist
 simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 26 )
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 5 )
+simlistx.files <- runSimCompareBstsDiD(simlistx,
+                                       effect.types = effect.types,
+                                       save.items.dir= dir_ext,
+                                       sim.id = sim.id,
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max)
+##----------------------
+## Aggregate every 4 periods (monthly, every 4 weeks) == 130
+##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
+simlistx <- simlist
+simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 4 )
 simlistx.files <- runSimCompareBstsDiD(simlistx, 
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*3 ) 
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max) 
 ##----------------------
-## Aggregate every 40 periods (every 40 weeks) == 13
+## Aggregate every 2 periods (biweekly, every 2 weeks) == 260
 ##---------------------
+# simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+#                                plot.show = F, plot.save = F )
 simlistx <- simlist
 simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 40 )
-simlistx.files <- runSimCompareBstsDiD(simlistx, 
+simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 2 )
+simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*4 ) 
-##----------------------
-## Aggregate every 52 periods (yearly) == 10
-##---------------------
-simlistx <- simlist
-simlistx <- runSimUpdateSimlist(simlistx, effect.types=effect.types, sim.id=sim.id, plot.show=F, plot.save=F)
-simlistx <- updateSimlistAggregateSimDfPd(simlistx, pd.agg = 52 )
-simlistx.files <- runSimCompareBstsDiD(simlistx, 
-                                       effect.types = effect.types,
-                                       save.items.dir= dir_ext,
-                                       sim.id = sim.id,
-                                       bsts.niter=bsts.niter*5 ) 
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max)
+
+## *** CAUTION *** CAN THROW ERRORS(?) - RUN LAST
 ##----------------------
 ## Aggregate every 104 periods (biannually) == 5
 ##---------------------
@@ -386,7 +364,8 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter=bsts.niter*5 )
+                                       bsts.niter = bsts.niter.start,
+                                       bsts.max.iter= bsts.niter.max )
 
 
 
