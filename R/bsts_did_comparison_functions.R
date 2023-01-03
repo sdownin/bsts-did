@@ -951,7 +951,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             conv.tol <- 0.8
             conv.min.iter.thresh <- 4e4 ## 40k
             # isConverged <- convcheck$converged.prop >= conv.tol
-            isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter > conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
+            isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter >= conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
             print(convcheck$converged)
             cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
                         convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
