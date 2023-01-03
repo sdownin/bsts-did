@@ -363,12 +363,12 @@ postPredChecks <- function(causimp, filename=NA,
     checklist$summary <- sprintf('\nPosterior Predictive:-----\n%s\nStd. Residuals:-----\n%s\n\n', mtext.postpred, mtext.residual)
     
     ## ALL CONVERGENCE CHECKS
-    c1 <- unname( checklist$ck.residual$geweke$check )
-    c2 <- unname( checklist$ck.residual$hw.st$check )
-    c3 <- unname( checklist$ck.residual$hw.hw$check )
-    c4 <- unname( checklist$ck.postpred$geweke$check )
-    c5 <- unname( checklist$ck.postpred$hw.st$check )
-    c6 <- unname( checklist$ck.postpred$hw.hw$check )
+    c1 <- unname( checklist$ck.postpred$geweke$check )
+    c2 <- unname( checklist$ck.postpred$hw.st$check )
+    c3 <- unname( checklist$ck.postpred$hw.hw$check )
+    c4 <- unname( checklist$ck.residual$geweke$check )
+    c5 <- unname( checklist$ck.residual$hw.st$check )
+    c6 <- unname( checklist$ck.residual$hw.hw$check )
     ##
     ck1 <- ifelse(is.na(c1) | is.nan(c1), FALSE, c1)
     ck2 <- ifelse(is.na(c2) | is.nan(c2), FALSE, c2)
@@ -953,7 +953,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             # isConverged <- convcheck$converged.prop >= conv.tol
             isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter > conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
             print(convcheck$converged)
-            cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nIs Converged = %s\n\n',
+            cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
                         convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
           } else {
             hasBstsError <- TRUE
@@ -1289,7 +1289,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     
     
     if ( ! is.na(save.items.dir) ) {
-      maxGb <- 10
+      maxGb <- 6
       # maxGb <- .001  ## **DEBUG**
       if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
         ## IF SMALL ENOUGH, Save simulation list as serialized data file
@@ -1299,7 +1299,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ## FREE UP MEMORY
         simlist[[key]] <- list(file = save.file.path)
       } else { 
-        ## IF TOO LARGE (> 10GB), then save BSTS object (with MCMC samples) separately from rest of simulation
+        ## IF TOO LARGE (> 6GB), then save BSTS object (with MCMC samples) separately from rest of simulation
         save.file.paths <- c()
         ## Save simulation list as serialized data file
         ## 1.  BSTS
