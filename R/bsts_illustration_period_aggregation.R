@@ -217,7 +217,7 @@ simlist.files <- runSimCompareBstsDiD(simlist,
                                       effect.types = effect.types,
                                       sim.id = sim.id,
                                       save.items.dir= dir_ext,
-                                      bsts.niter = bsts.niter.start,
+                                      bsts.niter = bsts.niter.max, ## **START at MAX niter for large npds **
                                       bsts.max.iter= bsts.niter.max
                                       )  ## D:\\BSTS_external
 
@@ -350,7 +350,7 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        effect.types = effect.types,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
-                                       bsts.niter = bsts.niter.start,
+                                       bsts.niter = bsts.niter.max,  ## **START at MAX niter for large npds **
                                        bsts.max.iter= bsts.niter.max)
 
 ## *** CAUTION *** CAN THROW ERRORS(?) - RUN LAST
@@ -366,6 +366,8 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
                                        bsts.max.iter= bsts.niter.max )
+
+
 
 
 
@@ -649,6 +651,12 @@ ggplot(data=cdf, aes(x=parallel.p, y=parallel.W)) +
 
 # cdf$go.for.bsts <- 0
 # cdf$go.for.bsts[cdf$parallel.W > 10] <- 1
+
+
+
+
+
+
 
 
 

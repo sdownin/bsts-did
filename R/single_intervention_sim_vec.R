@@ -451,6 +451,7 @@ runSimSingleIntervention <- function(
     ## Seasonal Component
     if ( is.null(nseasons) | is.null(season.frequency) | is.na(nseasons) | is.na(season.frequency) ) {
       season.val <- 0
+      b5 <-  b5 / (npds / 52) ## *** DEFAULT SETTING assumes yearly growth rate = (b5 / (pds/yr)), where pds/yr = 52 weeks
     } else {
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
                                      noise.mean=0, noise.sd=noise.level)

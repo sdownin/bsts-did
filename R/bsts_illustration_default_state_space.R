@@ -442,13 +442,22 @@ simlist.files <- runSimCompareBstsDiD(simlist,
 # 'D:\\BSTS_external'
 
 # filename <- '__GRIDSEARCH_output__n200_pd520_niter50000_16724204820_d1f1g1h1i1j1l1.rds'
-filename <- '__GRIDSEARCH_output__n200_pd520_niter1e+05_16726555451_d1f1g1h1i1j1l1.rds'
-simlist <- readRDS( file.path( dir_ext, filename ) )
+# filename <- '__GRIDSEARCH_output__n200_pd520_niter1e+05_16726555451_d1f1g1h1i1j1l1.rds'
+filename <- '__GRIDSEARCH_output__n200_pd520_niter80000_16727165757_d1f1g1h1i1j1l1.rds'
+simlist <- readRDS( file.path( dir_ext, 'bsts_default_state_space_20230103', filename ) )
 
 
-x <- simlist$compare$bsts$constant
+res.tbl <- simlist$compare$res.tbl$constant
+
+intpd <- which( res.tbl[[1]]$event.time == 0)
+npds <- nrow(res.tbl[[1]])
+
+x <- x.orig <- simlist$compare$bsts$constant
 sslist <- lapply(1:length(x), function(i) x[[i]]$CausalImpact$model$bsts.model )
 CompareBstsModels( sslist )
+
+##
+rm(simlist)
 
 # z <- rowSums(abs(sslist[[1]]$one.step.prediction.errors[,1:(intpd-1)]))
 
@@ -462,7 +471,7 @@ sscomp$ss.comps <- sapply(1:nrow(sscomp), function(i) paste(st.sp.lists[[i]], co
 
 
 ## PRE ----
-x <- simlist$compare$bsts$constant
+# x <- simlist$compare$bsts$constant
 ## ***SLOW*** [10 - 15 minutes]
 ss.fits <- lapply(1:length(st.sp.lists), function(i){
   cat(sprintf(' %s ',i))
@@ -485,7 +494,7 @@ saveRDS(ss.fits, file=file.path(dir_ext, 'bsts_default_state_space_comparison_1s
 
 
 ## alias for constant MCC curve shape state space list
-x <- simlist$compare$bsts$constant
+# x <- simlist$compare$bsts$constant
 ## sMAPE - symmetric MAPE
 sscomp$bsts.pre.onestep.smape <- laply(ss.fits, function(l){
   yhat.t <- l$yhat.t
@@ -510,10 +519,13 @@ sscomp$bsts.pre.onestep.rmse <- laply(ss.fits, function(l){
   err <- l$yhat.t - l$y.t
   sqrt( mean( err^2, na.rm=T ) )
 })
-
+sscomp$bsts.pre.cae <- laply(ss.fits, function(l){
+  err <- l$yhat.t - l$y.t
+  sum( abs(err), na.rm=T ) 
+})
 
 ## POST --
-res.tbl <- simlist$compare$res.tbl$constant
+# res.tbl <- simlist$compare$res.tbl$constant
 ## 
 sscomp$bsts.post.smape <- sapply(1:nrow(sscomp), function(i){
   idx <- intpd:npds
@@ -551,6 +563,14 @@ sscomp$bsts.post.mae <- sapply(1:nrow(sscomp), function(i){
   eps <- bsts - dgp
   mean( abs( eps ), na.rm=T)
 })
+sscomp$bsts.post.cae <- sapply(1:nrow(sscomp), function(i){
+  idx <- intpd:npds
+  dgp <- res.tbl[[i]]$b3.att[idx]
+  bsts <- res.tbl[[i]]$bsts.point.effect[idx]
+  err <- bsts - dgp
+  sum( abs(err), na.rm=T ) 
+})
+
 
 
 sscomp$has.season <- sapply(1:nrow(sscomp),function(i) 1*grepl(pattern = '(AddTrig|AddSeasonal)', x = sscomp$ss.comps[i], ignore.case = T, perl = T))
