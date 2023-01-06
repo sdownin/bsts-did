@@ -16,16 +16,9 @@ dir_plot <- file.path(dir_proj, 'plots')
 dir_r <- file.path(dir_proj,'R')
 ##  file prefix for saving images, writing outputs, etc.
 prefix <- 'bsts-illus_vignette_'
-
-## Load simulation functions
-## Actor index vectorized simulation
-source(file.path(dir_r,'single_intervention_sim_vec.R')) 
-## Setting up and adding state space components to state.space list
-source(file.path(dir_r,'bsts_helper_functions.R')) 
-## BSTS vs. DiD comparison and sensitivity analysis
-source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
 ```
-Start by loading the necessary R libraries. 
+Start by loading the necessary R libraries and the scripts we wrote for the
+single intervention simulation, BSTS analysis, and BSTS comparison with DiD. 
 ```{r libraries, message=FALSE}
 library(plyr)
 library(dplyr)
@@ -41,7 +34,13 @@ library(Boom)
 library(BoomSpikeSlab)
 library(e1071)
 library(forecast)  ## # library(sarima); library(qualV)
-set.seed(987654321)
+## Load simulation functions - Actor index vectorized simulation
+source(file.path(dir_r,'single_intervention_sim_vec.R')) 
+## Setting up and adding state space components to state.space list
+source(file.path(dir_r,'bsts_helper_functions.R')) 
+## BSTS vs. DiD comparison and sensitivity analysis
+source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
+set.seed(54321)  ## reproducibility
 ```
 
 ## 0. Generate Time Series Data
@@ -49,14 +48,6 @@ set.seed(987654321)
 We begin by simulating a data set of time series to which we will apply the BSTS model. 
 First we set the list of state space configurations and the main simulation settings.
 ```{r simulation settings, cache=TRUE}
-## State space configurations list to illustrate
-st.sp.lists <- list(
-  `1_level` = c('AddLocalLevel'),
-  `2_season` = c('AddLocalLevel','AddSeasonal'),
-  `3_regression`= c('AddLocalLevel','AddSeasonal','AddRegression'),
-  `4a_ar` = c('AddLocalLevel','AddAr','AddSeasonal','AddRegression')#,
-  # `4b_trend` = c('AddSemilocalLinearTrend','AddSeasonal','AddRegression')
-)
 ## MAIN SIM SETTINGS
 n <- 200  ## number of actors (i.e., number of time series)
 npds <- 520
@@ -146,7 +137,39 @@ plotBstsStateComps(bsts.model, intpd)
 ```
 
 
-## 2. Check MCMC Convergence and Diagnostics 
+## 2. Add Seasonality
+
+To account for seasonality in the time series data generating process, 
+we add a seasonal component to the state space ("seasonal.52.1" = one cycle of 52 periods per year). 
+This produces a state contribution of seasonal cycles (e.g., weekly periods each year) 
+added to the other state components. The augmented state space then improves 
+model performance in terms of the mean absolute error (MAE) of 
+one-step ahead predictions during the pre-intervention window. 
+```{r 2_season, message=FALSE}
+key <- '2_season'
+simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
+simlist[[key]]$bsts.state.specs <- list(
+  list(
+    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low')
+  )
+)
+## RUN BSTS and compare to DID
+keyid <- which(names(simlist) == key)
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$lg.max, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$lg.max,
+                               plot.show = F, plot.save=F, verbose=F) 
+##
+bsts.model <- simlist[[key]]$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model
+plotBstsStateComps(bsts.model, intpd)
+```
+
+
+## 3. Check MCMC Convergence and Diagnostics 
 
 Draws from the posterior distribution of the stationary Markov chain(s)
 are used to estimate the model prediction at each time period though 
@@ -179,7 +202,7 @@ convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
 The MCMC convergence checks (left column) indicate that the BSTS function 
 needs to be re-run with more MCMC iterations. Here we use a function we 
 wrote to double the number of MCMC iterations (up to a max number) when 
-convergence is not yet met for a given number of iterations. Setting
+convergence is not yet met for the current number of iterations. Setting
 the argument `verbose=TRUE` will print the BSTS sampling iteration progress
 and text summary of MCMC convergence checks.
 ```{r}
@@ -204,37 +227,9 @@ predicting close to the observed values (top-center panel).
 ```{r mcmc_diag_pass, fig.dim = c(14, 10), out.width="100%"}
 convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
 ```
-To account for seasonality in the time series, we add a seasonal component 
-to the state space ("seasonal.52.1" = one cycle of 52 periods per year). 
-This produces a state contribution of seasonal cycles (e.g., weekly periods each year) 
-added to the other state components. The augmented state space then improves 
-model performance in terms of the mean absolute error (MAE) of 
-one-step ahead predictions during the pre-intervention window. 
-```{r 2_season, message=FALSE}
-key <- '2_season'
-simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
-simlist[[key]]$bsts.state.specs <- list(
-  list(
-    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
-    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low')
-  )
-)
-## RUN BSTS and compare to DID
-keyid <- which(names(simlist) == key)
-simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
-                               effect.types = effect.types,
-                               sim.id = sim.id,
-                               save.items.dir= dir_ext,
-                               bsts.niter = bsts.niters$lg.max, ## **START at MAX niter for large npds **
-                               bsts.max.iter= bsts.niters$lg.max,
-                               plot.show = F, plot.save=F, verbose=F) 
-##
-bsts.model <- simlist[[key]]$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model
-plotBstsStateComps(bsts.model, intpd)
-```
 
 
-## 3. Add Regression Component and Compare BSTS State Spaces
+## 4. Add Regression and Compare BSTS State Spaces
 
 Adding a regression component to the state space largely improves model
 fit, evidenced by the substantial reducing in mean absolute error (MAE), 
