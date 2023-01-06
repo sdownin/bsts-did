@@ -92,14 +92,14 @@ expect.mod.sizes <- list(1, 5, 10)
 dgp.ars <- list(0, 0.1, 0.5)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
-  `8b`= c('AddLocalLevel','AddSeasonal')#,
-  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal')
+  `8b`= c('AddLocalLevel','AddSeasonal','AddRegression')#,
+  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal','AddRegression')
 )
 
 
 
 
-##
+## List of Simulation Scenarios
 simlist <- list()
 ## NUMBER OF ACTORS (number of timeseries)
 for (d in 1:length(ns)) {
@@ -200,8 +200,8 @@ for (d in 1:length(ns)) {
 ##
 effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
 ## Scale bsts iterations in increments (doubling) starting at 10k (more iterations for models that converge more slowly)
-bsts.niter.start <- 1e5  ## 10k
-bsts.niter.max   <- 1e5  ## 80k
+bsts.niter.start <- 1e5  ## 100k
+bsts.niter.max   <- 1e5  ## 100k
 ##
 sim.id <- round(10*as.numeric(Sys.time()))
 

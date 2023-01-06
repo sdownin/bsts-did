@@ -39,7 +39,7 @@ setwd(dir_proj)
 ##==============================
 ##  file prefix for saving images, writing outputs, etc.
 ##-----------------------------
-prefix <- 'bsts-illus_default-st-sp_'
+prefix <- '__DEBUG__bsts-illus_default-st-sp_'
 
 ##==============================
 ## Load simulation functions
@@ -94,45 +94,49 @@ expect.mod.sizes <- list(2)
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
-st.sp.lists <- list(
-  ## ## LEVEL
-  # `1`=c('AddLocalLevel'),
-  ## ## TREND
-  # `2`=c('AddLocalLinearTrend'),
-  # # `3`=c('AddStudentLocalLinearTrend'),
-  # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
-  # `4`=c('AddSemilocalLinearTrend'),
-  # ## ## SEASONAL
-  `5`= c('AddTrig'),
-  `5b`=c('AddSeasonal'),
-  # ## ## AUTOCORRELATION
-  # # list('AddAr'),
-  # `6`=c('AddAr'),
-  # ##------ COMBINATIONS --------------
-  # ## AR & SEASONALITY
-  # `7`= c('AddAr','AddTrig'),
-  # `7b`=c('AddAr','AddSeasonal'),
-  # # `7a`=c('AddAutoAr','AddTrig')#,
-  # ## LEVEL + ...
-  `8`= c('AddLocalLevel','AddTrig'),
-  `8b`=c('AddLocalLevel','AddSeasonal'),
-  # # `9`=c('AddLocalLevel','AddAr'),
-  # # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
-  # # ## (LEVEL + SLOPE) + ...
-  `11`= c('AddLocalLinearTrend','AddTrig'),
-  `11b`=c('AddLocalLinearTrend','AddSeasonal'),
-  # `12`=c('AddLocalLinearTrend','AddAr'),
-  # `12`= c('AddLocalLinearTrend','AddAr','AddTrig'),
-  # `12b`=c('AddLocalLinearTrend','AddAr','AddSeasonal'),
-  # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
-  # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
-  # `14`=c('AddStudentLocalLinearTrend','AddAr'),
-  # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
-  ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
-  `15`= c('AddSemilocalLinearTrend','AddTrig'),
-  `15b`=c('AddSemilocalLinearTrend','AddSeasonal')#,
-)
+# st.sp.lists <- list(
+#   ## ## LEVEL
+#   # `1`=c('AddLocalLevel'),
+#   ## ## TREND
+#   # `2`=c('AddLocalLinearTrend'),
+#   # # `3`=c('AddStudentLocalLinearTrend'),
+#   # ## ## LEVEL + SLOPE ( + AR SLOPE DRIFT)
+#   # `4`=c('AddSemilocalLinearTrend'),
+#   # ## ## SEASONAL
+#   `5`= c('AddTrig', 'AddRegression'),
+#   `5b`=c('AddSeasonal', 'AddRegression'),
+#   # ## ## AUTOCORRELATION
+#   # # list('AddAr'),
+#   # `6`=c('AddAr'),
+#   # ##------ COMBINATIONS --------------
+#   # ## AR & SEASONALITY
+#   # `7`= c('AddAr','AddTrig'),
+#   # `7b`=c('AddAr','AddSeasonal'),
+#   # # `7a`=c('AddAutoAr','AddTrig')#,
+#   # ## LEVEL + ...
+#   `8`= c('AddLocalLevel','AddTrig', 'AddRegression'),
+#   `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
+#   # # `9`=c('AddLocalLevel','AddAr'),
+#   # # `10`=c('AddLocalLevel','AddTrig','AddAutoAr'),
+#   # # ## (LEVEL + SLOPE) + ...
+#   `11`= c('AddLocalLinearTrend','AddTrig', 'AddRegression'),
+#   `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
+#   # `12`=c('AddLocalLinearTrend','AddAr'),
+#   # `12`= c('AddLocalLinearTrend','AddAr','AddTrig'),
+#   # `12b`=c('AddLocalLinearTrend','AddAr','AddSeasonal'),
+#   # `13`= c('AddStudentLocalLinearTrend','AddTrig'),
+#   # `13b`=c('AddStudentLocalLinearTrend','AddSeasonal')#,
+#   # `14`=c('AddStudentLocalLinearTrend','AddAr'),
+#   # # `14`c('AddStudentLocalLinearTrend','AddTrig','AddAr'),
+#   ## (LEVEL + SLOPE ( + AR1 SLOPE DRIFT)) + ...
+#   `15`= c('AddSemilocalLinearTrend','AddTrig', 'AddRegression'),
+#   `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
+# )
 
+##**DEBUG**
+st.sp.lists <- list(
+  `11b`=c('AddLocalLinearTrend','AddSeasonal')  ## 'AddSeasonal'
+)
 
 ##
 simlist <- list()
@@ -236,8 +240,8 @@ for (d in 1:length(ns)) {
 ##
 effect.types = c('constant') #c('geometric','quadratic')
 ##
-bsts.niter.start <-  5000
-bsts.niter.max   <-  8e4
+bsts.niter.start <- 200 ## 5000
+bsts.niter.max   <- 200 ## 8e4
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -293,12 +297,12 @@ expect.mod.sizes <- list(2)
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
-  `1`=c('AddLocalLevel'),
-  `2`=c('AddLocalLinearTrend'),
-  `4`=c('AddSemilocalLinearTrend'),
-  `6`= c('AddAr'),
-  `7`= c('AddAr','AddTrig'),
-  `7b`=c('AddAr','AddSeasonal')
+  `1`=c('AddLocalLevel', 'AddRegression'),
+  `2`=c('AddLocalLinearTrend', 'AddRegression'),
+  `4`=c('AddSemilocalLinearTrend', 'AddRegression'),
+  `6`= c('AddAr', 'AddRegression'),
+  `7`= c('AddAr','AddTrig', 'AddRegression'),
+  `7b`=c('AddAr','AddSeasonal', 'AddRegression')
 )
 
 ##

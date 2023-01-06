@@ -205,25 +205,53 @@ postPredChecks <- function(causimp, filename=NA,
   ## output list of convergence checks (booleans) and residual dataframes
   checklist <- list()
   
-  response <- causimp$series$response
+  response <-  causimp$series$response  
   y <- response
-  
+
+  # ##**DEBUG**
+  # print('as.numeric( response )')
+  # print(response)
+  # ##**
+    
   npds <- length(y)
   
-  intpd <-causimp$model$post.period[1]
+  intpd <- causimp$model$post.period[1]
   
-  niter <- nrow(causimp$model$bsts.model$coefficients)
+  niter <- length(causimp$model$bsts.model$sigma.obs)
   
   if (is.na(burn)) {
     burn <- round( niter * .2 )
   }
   
   ## Newdata (post-intervention data) to predict via BSTS
-  newdata <- causimp$model$bsts.model$predictors[1:(intpd-1), ]
-  newdata <- cbind(response=response[1:(intpd-1)], newdata)
+  hasRegression <- causimp$model$bsts.model$has.regression
+  if (hasRegression) {
+    newdata <- causimp$model$bsts.model$predictors[1:(intpd-1), ]
+    newdata <- cbind(response=response[1:(intpd-1)], newdata)
+  } else {
+    newdata <- NULL
+  }
+  
+  # ##**DEBUG**
+  # print('newdata[1:10,]')
+  # print(newdata[1:10,])
+  # ##**
   
   # predict.mbsts()
-  post.pred <- predict.bsts(causimp$model$bsts.model, newdata = newdata , burn = burn)
+  post.pred <- if (hasRegression) {
+    predict.bsts(causimp$model$bsts.model, newdata = newdata , burn = burn) ## already knows horizon from 
+  } else {
+    predict.bsts(causimp$model$bsts.model, burn = burn, 
+                 horizon = intpd-1,
+                 olddata = response[1:(intpd-1)])
+  }
+
+  # ##**DEBUG**
+  # plot(post.pred$mean, col='red',type='l',ylim=c(-2,6)); points(response[1:(intpd-1)], col='black', pch=16, main='DEBUG')
+  # print('post.pred:')
+  # print(post.pred)
+  # ##
+  
   post.pred.dist <- post.pred$distribution
   post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
   
@@ -394,6 +422,236 @@ postPredChecks <- function(causimp, filename=NA,
 }
 
 
+
+# 
+# ###
+# ## POSTERIOR PREDICTIVE CHECKS
+# ###
+# postPredChecksPreIntervention <- function(causimp, filename=NA, 
+#                                            save.plot=TRUE, return.val=FALSE,
+#                                            burn=NA, conv.alpha=0.05) {
+#   
+#   ppcheck.filename <- if (is.na(filename)){
+#     sprintf('bsts_post_pred_checks_%s.png', round(10*as.numeric(Sys.time())) )
+#   }  else {
+#     filename
+#   }
+#   
+#   ## output list of convergence checks (booleans) and residual dataframes
+#   checklist <- list()
+#   
+#   response <-  causimp$series$response  
+#   y <- response
+#   
+#   # ##**DEBUG**
+#   # print('as.numeric( response )')
+#   # print(response)
+#   # ##**
+#   
+#   npds <- length(y)
+#   
+#   intpd <- causimp$model$post.period[1]
+#   
+#   niter <- length(causimp$model$bsts.model$sigma.obs)
+#   
+#   if (is.na(burn)) {
+#     burn <- round( niter * .2 )
+#   }
+#   
+#   ## Newdata (post-intervention data) to predict via BSTS
+#   if (causimp$model$bsts.model$has.regression) {
+#     newdata <- causimp$model$bsts.model$predictors[1:(intpd-1), ]
+#     newdata <- cbind(response=response[1:(intpd-1)], newdata)
+#   } else {
+#     # newdata <- cbind(response=response[1:(intpd-1)], 
+#     #                  intercept=rep(1, intpd-1))
+#     newdata <- NULL
+#   }
+#   
+#   # ##**DEBUG**
+#   # print('newdata[1:10,]')
+#   # print(newdata[1:10,])
+#   # ##**
+#   
+#   # predict.mbsts()
+#   post.pred <- predict.bsts(causimp$model$bsts.model, newdata = newdata , burn = burn, horizon=intpd-1)
+#   ##**DEBUG**
+#   print('post.pred:')
+#   print(post.pred)
+#   ##
+#   post.pred.dist <- post.pred$distribution
+#   post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
+#   
+#   ## before intervention period bool dummy
+#   .ind <- (1:npds) < intpd
+#   
+#   if (save.plot) {
+#     png(filename = ppcheck.filename, width = 15, height = 10, units = 'in', res = 400)
+#   }
+#   ##----------- INSIDE PNG PLOT --------------------------------------
+#   par(mfrow=c(2,2), mar=c(2.5,2.5,2.5,1))
+#   
+#   ##===================
+#   ## Posterior Predictive (Y) plots 
+#   ##-------------------
+#   
+#   ##-----------
+#   ## Trace plot of Posterior Predictive distribution Markov Chain 
+#   post.pred.tr <- rowMeans(post.pred.dist)
+#   ##
+#   gd <- geweke.diag(post.pred.tr, .1, .5)
+#   gd.z <- abs(gd$z) ## z statistic
+#   gd.p <- 2*pnorm(gd.z, mean = 0, sd = 1, lower.tail = F)  ## P-value for 2-sided test
+#   gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
+#   ##
+#   hd <- heidel.diag.mod(post.pred.tr)
+#   hd.st.cmv <- hd[1,'CMV.stat'][1]
+#   hd.st.p <- hd[1,'pvalue'][1]
+#   hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
+#   hd.st.start <- hd[1,'start'][1]
+#   hd.hw.eps <- 0.1 ## default 0.1
+#   hd.hw <- hd[1,'halfwidth'][1]
+#   hd.hw.mean <- hd[1,'mean'][1]
+#   hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
+#   ##
+#   rng <- range(post.pred.tr)
+#   ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
+#   plot(post.pred.tr, type='l', main='A. Posterior Predicted MCMC Trace, Y' ,
+#        ylim=ylims
+#   )
+#   mtext.postpred <- sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+#                             gd.result,gd.z,gd.p,
+#                             hd.st.result, hd.st.cmv, hd.st.p,
+#                             hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
+#   mtext(text = mtext.postpred, side = 3, line=-4.5, outer = F)
+#   ##
+#   checklist$ck.postpred <- list(
+#     geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
+#     hw.st  = list(check=(hd.st.p >= conv.alpha), cmv=hd.st.cmv, p=hd.st.p),
+#     hw.hw  = list(check=(abs(hd.hw/hd.hw.mean) < hd.hw.eps), hw.mean=abs(hd.hw/hd.hw.mean), hw.eps=hd.hw.eps)
+#   )
+#   ##-----------
+#   
+#   ##-----------
+#   ## DENSITIES
+#   plot(density(y[.ind]),  main = "B. Density comparison, Y")
+#   lines(density(post.pred.mean), lwd=2, lty=2, col='red')
+#   legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
+#   ##-----------
+#   
+#   ##-----------
+#   ## HISTOGRAMS & BAYESIAN P-VALUES
+#   # max.distrib <- apply(post.pred, c(2, 3), max)
+#   max.distrib <- apply(post.pred$distribution, 1, max)
+#   pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
+#   hist(max.distrib, 30, col = "lightblue", border = "grey", 
+#        main = paste0("C. Bayesian p-val (Max Y) = ", round(pvalue, 2)),
+#        xlab = "Max. in-sample forecasts")
+#   abline(v = max(y[.ind]), col = "darkblue", lwd = 3)
+#   ##-----------
+#   
+#   ##===================
+#   ## Std. Residual plots
+#   ##-------------------
+#   y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
+#   # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+#   res <-  y.rep - t(post.pred.dist)
+#   std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
+#   # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+#   
+#   ##-----------
+#   ## Trace plot of Posterior Predictive distribution Markov Chain 
+#   res.tr <- colMeans(std.res)
+#   ##
+#   gd <- geweke.diag(res.tr, .1, .5)
+#   gd.z <- abs(gd$z) ## z statistic
+#   gd.p <- 2*pnorm(gd.z, mean = 0, sd = 1, lower.tail = F)  ## P-value for 2-sided test
+#   gd.result <- ifelse(gd.p < conv.alpha, 'FAIL', 'PASS')
+#   ##
+#   hd <- heidel.diag.mod(res.tr)
+#   hd.st.cmv <- hd[1,'CMV.stat'][1]
+#   hd.st.p <- hd[1,'pvalue'][1]
+#   hd.st.result <- ifelse( hd.st.p < conv.alpha, 'FAIL', 'PASS')
+#   hd.st.start <- hd[1,'start'][1]
+#   hd.hw.eps <- 0.1 ## default 0.1
+#   hd.hw <- hd[1,'halfwidth'][1]
+#   hd.hw.mean <- hd[1,'mean'][1]
+#   hd.hw.result <- ifelse( abs(hd.hw/hd.hw.mean) < hd.hw.eps, 'PASS', 'FAIL' )
+#   ##
+#   rng <- range(res.tr)
+#   ylims <- rng + c( -.05*diff(rng), .3*diff(rng) )
+#   plot(res.tr, type='l', main='D. Std.Residual MCMC Trace, Y',
+#        ylim=ylims)
+#   mtext.residual <- sprintf('Geweke: %s (z=%.2f, p=%.2f)\nH&W Stationarity: %s (CMV=%.2f, p=%.2f)\nH&W Halfwidth: %s (hw/mean=%.2f < eps=%.2f)',
+#                             gd.result,gd.z,gd.p,
+#                             hd.st.result, hd.st.cmv, hd.st.p,
+#                             hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
+#   mtext(text = mtext.residual, side = 3, line=-4.5, outer = F)
+#   ##
+#   checklist$ck.residual <- list(
+#     geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
+#     hw.st  = list(check=(hd.st.p >= conv.alpha), cmv=hd.st.cmv, p=hd.st.p),
+#     hw.hw  = list(check=(abs(hd.hw/hd.hw.mean) < hd.hw.eps), hw.mean=abs(hd.hw/hd.hw.mean), hw.eps=hd.hw.eps)
+#   )
+#   ##-----------
+#   
+#   ##-----------
+#   # Std. Residual Normality plot
+#   qqnorm(rowMeans(std.res), main = "E. Std.Residual QQ-plot, Y")
+#   qqline(rowMeans(std.res))
+#   ##-----------
+#   
+#   ##-----------
+#   ## Std Residual ACF
+#   Acf(rowMeans(std.res), main = "");title(main='F. Std.Residual ACF, Y')
+#   ##-----------
+#   
+#   ##----------- end PNG PLOT --------------------------------------
+#   if (save.plot) {
+#     dev.off()
+#   }
+#   
+#   ##
+#   if(return.val) {
+#     checklist$std.residual <- std.res
+#     checklist$postpred.dist <- post.pred.dist
+#     checklist$summary <- sprintf('\nPosterior Predictive:-----\n%s\nStd. Residuals:-----\n%s\n\n', mtext.postpred, mtext.residual)
+#     
+#     ## ALL CONVERGENCE CHECKS
+#     c1 <- unname( checklist$ck.postpred$geweke$check )
+#     c2 <- unname( checklist$ck.postpred$hw.st$check )
+#     c3 <- unname( checklist$ck.postpred$hw.hw$check )
+#     c4 <- unname( checklist$ck.residual$geweke$check )
+#     c5 <- unname( checklist$ck.residual$hw.st$check )
+#     c6 <- unname( checklist$ck.residual$hw.hw$check )
+#     ##
+#     ck1 <- ifelse(is.na(c1) | is.nan(c1), FALSE, c1)
+#     ck2 <- ifelse(is.na(c2) | is.nan(c2), FALSE, c2)
+#     ck3 <- ifelse(is.na(c3) | is.nan(c3), FALSE, c3)
+#     ck4 <- ifelse(is.na(c4) | is.nan(c4), FALSE, c4)
+#     ck5 <- ifelse(is.na(c5) | is.nan(c5), FALSE, c5)
+#     ck6 <- ifelse(is.na(c6) | is.nan(c6), FALSE, c6)
+#     ##
+#     checklist$converged <- c(
+#       pp.ge = ck1, 
+#       pp.st = ck2, 
+#       pp.hw = ck3, 
+#       r.ge  = ck4, 
+#       r.st  = ck5, 
+#       r.hw  = ck6
+#     )
+#     checklist$converged.all <- all( checklist$converged )
+#     checklist$converged.prop <- sum(checklist$converged) / length(checklist$converged)
+#     
+#     return(checklist)
+#   }
+#   
+# }
+
+
+
+
+
 ###
 ## GGPLOT OF DYNMAIC DID from ATTGT object
 ##  - MODIFIED FROM Callaway & Sant'Anna 2021
@@ -482,7 +740,7 @@ ggdid.agg.es <- function(attgt,
 runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                 effect.types=c('constant','quadratic','geometric'), 
                                 sim.id=round(10*as.numeric(Sys.time())),
-                                plot.show=F, plot.save=F) {
+                                plot.show=F, plot.save=F, verbose=TRUE) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
   # print(simlist)
@@ -496,7 +754,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
   for (i in 1:length(simlist)) {
     key <- names(simlist)[i]
     sim <- simlist[[key]]
-    cat(sprintf('\nScenario label: %s\n\n', key))
+    if(verbose) cat(sprintf('\nScenario label: %s\n\n', key))
     ##  
     set.seed( ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed) )
     noise.level <- ifelse(is.null(sim$noise.level), 0, sim$noise.level)
@@ -531,7 +789,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       # expect.mod.size = ifelse(is.null(sim$expect.mod.size), NA, sim$expect.mod.size),
       ## Plotting
       plot.show = plot.show, ## TRUE
-      plot.save = plot.save  ## TRUE
+      plot.save = plot.save, ## TRUE
+      verbose = verbose ## echo messages to console
     )
   }
   
@@ -560,7 +819,9 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
                                  sim.id=NA,
                                  save.items.dir=NA, ## save updated simlist items to seprate RDS files
                                  bsts.niter=5000,
-                                 bsts.max.iter=8e4 ## 80000
+                                 bsts.max.iter=8e4, ## 80000
+                                 plot.show=TRUE, plot.save=TRUE,
+                                 verbose = TRUE
 ) {
   ## cache original bsts.niter for dynamic niter updating if MCMC convergence failed
   bsts.niter.orig <- bsts.niter
@@ -590,7 +851,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
   {
     key <- names(simlist)[i]
     key.strip <- gsub('[|]','',key,ignore.case = F, perl = T)
-    cat(sprintf('\n%s, %s\n',i, key))
+    if(verbose) cat(sprintf('\n%s, %s\n',i, key))
     
     simlist[[key]]$cordf <- data.frame()
     simlist[[key]]$compare <- list(did=list(), bsts=list(), res.tbl=list(), 
@@ -604,6 +865,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     npds <- simlist[[key]]$npds
     intpd <- simlist[[key]]$intpd
     n <- simlist[[key]]$n
+    noise.level <- simlist[[key]]$noise.level
     
     ## Simulation object (containing the simulated timeseries)
     sim <- simlist[[key]]$sim
@@ -891,7 +1153,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
               st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
                                                                 y.pre.treat.NAs.post.treat,  
                                                                 state.conf.item)
-              cat(sprintf('add to state.space: %s\n',state.conf.item$name))
+              if(verbose) cat(sprintf('add to state.space: %s\n',state.conf.item$name))
             }
           }
         } else {
@@ -900,7 +1162,15 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         }
         # print(st.sp)
         
-        cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
+        if(verbose) cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
+        
+        ##-------------------------------
+        ## Regression component of model
+        if ('AddRegression' %in% state.comps) {
+          bsts.input.form <- y.pre.treat.NAs.post.treat ~ . ## with regression formula
+        } else {
+          bsts.input.form <- y.pre.treat.NAs.post.treat  ## without regression vector
+        }
         
         
         ##---------------------------------------------------------
@@ -913,11 +1183,12 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
           
           ## BSTS model
           bsts.model <- tryCatch(expr = {
-            bsts(y.pre.treat.NAs.post.treat ~ . ,
+            bsts(formula = bsts.input.form,
                  state.specification = st.sp,
                  data = predictors,
                  expected.model.size = expect.mod.size,
-                 niter = bsts.niter)
+                 niter = bsts.niter,
+                 ping = ifelse(verbose, round(bsts.niter/10), 0))
           },
           error=function(e) {
             message(sprintf('bsts() error: %s', as.character(e)))
@@ -944,16 +1215,16 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             ##
             # print(convcheck)
             ##
-            cat(sprintf('\nBSTS niter = %s',bsts.niter))
-            cat(convcheck$summary)
+            if(verbose) cat(sprintf('\nBSTS niter = %s',bsts.niter))
+            if(verbose) cat(convcheck$summary)
             ## UPDATE CONVERGENCE CHECK FLAG - ELSE RERUN WITH INCREASED bsts.niter
             # isConverged <- convcheck$converged.all
             conv.tol <- 0.8
             conv.min.iter.thresh <- 4e4 ## 40k
             # isConverged <- convcheck$converged.prop >= conv.tol
             isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter >= conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
-            print(convcheck$converged)
-            cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
+            if(verbose) print(convcheck$converged)
+            if(verbose) cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
                         convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
           } else {
             hasBstsError <- TRUE
@@ -979,15 +1250,19 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         }
         ##-------------------------------------------------------------
         
-        
-        ##
-        plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-        PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
-        # PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-        # PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-        # PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-        # PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-        PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+        if (plot.show) {
+          ##
+          plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+          # PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          # PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          # PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          # PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          if (bsts.model$has.regression) {
+            PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          }
+        }
+
         ##
         # ## BSTS model for Dynamic Regression
         # bsts.model <- bsts(y.pre.treat.NAs.post.treat,
@@ -999,16 +1274,18 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # summary(impact_amount$model$bsts.model)
         # plot(impact_amount)
         
-        # summary(impact_amount)
-        # png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
-        #                         key,effect.type,sim.id))
-        p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
-        ggsave(filename = file.path(save.img.dir,
-                                    sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                            prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
-        )
-        # dev.off()
-        
+        if (plot.save) {
+          # summary(impact_amount)
+          # png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
+          #                         key,effect.type,sim.id))
+          p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
+          ggsave(filename = file.path(save.img.dir,
+                                      sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+          )
+          # dev.off()
+        }
+
         ##-------------------
         ## OVERALL CONFIDENCE INTERVALS AND PVALUES
         ## OVERALL CAUSAL P-VALUE
@@ -1106,11 +1383,13 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # # View(res.tbl4)
         
         ##PLOT INCLUSION PROBABILITIES
-        png(filename = file.path(save.img.dir,
-                                 sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                         prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)))
-        plot(impact_amount$model$bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
-        dev.off()
+        if (plot.save & bsts.model$has.regression) {
+          png(filename = file.path(save.img.dir,
+                                   sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+                                           prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)))
+          plot(bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
+          dev.off()
+        }
         
         ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
         dyndf <- rbind(
@@ -1241,19 +1520,22 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         
         ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
         # ggarrange(p.err2, p.err3, p.err1, ncol=2, nrow=2, widths = , common.legend = F)
-        ggdraw() +
-          draw_plot(p.ind.series, x= 0 , y= 4/5, width=1, height=1/5) +
-          draw_plot(p.agg.es, x=0, y=3/5, width=1, height=1/5) +  ## *** DiD ***
-          draw_plot(p.bsts.impact, x=0, y=2/5, width=1, height=1/5) +  ## *** BSTS ***
-          draw_plot(p.err1, x = 0,  y = 1/5, width = 1, height = 1/5) +
-          draw_plot(p.err2, x = 0,  y = 0, width = .5, height = 1/5) +
-          draw_plot(p.err3, x = .5, y = 0, width = .5, height = 1/5) +
-          draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
-                          x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
-        ggsave(filename = file.path(save.img.dir,
-                                    sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                            prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)),
-               height=15, width=9, units = 'in', dpi = 300)
+        if (plot.save) {
+          ggdraw() +
+            draw_plot(p.ind.series, x= 0 , y= 4/5, width=1, height=1/5) +
+            draw_plot(p.agg.es, x=0, y=3/5, width=1, height=1/5) +  ## *** DiD ***
+            draw_plot(p.bsts.impact, x=0, y=2/5, width=1, height=1/5) +  ## *** BSTS ***
+            draw_plot(p.err1, x = 0,  y = 1/5, width = 1, height = 1/5) +
+            draw_plot(p.err2, x = 0,  y = 0, width = .5, height = 1/5) +
+            draw_plot(p.err3, x = .5, y = 0, width = .5, height = 1/5) +
+            draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
+                            x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
+          ggsave(filename = file.path(save.img.dir,
+                                      sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)),
+                 height=15, width=9, units = 'in', dpi = 300)
+        }
+
         
         ##===============================================================
         ## 1-step ahead prediction error
@@ -1299,7 +1581,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ## FREE UP MEMORY
         simlist[[key]] <- list(file = save.file.path)
       } else { 
-        ## IF TOO LARGE (> 6GB), then save BSTS object (with MCMC samples) separately from rest of simulation
+        ## IF TOO LARGE, then save BSTS object (with MCMC samples) separately from rest of simulation
         save.file.paths <- c()
         ## Save simulation list as serialized data file
         ## 1.  BSTS
@@ -1340,4 +1622,4 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
 
 
 
-cat(sprintf('\n\nLoaded BSTS vs. DiD Comparison and Sensitivity Analysis Functions.\n\n'))
+cat(sprintf('\nLoaded BSTS vs. DiD Comparison and Sensitivity Analysis Functions.\n'))

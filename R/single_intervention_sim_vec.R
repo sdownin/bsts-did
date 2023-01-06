@@ -279,6 +279,7 @@ runSimSingleIntervention <- function(
     plot.sq.w=9,
     plot.sq.h=9,
     plot.dpi=300,
+    verbose=TRUE,
     ...
   ) {
   
@@ -294,16 +295,19 @@ runSimSingleIntervention <- function(
   
   sim.count <- ntypes * npds  ## n
   
-  cat(sprintf('\nRunning Internal Intervention Simulation for %s iterations:\n  %s periods (vec.len.=%s),  effect type = %s\n',
+  if(verbose) cat(sprintf('\nRunning Single Intervention Simulation for %s iterations:\n  %s periods (vec.len.=%s),  effect type = %s\n',
               sim.count, npds, n, effect.type))
   
   ## Initialize progress bar
   counter <- 0
-  pb <- txtProgressBar(min = 0,      # Minimum value of the progress bar
+  if(verbose) {
+      pb <- txtProgressBar(min = 0,      # Minimum value of the progress bar
                        max = sim.count, # Maximum value of the progress bar
                        style = 3,    # Progress bar style (also available style = 1 and style = 2)
                        width = 80,   # Progress bar width. Defaults to getOption("width")
                        char = "=")   # Character used to create the bar
+  }
+
   
   set.seed(rand.seed)
   
@@ -448,10 +452,12 @@ runSimSingleIntervention <- function(
                  w0=ifelse(effect.type=='geometric', w0*6, w0),
                  w1=w1, w2=w2, w2.shift=w2.shift)
     
-    ## Seasonal Component
+    ## Seasonal Component and scaling yearly growth to period-growth
     if ( is.null(nseasons) | is.null(season.frequency) | is.na(nseasons) | is.na(season.frequency) ) {
       season.val <- 0
-      b5 <-  b5 / (npds / 52) ## *** DEFAULT SETTING assumes yearly growth rate = (b5 / (pds/yr)), where pds/yr = 52 weeks
+      ## *** DEFAULT SETTING assumes yearly growth rate = (b5 / (pds/yr)), where pds/yr = 52 weeks
+      ##     That is, the simulation assumes weekly periods for growth rate, even if seasonality component is missing from DGP.
+      b5 <-  b5 / (npds / 52) 
     } else {
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
                                      noise.mean=0, noise.sd=noise.level)
@@ -572,7 +578,7 @@ runSimSingleIntervention <- function(
       ## Unmatched controls
       um.ctrl <- unique(df$actor[which(df$group=='control' & is.na(df$match_id))]) ## & df$effect.type==effect.type
       if (length(um.ctrl)==0) {
-        cat(sprintf(' skipping i=%s: actor=%s\n',i,actor.eff.tr[i]))
+        if(verbose) cat(sprintf(' skipping i=%s: actor=%s\n',i,actor.eff.tr[i]))
         next
       }
       
@@ -804,6 +810,8 @@ runSimSingleInterventionEffectComparison <- function(
     plot.sq.w=9,
     plot.sq.h=9,
     plot.dpi=300,
+    ## 
+    verbose=TRUE,
     ...
   ) {   #effect.types, sim.id, plot.show, plot.save, 
   
@@ -858,6 +866,7 @@ runSimSingleInterventionEffectComparison <- function(
       plot.sq.w=plot.sq.w, 
       plot.sq.h=plot.sq.h, 
       plot.dpi=plot.dpi,
+      verbose=verbose,
        ...
     )
     ##
@@ -894,7 +903,7 @@ runSimSingleInterventionEffectComparison <- function(
   {
     PLOTID <- round(10*as.numeric(Sys.time()))
     
-    cat('\n rendering plots...')
+    if(verbose) cat('\n rendering plots...')
     ## firm-period observations count to find proportion of treated firms by effect.type
     cnt <- ddply(df, .(effect.type), summarize,
                  count.tr=sum(group=='treatment'),
@@ -1047,7 +1056,7 @@ runSimSingleInterventionEffectComparison <- function(
     #          width=plot.wide.w,heigh=plot.wide.h,dpi=plot.dpi,units='in')
     # }
     
-    cat('done.\n\n')
+    if(verbose) cat('done.\n\n')
   }
   
   
@@ -1072,7 +1081,7 @@ runSimSingleInterventionEffectComparison <- function(
 }
 
 
-cat('\nLoaded Single Intervention Simulation - vectorized.\n\n')
+cat('\nLoaded Single Intervention Simulation - vectorized.\n')
 
 
 
