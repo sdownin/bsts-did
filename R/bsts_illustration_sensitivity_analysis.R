@@ -89,7 +89,7 @@ seasonalities <- list(TRUE, FALSE)   ## c(TRUE,  FALSE )
 prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
 expect.mod.sizes <- list(1, 5, 10)
 ## FOCAL CONSTRUCT
-dgp.ars <- list(0, 0.1, 0.5)  ## 0.6  ## .1,.2,.4
+dgp.ars <- list(0)  ## list(0, 0.1, 0.5) used in 20230105 run
 ## STATE SPACE CONFIGURATIONS
 st.sp.lists <- list(
   `8b`= c('AddLocalLevel','AddSeasonal','AddRegression')#,

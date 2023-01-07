@@ -874,7 +874,8 @@ fitBstsUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simli
                                  bsts.niter=1e3,
                                  bsts.max.iter=1e5, ## 80000
                                  plot.show=TRUE, plot.save=TRUE,
-                                 verbose=TRUE
+                                 verbose=TRUE, 
+                                 save.sim.rds=TRUE
 ) {
   ## cache original bsts.niter for dynamic niter updating if MCMC convergence failed
   bsts.niter.orig <- bsts.niter
@@ -1275,7 +1276,8 @@ fitBstsUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simli
     } ## // end k loop over effect types
     
     
-    if ( ! is.na(save.items.dir) ) {
+    if ( save.sim.rds ) {
+      save.items.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
       maxGb <- 6
       # maxGb <- .001  ## **DEBUG**
       if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
@@ -1395,9 +1397,37 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
 
 
 
+##
+##  Get the  CausalImpact object from the BSTS vs. DiD comparison simlist object
+##
+getCausalImpactFromSimlist <- function(simlist, key=NA, 
+                                       effect.type='quadratic',
+                                       state.space.list.id=1
+                                       ) {
+  if (is.na(key)) {
+    if (length(names(simlist))==0) {
+      names(simlist) <- as.character( 1:length(simlist) )
+    }
+    key <- names(simlist)[1]
+  }
+  bstslist <- simlist[[key]]$compare$bsts[[ effect.type ]]
+  return( bstslist[[ state.space.list.id ]]$CausalImpact )
+}
 
 
-
+##
+##  Get the  CausalImpact object from the BSTS vs. DiD comparison simlist object
+##
+getBstsModelFromSimlist <- function(simlist, key=NA, 
+                                     effect.type='quadratic',
+                                     state.space.list.id=1
+                                    ) {
+  
+  causimp <- getCausalImpactFromSimlist(simlist, key, 
+                                        effect.type, 
+                                        state.space.list.id)
+  return( causimp$model$bsts.model )
+}
 
 
 
