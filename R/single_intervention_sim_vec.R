@@ -355,12 +355,6 @@ runSimSingleIntervention <- function(
     ## focal actor past performance
     y.tm1 <- if (t==1) { rep(ystart, n) } else { df$y[idx.tm1] }
     ###
-    ##
-    c1.tm1 <- if (t==1) { rep(0, n) } else { df$c1[idx.tm1] }
-    ##
-    c2.tm1 <- if (t==1) { rep(0, n) } else { df$c2[idx.tm1] }
-    ##
-    c3.tm1 <- if (t==1) { rep(0, n) } else { df$c3[idx.tm1] }
     
     
     ##------------------------------------------------------
@@ -467,6 +461,13 @@ runSimSingleIntervention <- function(
     
     
     ## --------------- Covariates -------------------------
+    ## INITIAL VALUES OF COVARIATES
+    c1.tm1 <- if (t==1) { rep(0, n) } else { df$c1[idx.tm1] }
+    ## START HIGHER = 10
+    c2.tm1 <- if (t==1) { rep(10, n) } else { df$c2[idx.tm1] }
+    ## 
+    c3.tm1 <- if (t==1) { rep(0, n) } else { df$c3[idx.tm1] }
+    
     ## SMALL VARIANCE RANDOM WALK
     # c1 <- rpois(n, lambda = noise.level*0.8) + 1
     c1 <- rnorm(n, c1.tm1, sd=noise.level * 0.01 )
@@ -483,7 +484,7 @@ runSimSingleIntervention <- function(
     ## SKEWED COVARIATE
     c3 <- rgamma(n, shape = max(c3.tm1, 1), scale = noise.level * 0.1 )
     
-    
+    ##-------------------------------------
     ## PERFORMANCE
     y <- yFunc(b0=b0, 
                b1=b1, 
@@ -505,7 +506,7 @@ runSimSingleIntervention <- function(
                c3=c3,
                y.tm1=y.tm1
               )
-
+    ##--------------------------------------
     
     
     ##--------------------------------------

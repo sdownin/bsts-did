@@ -818,8 +818,9 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
                                  effect.types=c('constant','quadratic','geometric'), 
                                  sim.id=NA,
                                  save.items.dir=NA, ## save updated simlist items to seprate RDS files
-                                 bsts.niter=5000,
-                                 bsts.max.iter=8e4, ## 80000
+                                 bsts.niter=5000, 
+                                 bsts.max.iter=8e4, ## 80000 
+                                 bsts.n.cov.cats=2,  ## bins for each covariate (c1,c2,c3)
                                  plot.show=TRUE, plot.save=TRUE,
                                  verbose = TRUE
 ) {
@@ -909,6 +910,9 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       ## Remove NAs
       simdf <- simdf[!is.na(simdf$match_id), ]
       
+      ## Rows
+      nrow.sdf <- nrow(simdf)
+      
       ## Compute Multiperiod DiD for Avg Treatment Effect on Treated
       ccattgt <- att_gt(yname = "y", ## "Y",
                         tname = "t",
@@ -972,78 +976,190 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # ggplot(simdf,aes(x=y, colour=effect.type)) + geom_density(alpha=0.1, size=1.4)
       
       
-      ##====================
+      ##===========================================
+      ##
+      ##
       ## BSTS Timseries Setup
-      ##--------------------
-      ## Aggregate into timeseries dataframe
-      tsdf <- simdf %>%
-        dplyr::filter( ! is.na(match_id)) %>%
-        group_by(t, t.post.intpd, effect.type, match_pd, gname, group, group.color) %>%
-        dplyr::summarize(
-          n_in_pd = n(),
-          actors = paste(unique(actor), collapse = '|'),
-          y_outcome = mean(y, na.rm=T),
-          y_sum = sum(y, na.rm=T),
-          y_sd = sd(y, na.rm=T),
-          y_min = min(y, na.rm=T),
-          y_max = max(y, na.rm=T),
-          y_skew = skewness(y, na.rm = T, type = 2), ## moment-based distribution
-          y_kurt = kurtosis(y, na.rm = T, type = 2), ## moment-based distribution
-          # ##
-          # x1_sum = sum(x1, na.rm=T),
-          # x2_sum = sum(x2, na.rm=T),
-          # x3_sum = sum(x3, na.rm=T),
-          # ##
-          # c1_sum = sum(c1, na.rm=T),
-          # c2_sum = sum(c2, na.rm=T),
-          # c3_sum = sum(c3, na.rm=T),
-          # #
-          # b1_sum = sum(b1, na.rm=T),
-          # b2_sum = sum(b2, na.rm=T),
-          # b3_sum = sum(b3, na.rm=T),
-          # #
-          # u_sum = sum(u, na.rm=T),
-          # v_sum = sum(v, na.rm=T),
-          ##
-          x1_mean = mean(x1, na.rm=T),
-          x2_mean = mean(x2, na.rm=T),
-          x3_mean = mean(x3, na.rm=T),
-          ##
-          c1_mean = mean(c1, na.rm=T),
-          c2_mean = mean(c2, na.rm=T),
-          c3_mean = mean(c3, na.rm=T),
-          #
-          c1_sd = sd(c1, na.rm=T),
-          c2_sd = sd(c2, na.rm=T),
-          c3_sd = sd(c3, na.rm=T),
-          ##
-          c1_skew = skewness(c1, na.rm=T, type = 2),
-          c2_skew = skewness(c2, na.rm=T, type = 2),
-          c3_skew = skewness(c3, na.rm=T, type = 2),
-          #
-          c1_kurt = skewness(c1, na.rm=T, type = 2),
-          c2_kurt = skewness(c2, na.rm=T, type = 2),
-          c3_kurt = skewness(c3, na.rm=T, type = 2),
-          #
-          b1_mean = mean(b1, na.rm=T),
-          b2_mean = mean(b2, na.rm=T),
-          b3_mean = mean(b3, na.rm=T),
-          #
-          u_mean = mean(u, na.rm=T),
-          v_mean = mean(v, na.rm=T)
-        )
-      tsdf$.id <- 1:nrow(tsdf)
+      ##
+      ##
+      ##----------------------------------------
+
+      ## AGGREGATE LONG DATAFRAME OF COVARIATES 
+      ## TREATMENT
+      bsts.df <- simdf %>%
+        dplyr::filter( 
+          ! is.na(match_id), 
+          group=='treatment'
+        ) %>%
+        group_by(t) %>%
+        summarize(
+          y_treatment = mean(y, na.rm=T)
+        ) 
+      # %>%
+      #   mutate(t=t,y_outcome=mean, .keep='used')
       
-      ## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
-      val.cols <- c('y_outcome','y_sum','y_min','y_max','y_sd',
-                    'y_skew','y_kurt',
-                    'x1_mean','x2_mean','x3_mean',
-                    'c1_mean','c2_mean','c3_mean',
-                    'c1_sd','c2_sd','c3_sd',
-                    'c1_skew','c2_skew','c3_skew',
-                    'c1_kurt','c2_kurt','c3_kurt',
-                    'b1_mean','b2_mean','b3_mean',
-                    'u_mean','v_mean')
+      if ( is.na(bsts.n.cov.cats) ) { 
+        ### 1 CONTROL GROUP just use untreated actors' mean
+        ## ONLY 1 WHOLE-CONTROL-GROUP AGGREGATED AS ONE SERIES
+        cov.df.wide <- simdf %>%
+          dplyr::filter( 
+            ! is.na(match_id), 
+            group=='control'
+          ) %>%
+          group_by(t) %>%
+          dplyr::summarize(
+            y_control = mean(y, na.rm=T),
+            c1_mean = mean(c1, na.rm=T),
+            c2_mean = mean(c2, na.rm=T),
+            c3_mean = mean(c3, na.rm=T),
+            c1_sd = sd(c1, na.rm=T),
+            c2_sd = sd(c2, na.rm=T),
+            c3_sd = sd(c3, na.rm=T)
+          ) #%>% pivot_wider(names_from, values_from)
+      } else {
+        ### SYNTHETIC CONTROL GROUPS (intersection of all covariate factors)
+        cat('\ncreating synthetic control groups as covariate series...')
+        ## create quantile categories (bins) 
+        # ## quantile upper limits; Get equal probability sequence from number of categories to create bins
+        # quant.up.lims <- (1:ncats)*(1/ncats)
+        c1cats <- cut(simdf$c1, bsts.n.cov.cats)
+        simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
+        # c1lvls <- sort(unique(c1cats))
+        # simdf$c1.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c1lvls==c1cats[i])],c1cats[i]))
+        ##
+        c2cats <- cut(simdf$c2, bsts.n.cov.cats)
+        simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
+        # c2lvls <- sort(unique(c2cats))
+        # simdf$c2.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c2lvls==c2cats[i])],c2cats[i]))
+        ##
+        c3cats <- cut(simdf$c3, bsts.n.cov.cats)
+        simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
+        # c3lvls <- sort(unique(c3cats))
+        # simdf$c3.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c3lvls==c3cats[i])],c3cats[i]))
+        ### SYNTHETIC CONTROL GROUPS
+        .cov.df <- simdf %>%
+          dplyr::filter( 
+            ! is.na(match_id), 
+            group=='control'
+          ) %>%
+          group_by(t, c3.f, c2.f, c1.f) %>%
+          dplyr::summarize(
+            cov_mean = mean(y, na.rm=T)#,
+            # cov_sum = sum(y, na.rm=T),
+            # cov_sd = sd(y, na.rm=T)
+          )  
+        .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = '|'))
+        .cov.df$c1.f <- NULL
+        .cov.df$c2.f <- NULL
+        .cov.df$c3.f <- NULL
+        ###
+        cov.df.wide <- .cov.df %>% 
+          pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
+        max.cov.missing <- 0.8
+        cov.col.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
+           ( sum(!is.na(x)) / length(x)  ) > max.cov.missing & 
+            !is.na(x[1]) & 
+            !is.na(x[length(x)])
+        })
+        ## KEEP IF First or last row is not NA (for fill() below) 
+        cov.col.keep <- ( cov.cols.nonNApct >  max.cov.missing )
+        cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]
+        cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
+        ##
+        cov.cols.nonNApct2 <- apply(cov.df.wide[,-1], 2, function(x){ 
+          sum(!is.na(x)) / length(x) 
+        })
+        cov.cols.nonNApct.keep <- (cov.cols.nonNApct2)
+        cov.cols.fill <- names(cov.df.wide)[ cov.cols.nonNApct2 < 1 ] 
+        cov.df.wide <- cov.df.wide %>% 
+          ungroup() %>% 
+          tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') %>%
+          tidyr::fill(all_of(cov.cols.fill), .direction = 'up')
+        # for (key in cov.cols.keep.names) {
+        # cov.df.wide <- cov.df.wide %>% dplyr::fill('B|A|B', .direction='down')
+          # cov.df.wide <- rbind(
+          #   .cov.df %>% fill(.data[[key]], .direction = 'downup')
+          # )
+        # }
+        
+        cat('done.\n')
+      }
+      apply(cov.df.wide[,-1],2,function(x)sum(!is.na(x))/length(x))
+      
+      
+      # cov.df.wide <- .cov.df %>% pivot_wider(names_from = , values_from = c('c1'))
+      
+      bsts.df <- bsts.df %>% full_join(cov.df.wide)
+      ##############################
+      # ## Aggregate into timeseries dataframe
+      # tsdf <- simdf %>%
+      #   dplyr::filter( ! is.na(match_id)) %>%
+      #   group_by(t, t.post.intpd, effect.type, match_pd, gname, group, group.color) %>%
+      #   dplyr::summarize(
+      #     n_in_pd = n(),
+      #     actors = paste(unique(actor), collapse = '|'),
+      #     y_outcome = mean(y, na.rm=T),
+      #     y_sum = sum(y, na.rm=T),
+      #     y_sd = sd(y, na.rm=T),
+      #     y_min = min(y, na.rm=T),
+      #     y_max = max(y, na.rm=T),
+      #     y_skew = skewness(y, na.rm = T, type = 2), ## moment-based distribution
+      #     y_kurt = kurtosis(y, na.rm = T, type = 2), ## moment-based distribution
+      #     # ##
+      #     # x1_sum = sum(x1, na.rm=T),
+      #     # x2_sum = sum(x2, na.rm=T),
+      #     # x3_sum = sum(x3, na.rm=T),
+      #     # ##
+      #     # c1_sum = sum(c1, na.rm=T),
+      #     # c2_sum = sum(c2, na.rm=T),
+      #     # c3_sum = sum(c3, na.rm=T),
+      #     # #
+      #     # b1_sum = sum(b1, na.rm=T),
+      #     # b2_sum = sum(b2, na.rm=T),
+      #     # b3_sum = sum(b3, na.rm=T),
+      #     # #
+      #     # u_sum = sum(u, na.rm=T),
+      #     # v_sum = sum(v, na.rm=T),
+      #     ##
+      #     x1_mean = mean(x1, na.rm=T),
+      #     x2_mean = mean(x2, na.rm=T),
+      #     x3_mean = mean(x3, na.rm=T),
+      #     ##
+      #     c1_mean = mean(c1, na.rm=T),
+      #     c2_mean = mean(c2, na.rm=T),
+      #     c3_mean = mean(c3, na.rm=T),
+      #     #
+      #     c1_sd = sd(c1, na.rm=T),
+      #     c2_sd = sd(c2, na.rm=T),
+      #     c3_sd = sd(c3, na.rm=T),
+      #     ##
+      #     c1_skew = skewness(c1, na.rm=T, type = 2),
+      #     c2_skew = skewness(c2, na.rm=T, type = 2),
+      #     c3_skew = skewness(c3, na.rm=T, type = 2),
+      #     #
+      #     c1_kurt = skewness(c1, na.rm=T, type = 2),
+      #     c2_kurt = skewness(c2, na.rm=T, type = 2),
+      #     c3_kurt = skewness(c3, na.rm=T, type = 2),
+      #     #
+      #     b1_mean = mean(b1, na.rm=T),
+      #     b2_mean = mean(b2, na.rm=T),
+      #     b3_mean = mean(b3, na.rm=T),
+      #     #
+      #     u_mean = mean(u, na.rm=T),
+      #     v_mean = mean(v, na.rm=T)
+      #   )
+      # tsdf$.id <- 1:nrow(tsdf)
+      
+      # ## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
+      # val.cols <- c('y_outcome','y_sum','y_min','y_max','y_sd',
+      #               'y_skew','y_kurt',
+      #               'x1_mean','x2_mean','x3_mean',
+      #               'c1_mean','c2_mean','c3_mean',
+      #               'c1_sd','c2_sd','c3_sd',
+      #               'c1_skew','c2_skew','c3_skew',
+      #               'c1_kurt','c2_kurt','c3_kurt',
+      #               'b1_mean','b2_mean','b3_mean',
+      #               'u_mean','v_mean')
       ts <- unique(tsdf$t)
       groups <- unique(tsdf$group)
       ## init timeseries dataframe - wide
@@ -1074,17 +1190,10 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      dat <- tsdfw[,c('treatment_y_outcome',
-                      'control_y_outcome',
-                      # 'control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
-                      # 'control_y_max','control_y_skew', 'control_y_kurt',
-                      'control_c1_mean','control_c2_mean', 'control_c3_mean',
-                      'control_c1_sd','control_c2_sd',  'control_c3_sd',
-                      'control_c1_skew','control_c2_skew', 'control_c3_skew'#,
-                      # 'control_c1_kurt','control_c2_kurt',
-                      # 'control_c3_kurt'#,
-                      # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
-                      # 'control_u_mean','control_v_mean'
+      dat <- tsdfw[,c('y_treatment',
+                      'y_control',
+                      'c1_mean','c2_mean','c3_mean',
+                      'c1_sd','c2_sd','c3_sd'
       )]
       ## Train on y pre-treatment but NA's post-treatment
       y.pre.treat.NAs.post.treat <- c(dat$treatment_y_outcome[1:(intpd-1)], rep(NA,npds-intpd+1))
