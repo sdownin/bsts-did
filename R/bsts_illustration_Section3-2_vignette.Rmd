@@ -1,0 +1,423 @@
+---
+title: "Bayesian Structural Time Series (BSTS) Illustration & Tutorial"
+output: pdf_document
+---
+
+This is a tutorial and illustration for running Bayesian structural time series 
+(BSTS) models, including configuring the state space and checking model diagnostics. 
+```{r initExclude, setup, include=FALSE}
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(CausalImpact)
+library(bsts)
+library(did)
+library(ggpubr)
+library(cowplot)
+library(coda)
+library(Boom)
+library(BoomSpikeSlab)
+library(e1071)
+library(forecast)  ## # library(sarima); library(qualV)
+set.seed(987654321)  ## reproducibility
+## Load simulation functions - Actor index vectorized simulation
+source(file.path(dir_r,'single_intervention_sim_vec.R')) 
+## Setting up and adding state space components to state.space list
+source(file.path(dir_r,'bsts_helper_functions.R')) 
+## BSTS vs. DiD comparison and sensitivity analysis
+source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
+
+dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
+knitr::opts_knit$set(root.dir = dir_proj)
+
+## Directories
+dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
+dir_ext <- 'D:\\BSTS_external'
+dir_plot <- file.path(dir_proj, 'plots')
+dir_r <- file.path(dir_proj,'R')
+##  file prefix for saving images, writing outputs, etc.
+prefix <- 'bsts-illus_vignette_'
+
+## MAIN SIM SETTINGS
+n <- 100  ## number of actors (i.e., number of time series)
+npds <- 520
+intpd <- round( npds * (5/6) )
+effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
+bsts.niters <- list(sm.start = 500, sm.max = 1000, lg.start = 5000, lg.max = 10000)
+
+##
+sim.config <- list(
+  ##--------Simulation settings--------------
+  n = n,    ## Number of firms
+  npds = npds,  ## Number of periods
+  intpd = intpd, ## #intervention period = (5/6)'ths of the total periods 
+  noise.level = 1.3, ## stdev of simulated noise terms
+  prior.sd.scenario = 'sd.low', ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+  treat.rule = 'random', 
+  treat.prob =  0.5,  ## ifelse(treat.rule=='random', 0.5, 1), 
+  treat.threshold = 1, ## ifelse(treat.rule=='random', 1, 0.5),
+  seasonality = TRUE,
+  dgp.nseasons= 52,  ## ifelse(seasonality, dgp.nseasons, NA), 
+  dgp.freq=  1, ##ifelse(seasonality, dgp.freq, NA),
+  rand.seed = 13579,
+  ## Dynamic treatment effect  (quadratic polynomial)
+  w0 = 1.5,  ## constant
+  w1 = 0.13, ## linear
+  w2 = -.05 / sqrt(npds), ## quadratic
+  w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
+  ## focal parameters of outcome function (manipulated in sensitivity analysis)
+  b4 = 1.0,   ## seasonal component weight
+  b5 = 0.04,  ## yearly growth rate
+  b9 = 0,     ## autocorrelation
+  ##
+  expect.mod.size = 1  # number of covariates included in BSTS model of counterfactual
+)
+##
+simlist <- list()
+
+## state space configuration used as label
+key <- '1_level'
+## SImulations list (for comparisons, gridsearches; use list length==1 for single model run)
+simlist[[ key ]] <- sim.config
+## Simulation ID
+sim.id <- round(10*as.numeric(Sys.time()))
+## RUN SIMULATION -  GENERATE TIME SERIES
+simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+                               sim.id = sim.id, plot.show = F, plot.save = F )
+## Save simulation for reuse with multiple BSTS models
+simcopy <- simlist[[key]]
+
+```
+
+
+## 1. Fit Basic BSTS Model
+
+Fit a simple BSTS model with only the local level in the state space. 
+To visualize the results, we plot the state space components against the 
+observed and predicted series. In this cases the state space only has a 
+trend component (i.e., the local level, which does not include a slope). 
+Following BSTS (and other forecasting) conventions, one-step ahead prediction 
+error in the pre-intervention window is used to assess model fit. 
+Improved performance of model fit is evident in the decreased error metrics, 
+such as the mean absolute error (MAE). 
+
+
+
+```{r}
+## load BSTS library
+library(bsts)
+library(CausalImpact)
+###***********
+# line for calling data?    LOAD SIMULATED TABLE?   OR CCONMA DATA ?
+## y.pre
+## 
+```
+
+
+Configure the model's state space by adding state components to the 
+state space list `st.sp`. 
+
+```{r}
+## Initiate empty state space configuration list
+st.sp <- list()
+## Add local level to trend component of state space
+st.sp <- AddLocalLevel(st.sp, y.pre)
+## Add trigonometric seasonality to state space
+st.sp <- AddTrig(st.sp, y.pre, period = 12, frequencies = 1)
+## Set BSTS MCMC iterations
+bsts.niter <- 1000
+```
+
+
+Fit the BSTS model by calling the `bsts()` function to run MCMC estimation 
+for `bsts.niter` draws from the stationary distribution of the Markov chain that 
+specifies the posterior distribution (assuming convergence was reached,
+which will be addressed below.)
+
+
+```{r}
+## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+## component (all covariates in ‘predictors’ dataframe)
+bsts.fit <- bsts(y.pre ~ . ,
+                 state.specification = st.sp,
+                 data = predictors,  ## dataframe of predictors
+                 niter = bsts.niter)
+```
+
+
+This fitted bsts model `bsts.fit` can now be passed into the `CausalImpact()`
+function. This will use `bsts.fit`, which was fitted on the pre-intervention 
+data, in order to forecast (i.e., predict outside of the sample time window) 
+the counterfactual series (i.e., the hypothetical outcome series if there
+had been no exposure to treatment).  The pointwise causal impact of the intervention 
+is then computed as the difference between the predicted 
+(counterfactual untreated outcome) and observed (actual treated outcome). 
+The cumulative impact estimate is the cumulative sum of the 
+pointwise impact estimates. 
+
+```{r}
+
+## Causal impact estimation: fitted BSTS model forecasts the counterfactual
+impact.amount <- CausalImpact(bsts.model = bsts.fit,
+                              post.period.response = y.post,
+                              alpha=0.05, model.args=list(niter = bsts.niter))
+
+```
+
+
+
+
+
+
+```{r 1_level, message=FALSE, include=FALSE}
+##  BSTS state specifications (list configurations of state space parameters)
+simlist[[key]]$bsts.state.specs <- list(
+  list(
+    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low')
+  )
+)
+## RUN BSTS and compare to DID
+keyid <- which(names(simlist) == key)
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$sm.max, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$sm.max,
+                               plot.show = F, plot.save=F, verbose=F,
+                               save.sim.rds=F)  
+##
+bsts.model <- getBstsModelFromSimlist(simlist, key)
+plotBstsStateComps(bsts.model, intpd)
+```
+
+
+## 2. Add Seasonality
+
+To account for seasonality in the time series data generating process, 
+we add a seasonal component to the state space ("seasonal.52.1" = one cycle of 52 periods per year). 
+This produces a state contribution of seasonal cycles (e.g., weekly periods each year) 
+added to the other state components. The augmented state space then improves 
+model performance in terms of the mean absolute error (MAE) of 
+one-step ahead predictions during the pre-intervention window. 
+```{r 2_season, message=FALSE, include=FALSE}
+key <- '2_season'
+simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
+simlist[[key]]$bsts.state.specs <- list(
+  list(
+    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low')
+  )
+)
+## RUN BSTS and compare to DID
+keyid <- which(names(simlist) == key)
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$sm.max, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$sm.max,
+                               plot.show = F, plot.save=F, verbose=F,
+                               save.sim.rds=F) 
+##
+bsts.model <- getBstsModelFromSimlist(simlist, key)
+plotBstsStateComps(bsts.model, intpd)
+```
+
+
+## 3. Check MCMC Convergence and Diagnostics 
+
+Draws from the posterior distribution of the stationary Markov chain(s)
+are used to estimate the model prediction at each time period though 
+Markov chain Monte Carlo (MCMC) estimation. However, when the Markov chains
+have not yet converged (usually due to insufficient MCMC burn-in period
+or sampled iterations), then the iterations cannot be treated as draws from
+the stationary distribution for the posterior predicted distribution. Thus, the 
+estimates may be unstable and/or biased, so users must assess convergence of 
+the MCMC chains. Similarly, there is need to assess how the model fits the 
+observed data. 
+
+For this purpose we plot MCMC convergence and model fit checks for the outcome 
+(Y, top row panels) and the standardized residuals (bottom row panels). 
+In the first column, the trace of the Markov chain (mean of draws per period) 
+is shown for the posterior predictive distribution of the outcome (Y). 
+For model fit, the observed and predicted values of Y are compared (top-center), 
+where tighter alignment indicates better fit. Additionally, using the maximum 
+value of Y as an auxiliary statistic, the Bayesian p-val presents the proportion of
+maximum Y values (from MCMC) that are larger than the observed largest 
+value of Y. Smaller values of Bayesian p-val indicate worse fit, which offers a 
+similar in interpretation to the frequentist null hypothesis statistical test 
+(NHST) under a null assumption of a well fitting model. 
+Values of Bayesian p-val >= alpha (conventionally 0.05) would therefore not reject the 
+null of good fit, whereas Bayesian p-val < alpha indicates problem(s) of fit to 
+be addressed (e.g., by increasing MCMC iterations, or respecifying the state space).
+
+```{r mcmc_diag_fail, fig.dim = c(14, 10), out.width="100%", include=FALSE}
+causimp <- getCausalImpactFromSimlist(simlist, key)
+convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
+```
+The MCMC convergence checks (left column) indicate that the BSTS function 
+needs to be re-run with more MCMC iterations. Here we use a function we 
+wrote to double the number of MCMC iterations (up to a max number) when 
+convergence is not yet met for the current number of iterations. Setting
+the argument `verbose=TRUE` will print the BSTS sampling iteration progress
+and text summary of MCMC convergence checks.
+```{r}
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$lg.start, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$lg.max,
+                               plot.show = F, plot.save=F, verbose=TRUE,
+                               save.sim.rds=F)  
+##
+bsts.model <- getBstsModelFromSimlist(simlist, key)
+plotBstsStateComps(bsts.model, intpd)
+```
+This model with the larger value of `niter` is more extensively sampled from the 
+posterior predictive distribution. So when we recheck convergence and fit diagnostics, 
+these should generally show improvement (or at least parity) with the model fit from 
+fewer MCMC iterations. Indeed the MCMC trace plots (left column) indicate
+convergence. However, the model is underspecified and does a poor job of 
+predicting close to the distribution of observed values (top-center panel).
+```{r mcmc_diag_pass, fig.dim = c(14, 10), out.width="100%", include=FALSE}
+causimp <- getCausalImpactFromSimlist(simlist, key)
+convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
+```
+
+
+## 4. Add Regression and Compare BSTS State Spaces
+
+Adding a regression component to the state space largely improves model
+fit, evidenced by the substantial reducing in mean absolute error (MAE), 
+again based on the one-step ahead prediction error in the pre-intervention period.
+Note how the predicted values (blue line)
+```{r 3_regression, include=FALSE}
+key <- '3_regression'
+simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
+simlist[[key]]$bsts.state.specs <- list(
+  list(
+    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddRegression')
+  )
+)
+## RUN BSTS and compare to DID
+keyid <- which(names(simlist) == key)
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$lg.start, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$lg.max,
+                               plot.show = F, plot.save=F, verbose=F,
+                               save.sim.rds=F) 
+##
+bsts.model <- getBstsModelFromSimlist(simlist, key)
+plotBstsStateComps(bsts.model, intpd)
+```
+The spike-and-slab priors used for variable selection enable the BSTS model 
+to create a counterfactual for causal inference by first creating a predictive 
+model before the intervention. This predictive model is then used for forecasting
+post-intervention (i.e., the counterfactual) for the purpose of Bayesian 
+causal inference. Focusing on the BSTS model's variable selection, the plot of expected 
+inclusion probabilities for each covaraite in the predictors data table 
+indicates the likelihood that each covariate is used 
+in the model (i.e., used to create the synthetic control group). This comes from
+the proportion of MCMC draws (sampling from the posterior predictive distribution
+of the outcome [Y]) that include each covariate in the regression component of the 
+model.
+```{r bsts_inclusion_probs, include=FALSE}
+PlotBstsCoefficients(bsts.model)
+```
+Plotting a comparison of the cumulative one-step ahead prediction error
+reveals how the structural model with regression component vastly 
+outperforms the simple structural models without the information captured by 
+the covariates.
+```{r bsts_compare, include=FALSE}
+m1 <- getBstsModelFromSimlist(simlist, '1_level')
+m2 <- getBstsModelFromSimlist(simlist, '2_season')
+m3 <- getBstsModelFromSimlist(simlist, '3_regression')
+CompareBstsModels(list(`1_level`=m1, `2_season`=m2, `3_regression`=m3))
+```
+We can also compare an alternative state space with an autoregressive component 
+added to the local level (trend without slope). However, the autoregressive 
+component (AR[1]) does not necessarily improve model fit, as evidenced by the
+slightly increased MAE. Of course, the worse performance would be expected 
+given that the state space contains a structural component not present in the
+data generating process. 
+```{r 4a_ar, include=FALSE}
+key <- '4a_ar'
+simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
+simlist[[key]]$bsts.state.specs <- list(
+  list(  
+    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low'),
+    getStateSpaceConfBySimScenario('AddRegression'),
+    getStateSpaceConfBySimScenario('AddAr', 'sd.low')
+  )
+)
+## RUN BSTS and compare to DID
+keyid <- which(names(simlist) == key)
+simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+                               effect.types = effect.types,
+                               sim.id = sim.id,
+                               save.items.dir= dir_ext,
+                               bsts.niter = bsts.niters$lg.start, ## **START at MAX niter for large npds **
+                               bsts.max.iter= bsts.niters$lg.max,
+                               plot.show = F, plot.save=F, verbose=F,
+                               save.sim.rds=F) 
+##
+bsts.model <- getBstsModelFromSimlist(simlist, key)
+plotBstsStateComps(bsts.model, intpd)
+PlotBstsCoefficients(bsts.model)
+##
+m4a <- bsts.model
+CompareBstsModels(list(`1_level`=m1, `2_season`=m2, `3_regression`=m3,`4a_ar`=m4a))
+```
+
+```{r 4b_trend, include=FALSE}
+# Finally, we can compare an alternative trend specification, 
+# the semi-local linear trend, which is suited to longer-term forecasts 
+# (compared to the local linear trend). This includes both a slope in the trend
+# (which the local level omits) and allows the slope to evolve according to an 
+# AR(1) process. The linear trend component can take longer for MCMC chains to 
+# converge, which can potentially lead to issues with convergence and/or fit 
+# when the underlying data generating process does not have an evolving slope 
+# (in addition to the 'level') of the trend over time.
+##
+#
+# key <- '4b_trend'
+# simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
+# simlist[[key]]$bsts.state.specs <- list(
+#   list(
+#     # getStateSpaceConfBySimScenario('AddLocalLinearTrend', 'sd.low'),
+#     getStateSpaceConfBySimScenario('AddSemilocalLinearTrend', 'sd.low'),
+#     getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low'),
+#     getStateSpaceConfBySimScenario('AddRegression')
+#   )
+# )
+# ## RUN BSTS and compare to DID
+# keyid <- which(names(simlist) == key)
+# simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
+#                                effect.types = effect.types,
+#                                sim.id = sim.id,
+#                                save.items.dir= dir_ext,
+#                                bsts.niter = bsts.niters$lg.max, ## **START at MAX niter for large npds **
+#                                bsts.max.iter= bsts.niters$lg.max,
+#                                plot.show = F, plot.save=F, verbose=T) 
+# ##
+# causimp <- simlist[[key]]$compare$bsts$quadratic[[1]]$CausalImpact
+# bsts.model <- causimp$model$bsts.model
+# plotBstsStateComps(bsts.model, intpd)
+# PlotBstsCoefficients(bsts.model)
+##
+# m4a <- simlist$`4a_ar`$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model
+# m4b <- simlist$`4b_trend`$compare$bsts$quadratic[[1]]$CausalImpact$model$bsts.model
+# CompareBstsModels(list(`1_level`=m1, `2_season`=m2, `3_regression`=m3, 
+#                        `4a_ar`=m4a, `4b_trend`=m4b))
+```
+
+This concludes the tutorial vignette. 

@@ -25,6 +25,11 @@ library(forecast)
 library(coda)
 library(e1071)
 library(qualV)
+library(stringdist)
+##
+library(RColorBrewer)
+library(scico)
+library(ggplot2)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
@@ -378,40 +383,390 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
 
 
 
-library(RColorBrewer)
-library(scico)
-library(ggplot2)
+##############################################
+##
+##
+##
+## AGGREGATION x MCC CURVE INTERACTION
+##
+##
+##
+##############################################
+# gsdir  <-  'D:\\BSTS_external\\MCC_curve_interact_aggregation_comparison'  ## 'D:\\BSTS_external\\bsts_did_comparison_summary_gridsearch'
+gsdir <- file.path(dir_ext, 'bsts_period_aggregation_MCC_curve_interaction_20230103')
+# gsdir <- 'D:\\BSTS_external\\MCC_curve_interact_aggreagation_comparision_n200-400'
+
+files <- dir(gsdir, pattern = '\\.rds$')
+suml <- list()
+sdf <- data.frame(stringsAsFactors = F)
+effect.types <- c('constant','quadratic','geometric')
+for (i in 1:length(files)) {
+  
+  x <- readRDS(file.path(gsdir, files[i]))
+  
+  intpd <- x$intpd
+  npds <- x$npds
+  n <- x$n
+  npds.post <- npds - intpd + 1
+  
+  for (k in 1:length(effect.types)) {
+    cat(sprintf('i=%s %s k=%s\n',i,files[i],k))
+    
+    effect.type <- effect.types[k]    
+    
+    parallel.p <- x$compare$did[[effect.type]]$attgt$Wpval
+    parallel.W <- x$compare$did[[effect.type]]$attgt$W
+    
+    nss <- length(x$compare$bsts[[effect.type]])
+    
+    for (h in 1:length(nss)) {
+      
+      # x$compare$bsts[[effect.type]][[h]]$CausalImpact
+      
+      # x$compare$res.tbl
+      
+      res.tbl <- x$compare$res.tbl[[effect.type]][[h]]
+      
+      
+      npds.int <- length(intpd:npds)
+      
+      dsig <- 1 * (res.tbl$did.point.conf.low[intpd:npds] * res.tbl$did.point.conf.high[intpd:npds] > 0 ) ## positive product means both same sign, not containing zero --> significant
+      bsig <- 1 * (res.tbl$bsts.point.effect.lower[intpd:npds] * res.tbl$bsts.point.effect.upper[intpd:npds] > 0)
+      
+      did.bsts.sigvec.dist.cos <- sum(dsig * bsig) / (sqrt(sum(dsig^2))*sqrt(sum(bsig^2)))
+      did.bsts.sigvec.dist.ham <- hamming.distance(dsig, bsig)
+      
+      ## time until first significance
+      ##   0 = significant in 1st treatment period (at t_event = 0)
+      tsig.1.did <- ifelse(sum(dsig==1)>0, which(dsig == 1)[1]  , NA)
+      tsig.1.bsts <- ifelse(sum(bsig==1)>0 , which(bsig == 1)[1]  , NA)
+      
+      tsig.1.tnotsig.1.did <- NA
+      tsig.1.tnotsig.1.bsts <- NA
+      
+      ## time from 1st significance to 1st insignificance 
+      if (!is.na(tsig.1.did)) {
+        id.1notsig.after.1sig.did <- which( dsig[(tsig.1.did+1):npds.int] == 0 )
+        tsig.1.tnotsig.1.did <- ifelse(length(id.1notsig.after.1sig.did)>0, id.1notsig.after.1sig.did[1] + tsig.1.did , NA)
+      }
+      if (!is.na(tsig.1.bsts)) {
+        id.1notsig.after.1sig.bsts <- which( bsig[(tsig.1.bsts+1):npds.int] == 0 )
+        tsig.1.tnotsig.1.bsts <- ifelse(length(id.1notsig.after.1sig.bsts)>0, id.1notsig.after.1sig.bsts[1] + tsig.1.bsts , NA)
+      }
+      
+      
+      ## longest pointwise significance span
+      tsig.long.did <- stringdist(paste(dsig,collapse=''), 
+                                  paste(rep(1, length(dsig)),collapse=''), 
+                                  method='lcs')
+      tsig.long.bsts <- stringdist(paste(bsig,collapse=''), 
+                                   paste(rep(1, length(bsig)),collapse=''), 
+                                   method='lcs')
+      
+      ## Period of last pointwise signifance
+      tsig.last.did <- max(which(dsig == 1))
+      tsig.last.bsts<- max(which(bsig == 1))
+      
+      # x$compare$bsts[[effect.type]][[h]]$CausalImpact$summary
+      # x$compare$bsts[[effect.type]][[h]]$CausalImpact$series
+      
+      st.sp.l <- x$compare$bsts[[effect.type]][[h]]$CausalImpact$model$bsts.model$state.specification
+      st.sp.str <- paste(sapply(st.sp.l, function(x)x$name), collapse = '|')
+      
+      
+      if ( is.null(parallel.p) ) {
+        # cat(sprintf(' skiping i=%s, parallel trends test p-val is missing (NULL)\n',i))
+        # next
+        parallel.p <- NA
+      }
+      if (is.null(parallel.W)) {
+        parallel.W <- NA
+      }
+      
+      att.dgp <- mean( res.tbl$b3.att[intpd:npds], na.rm = T)
+      att.dgp.tot <- sum( res.tbl$b3.att[intpd:npds], na.rm=T)
+      
+      causimp <- getCausalImpactFromSimlist(list(x), key=1, effect.type=effect.type) 
+      
+      att.bsts <- causimp$summary$AbsEffect[1]
+      att.bsts.tot <-  causimp$summary$AbsEffect[2]
+      
+      att.bsts.lo <- mean(causimp$series$point.effect.lower[intpd:npds], na.rm=T)
+      att.bsts.lo.tot <- causimp$series$cum.effect.lower[npds]
+      att.bsts.hi <- mean(causimp$series$point.effect.upper[intpd:npds], na.rm=T)
+      att.bsts.hi.tot <- causimp$series$cum.effect.upper[npds]
+      
+      # b3.bsts.tot <- sum( res.tbl$bsts.point.effect[intpd:npds], na.rm=T)
+      
+      # b3.did <- x$compare$did[[effect.type]]$agg.es$overall.att
+      
+      attgt <- x$compare$did[[effect.type]]$attgt
+      agg.group <- aggte(attgt, type = 'group', bstrap = T)
+      
+      att.did <- agg.group$overall.att
+      att.did.tot <- sum(res.tbl$did.estimate[intpd:npds], na.rm=T)
+      
+      att.did.lo <- mean(res.tbl$did.point.conf.low[intpd:npds], na.rm=T)
+      att.did.lo.tot <- sum(res.tbl$did.point.conf.low[intpd:npds], na.rm=T)
+      
+      att.did.hi <- mean(res.tbl$did.point.conf.high[intpd:npds], na.rm=T)
+      att.did.hi.tot <- sum(res.tbl$did.point.conf.high[intpd:npds], na.rm=T)
+      
+      att.did.pre.rmse <- sqrt(mean( (res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])^2, na.rm=T ))
+      att.did.pre.abs.err.tot <- sum( abs(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]), na.rm=T)
+      
+      att.did.post.rmse <- sqrt(mean( (res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds])^2, na.rm=T ))
+      att.did.post.abs.err.tot <- sum( abs(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]), na.rm=T)
+      
+      att.did.pre.mape <- mean( abs( (res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]) / res.tbl$did.estimate[1:(intpd-1)] ), na.rm=T )
+      
+      bsts.posterior.p <- causimp$summary$p[1]
+      # bsts.mape <- 
+      bsts.post.rmse <- sqrt(mean( (causimp$series$response[intpd:npds] - causimp$series$point.pred[intpd:npds])^2 )) 
+      bsts.post.abs.err.tot <- sum( abs(causimp$series$response[intpd:npds] - causimp$series$point.pred[intpd:npds]), na.rm=T)
+      
+      bsts.pre.rmse <- sqrt(mean( (causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)])^2 ))
+      bsts.pre.abs.err.tot <- sum( abs(causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)]) , na.rm=T)
+      
+      bsts.pre.1step <- causimp$model$bsts.model$one.step.prediction.errors[,1:(intpd-1)]
+      bsts.pre.1step.tot <- sum(bsts.pre.1step, na.rm=T)
+      bsts.pre.1step.rmse <- sqrt(mean( colMeans(bsts.pre.1step)^2 ))
+      # plot(rowMeans(bsts.pre.1step),type='l')
+      # colMeans(bsts.pre.1step)
+      
+      bsts.pre.mape <- mean( abs( (causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)]) / causimp$series$response[1:(intpd-1)] ), na.rm=T )
+      
+      bsts.niter <- causimp$model$bsts.model$niter
+      
+      bsts.cnt.prior.inclu <- sum( causimp$model$bsts.model$prior$prior.inclusion.probabilities > .5, na.rm=T)
+      
+      
+      ## Period of first cumulative significance (is there an effect at all? If yes, when? )
+      agg.es <- x$compare$did[[effect.type]]$agg.es
+      did.tbl <- tidy(agg.es)
+      did.tbl <- did.tbl[which(did.tbl$event.time >= 0),]
+      idx.did.cumu.sig <- which( cumsum(did.tbl$conf.low) > 0 ) ## lower confidence interval > 0 == significant 
+      tsig.cumu.1.did <- ifelse( length(idx.did.cumu.sig)>0, idx.did.cumu.sig[1], NA)
+      
+      bsts.tbl <- causimp$series[intpd:npds, ]
+      idx.bsts.cumu.sig <- which( bsts.tbl$cum.effect.lower > 0  )
+      tsig.cumu.1.bsts <- ifelse( length(idx.bsts.cumu.sig)>0, idx.bsts.cumu.sig[1], NA)
+      
+      # (x$compare$did[[effect.type]]$agg.es$crit.val.egt * x$compare$did[[effect.type]]$agg.es$overall.se)
+      
+      idf <- data.frame(file=files[i], intpd=intpd, npds=npds, n=n, npds.per.n=npds/n,
+                        npds.postint=npds.int,
+                        effect.type=effect.type, st.sp=st.sp.str, bsts.niter=bsts.niter,
+                        parallel.p=parallel.p, parallel.W=parallel.W, 
+                        att.bsts=att.bsts,  
+                        att.bsts.lo=att.bsts.lo,  
+                        att.bsts.hi=att.bsts.hi, 
+                        att.bsts.tot=att.bsts.tot, 
+                        att.bsts.lo.tot=att.bsts.lo.tot, 
+                        att.bsts.hi.tot=att.bsts.hi.tot,
+                        #
+                        bsts.post.rmse=bsts.post.rmse,  
+                        bsts.post.abs.err.tot=bsts.post.abs.err.tot,
+                        bsts.pre.rmse=bsts.pre.rmse,
+                        bsts.pre.abs.err.tot=bsts.pre.abs.err.tot,
+                        bsts.pre.1step.tot=bsts.pre.1step.tot,
+                        bsts.pre.1step.rmse=bsts.pre.1step.rmse,
+                        #
+                        bsts.pre.mape=bsts.pre.mape,
+                        ##
+                        bsts.posterior.p=bsts.posterior.p, 
+                        bsts.niter=bsts.niter,
+                        bsts.cnt.prior.inclu=bsts.cnt.prior.inclu,
+                        ##
+                        att.did=att.did, 
+                        att.did.tot=att.did.tot,
+                        att.did.lo=att.did.lo, 
+                        att.did.lo.tot=att.did.lo.tot,
+                        att.did.hi=att.did.hi, 
+                        att.did.hi.tot=att.did.hi.tot,
+                        ##
+                        att.did.pre.rmse=att.did.pre.rmse,
+                        att.did.pre.abs.err.tot=att.did.pre.abs.err.tot,
+                        att.did.post.rmse=att.did.post.rmse,
+                        att.did.post.abs.err.tot=att.did.post.abs.err.tot,
+                        #
+                        att.did.pre.mape=att.did.pre.mape,
+                        ##
+                        did.bsts.sigvec.dist.cos=did.bsts.sigvec.dist.cos,
+                        did.bsts.sigvec.dist.ham=did.bsts.sigvec.dist.ham,
+                        did.bsts.sigvec.dist.cos.scaled= did.bsts.sigvec.dist.cos / length(intpd:npds),
+                        did.bsts.sigvec.dist.ham.scaled= did.bsts.sigvec.dist.ham / length(intpd:npds),
+                        ## period of 1st pointwise significance
+                        tsig.1.did=tsig.1.did,
+                        tsig.1.bsts=tsig.1.bsts,
+                        tsig.1.did.lag = tsig.1.did - 1,  ## delay before 1st pointwise significance
+                        tsig.1.bsts.lag = tsig.1.bsts - 1, ## delay before 1st pointwise significance
+                        ## period of last pointwise significance
+                        tsig.last.did = tsig.last.did, 
+                        tsig.last.bsts = tsig.last.bsts,
+                        ## longest pointwise significance period
+                        tsig.long.did=tsig.long.did,
+                        tsig.long.bsts=tsig.long.bsts,
+                        ## 1st not significant period after 1st significant period - For Use in Geometric effect precision illustration
+                        tsig.1.tnotsig.1.did=tsig.1.tnotsig.1.did,
+                        tsig.1.tnotsig.1.bsts=tsig.1.tnotsig.1.bsts,
+                        ##
+                        tsig.cumu.1.did = tsig.cumu.1.did,
+                        tsig.cumu.1.bsts = tsig.cumu.1.bsts,
+                        ## NO ENTROPY? Check if still pointwise significant at end
+                        did.no.entropy = ( tsig.last.did == npds.int ),
+                        bsts.no.entropy = ( tsig.last.bsts == npds.int ),
+                        ##
+                        bias.bsts=(att.bsts - att.dgp), 
+                        bias.did=(att.did - att.dgp),
+                        bsts.advantage=(abs(att.did - att.dgp) / abs(att.bsts - att.dgp))
+      )
+      sdf <- rbind(sdf, idf)
+      
+    }
+    
+  }
+  
+}
+##
+sdf$agg.span <- max(sdf$npds) / sdf$npds
+sdf$agg.granularity <- sdf$npds / max(sdf$npds) 
+sdf$agg.granularity.log <- log(sdf$agg.granularity)
+##
+write.csv(sdf, file=file.path(gsdir,'bsts_period_aggregation_MCC_curve_interaction_n200-400_SUMMARY.csv'))
+# cdf <- read.csv(file.path(gsdir,'bsts_did_period_aggregation_summary.csv'))
+# cdf <- read.csv(file.path(gsdir,'_prev','bsts_did_period_aggregation_summary.csv'))
+# # att.did <- agg.es$overall.att
+# # att.bsts <- impact_amount$summary$AbsEffect[1]
+
+# cdf$perf.adv.model <- 'DID'
+# cdf$perf.adv.model[cdf$bsts.advantage > 1] <- "BSTS"
+# cdf$total.obs <- cdf$n * cdf$npds
+# cdf$actors <- as.factor(cdf$n)
+
+ns <- c(200, 400)
+aggcor <- data.frame()
+for (i in 1:length(effect.types)) {
+  effect.type <- effect.types[i]
+  for (j in 1:length(ns)) {
+    n <- ns[j]
+    idx <- which( sdf$effect.type==effect.type & sdf$n == n )
+    sdfx <- sdf[idx, ]
+    ##
+    aggcor <- rbind(aggcor, data.frame(
+      nobs.cor = nrow(sdfx),
+      nactors=n,
+      effect.type=effect.type,
+      gran.mean = mean( sdfx$agg.granularity, na.rm=T),
+      gran.sd = sd( sdfx$agg.granularity, na.rm=T),
+      
+      gran.log.mean = mean( sdfx$agg.granularity.log, na.rm=T),
+      gran.log.sd = sd( sdfx$agg.granularity.log, na.rm=T),
+      
+      bsts.niter.conv.mean = mean(sdfx$bsts.niter, na.rm=T),
+      bsts.niter.conv.sd = sd(sdfx$bsts.niter, na.rm=T),
+      bsts.adv.mean = mean( abs(sdfx$bsts.advantage) , na.rm=T),
+      bsts.adv.sd = sd( abs(sdfx$bsts.advantage) , na.rm=T),
+      
+      bias.bsts.mean = mean( sdfx$bias.bsts, na.rm=T),
+      bias.bsts.sd = sd( sdfx$bias.bsts, na.rm=T),
+      bias.did.mean = mean( sdfx$bias.did, na.rm=T),
+      bias.did.sd = sd( sdfx$bias.did, na.rm=T),
+      
+      cor.bsts.adv.gran= cor(abs(sdfx$bsts.advantage), sdfx$agg.granularity),
+      cor.bsts.adv.gran.testp = cor.test(abs(sdfx$bsts.advantage), sdfx$agg.granularity)$p.value,
+      
+      cor.bsts.bias.gran= cor(sdfx$bias.bsts, sdfx$agg.granularity), 
+      cor.bsts.bias.gran.testp= cor.test(sdfx$bias.bsts, sdfx$agg.granularity)$p.value, 
+      
+      cor.did.bias.gran= cor(sdfx$bias.did, sdfx$agg.granularity),
+      cor.did.bias.gran.testp =   cor.test(sdfx$bias.did, sdfx$agg.granularity)$p.value, 
+      
+      ##---
+      
+      cor.bsts.adv.gran.log= cor(abs(sdfx$bsts.advantage), sdfx$agg.granularity.log),
+      cor.bsts.adv.gran.log.testp = cor.test(abs(sdfx$bsts.advantage), sdfx$agg.granularity.log)$p.value,
+      
+      cor.bsts.bias.gran.log= cor(sdfx$bias.bsts, sdfx$agg.granularity.log), 
+      cor.bsts.bias.gran.log.testp= cor.test(sdfx$bias.bsts, sdfx$agg.granularity.log)$p.value, 
+      
+      cor.did.bias.gran.log= cor(sdfx$bias.did, sdfx$agg.granularity.log),
+      cor.did.bias.gran.log.testp =   cor.test(sdfx$bias.did, sdfx$agg.granularity.log)$p.value
+    ))
+  }
+}
+write.csv(aggcor, file=file.path(gsdir, 'bsts_did_period_aggregation_correlation_MCC_curve_interaction.csv'))
+
+
+
+
+########################################
+########################################
+
+
+
+# ggplot(data=sdf, aes(x=npds, y=parallel.p+1, colour=effect.type)) + 
+#   geom_point() + facet_wrap( . ~ factor(n))  + 
+#   geom_smooth(method='lm') +
+#   scale_y_log10()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ########################################
 ##  PERIOD AGGREGATION - SUMMARIZE
-##   N=50,100,200,400,800,1600
-##   T=5,10,20,24,30,40,60,120
+##   N=200,400
+##   T=[5] 10, 13, 20, 26, 52, 65, 104, 130, 260, 520
 ########################################
-gsdir  <-  'D:\\BSTS_external\\bsts_did_aggregation_comparison'  ## 'D:\\BSTS_external\\bsts_did_comparison_summary_gridsearch'
+# gsdir  <-  'D:\\BSTS_external\\bsts_did_aggregation_comparison'  ## 'D:\\BSTS_external\\bsts_did_comparison_summary_gridsearch'
+gsdir <- file.path(dir_ext, 'bsts_period_aggregation_MCC_curve_interaction_20230103')
 files <- dir(gsdir, pattern = '\\.rds$')
 suml <- list()
 cdf <- data.frame(stringsAsFactors = F)
+effect.type <- 'quadratic'
 for (i in 1:length(files)) {
   cat(sprintf('i=%s %s\n',i,files[i]))
   x <- readRDS(file.path(gsdir, files[i]))
   intpd <- x$intpd
   npds <- x$npds
   n <- x$n
-  p <- x$compare$did$quadratic$attgt$Wpval
-  W <- x$compare$did$quadratic$attgt$W
+  p <- x$compare$did[[ effect.type ]]$attgt$Wpval
+  W <- x$compare$did[[ effect.type ]]$attgt$W
+  
+  bsts.model <- getBstsModelFromSimlist(list(x), key=1, effect.type = effect.type)
+  
+  causimp <- getCausalImpactFromSimlist(list(x), effect.type = effect.type)
+  
   
   if ( is.null(p) ) {
     cat(sprintf(' skiping i=%s, parallel trends test p-val is missing (NULL)\n',i))
     next
   }
   
-  b3.bsts<-  x$compare$bsts$quadratic[[1]]$CausalImpact$summary$AbsEffect[1]
-  b3.tot.bsts <-  x$compare$bsts$quadratic[[1]]$CausalImpact$summary$AbsEffect[2]
+  b3.bsts<-  causimp$summary$AbsEffect[1]
+  b3.tot.bsts <-  causimp$summary$AbsEffect[2]
   
-  b3.did <- x$compare$did$quadratic$agg.es$overall.att
+  b3.did <- x$compare$did[[ effect.type ]]$agg.es$overall.att
   
-  b3.dgp <- mean( x$compare$res.tbl$quadratic[[1]]$b3.att[intpd:npds], na.rm = T)
+  b3.dgp <- mean( x$compare$res.tbl[[ effect.type ]][[1]]$b3.att[intpd:npds], na.rm = T)
   
-  idf <- data.frame(file=files[i], intpd=intpd, npds=npds, n=n,
+  idf <- data.frame(file=files[i], intpd=intpd, npds=npds, n=n, bsts.niter=bsts.model$niter,
                     parallel.p=p, parallel.W=W, b3.bsts=b3.bsts,
                     b3.tot.bsts=b3.tot.bsts, b3.did=b3.did, 
                     bias.bsts=(b3.bsts - b3.dgp), bias.did=(b3.did - b3.dgp),
@@ -424,6 +779,10 @@ write.csv(cdf, file=file.path(gsdir,'bsts_did_period_aggregation_summary.csv'))
 # cdf <- read.csv(file.path(gsdir,'_prev','bsts_did_period_aggregation_summary.csv'))
 # # att.did <- agg.es$overall.att
 # # att.bsts <- impact_amount$summary$AbsEffect[1]
+
+
+read.csv(file.path(gsdir,'bsts_did_period_aggregation_summary.csv'))
+
 
 cdf$perf.adv.model <- 'DID'
 cdf$perf.adv.model[cdf$bsts.advantage > 1] <- "BSTS"
@@ -651,316 +1010,6 @@ ggplot(data=cdf, aes(x=parallel.p, y=parallel.W)) +
 
 # cdf$go.for.bsts <- 0
 # cdf$go.for.bsts[cdf$parallel.W > 10] <- 1
-
-
-
-
-
-
-
-
-
-
-##############################################
-##
-##
-##
-## AGGREGATION x MCC CURVE INTERACTION
-##
-##
-##
-##############################################
-# gsdir  <-  'D:\\BSTS_external\\MCC_curve_interact_aggregation_comparison'  ## 'D:\\BSTS_external\\bsts_did_comparison_summary_gridsearch'
-gsdir <- 'D:\\BSTS_external\\MCC_curve_interact_aggreagation_comparision_n200-400'
-files <- dir(gsdir, pattern = '\\.rds$')
-suml <- list()
-sdf <- data.frame(stringsAsFactors = F)
-effect.types <- c('constant','quadratic','geometric')
-for (i in 1:length(files)) {
-  
-  x <- readRDS(file.path(gsdir, files[i]))
-  
-  intpd <- x$intpd
-  npds <- x$npds
-  n <- x$n
-  npds.post <- npds - intpd + 1
-  
-  for (k in 1:length(effect.types)) {
-    cat(sprintf('i=%s %s k=%s\n',i,files[i],k))
-    
-    effect.type <- effect.types[k]    
-    
-    parallel.p <- x$compare$did[[effect.type]]$attgt$Wpval
-    parallel.W <- x$compare$did[[effect.type]]$attgt$W
-    
-    nss <- length(x$compare$bsts[[effect.type]])
-    
-    for (h in 1:length(nss)) {
-
-      # x$compare$bsts[[effect.type]][[h]]$CausalImpact
-      
-      # x$compare$res.tbl
-      
-      res.tbl <- x$compare$res.tbl[[effect.type]][[h]]
-      
-      
-      npds.int <- length(intpd:npds)
-      
-      dsig <- 1 * (res.tbl$did.point.conf.low[intpd:npds] * res.tbl$did.point.conf.high[intpd:npds] > 0 ) ## positive product means both same sign, not containing zero --> significant
-      bsig <- 1 * (res.tbl$bsts.point.effect.lower[intpd:npds] * res.tbl$bsts.point.effect.upper[intpd:npds] > 0)
-      
-      did.bsts.sigvec.dist.cos <- sum(dsig * bsig) / (sqrt(sum(dsig^2))*sqrt(sum(bsig^2)))
-      did.bsts.sigvec.dist.ham <- hamming.distance(dsig, bsig)
-      
-      ## time until first significance
-      ##   0 = significant in 1st treatment period (at t_event = 0)
-      tsig.1.did <- ifelse(sum(dsig==1)>0, which(dsig == 1)[1]  , NA)
-      tsig.1.bsts <- ifelse(sum(bsig==1)>0 , which(bsig == 1)[1]  , NA)
-      
-      tsig.1.tnotsig.1.did <- NA
-      tsig.1.tnotsig.1.bsts <- NA
-      
-      ## time from 1st significance to 1st insignificance 
-      if (!is.na(tsig.1.did)) {
-        id.1notsig.after.1sig.did <- which( dsig[(tsig.1.did+1):npds.int] == 0 )
-        tsig.1.tnotsig.1.did <- ifelse(length(id.1notsig.after.1sig.did)>0, id.1notsig.after.1sig.did[1] + tsig.1.did , NA)
-      }
-      if (!is.na(tsig.1.bsts)) {
-        id.1notsig.after.1sig.bsts <- which( bsig[(tsig.1.bsts+1):npds.int] == 0 )
-        tsig.1.tnotsig.1.bsts <- ifelse(length(id.1notsig.after.1sig.bsts)>0, id.1notsig.after.1sig.bsts[1] + tsig.1.bsts , NA)
-      }
-
-      
-      ## longest pointwise significance span
-      tsig.long.did <- stringdist(paste(dsig,collapse=''), 
-                                  paste(rep(1, length(dsig)),collapse=''), 
-                                  method='lcs')
-      tsig.long.bsts <- stringdist(paste(bsig,collapse=''), 
-                                   paste(rep(1, length(bsig)),collapse=''), 
-                                   method='lcs')
-      
-      ## Period of last pointwise signifance
-      tsig.last.did <- max(which(dsig == 1))
-      tsig.last.bsts<- max(which(bsig == 1))
-      
-      # x$compare$bsts[[effect.type]][[h]]$CausalImpact$summary
-      # x$compare$bsts[[effect.type]][[h]]$CausalImpact$series
-    
-      st.sp.l <- x$compare$bsts[[effect.type]][[h]]$CausalImpact$model$bsts.model$state.specification
-      st.sp.str <- paste(sapply(st.sp.l, function(x)x$name), collapse = '|')
-
-      
-      if ( is.null(parallel.p) ) {
-        # cat(sprintf(' skiping i=%s, parallel trends test p-val is missing (NULL)\n',i))
-        # next
-        parallel.p <- NA
-      }
-      if (is.null(parallel.W)) {
-        parallel.W <- NA
-      }
-      
-      att.dgp <- mean( res.tbl$b3.att[intpd:npds], na.rm = T)
-      att.dgp.tot <- sum( res.tbl$b3.att[intpd:npds], na.rm=T)
-      
-      causimp <- x$compare$bsts[[effect.type]][[h]]$CausalImpact
-      
-      att.bsts <- causimp$summary$AbsEffect[1]
-      att.bsts.tot <-  causimp$summary$AbsEffect[2]
-      
-      att.bsts.lo <- mean(causimp$series$point.effect.lower[intpd:npds], na.rm=T)
-      att.bsts.lo.tot <- causimp$series$cum.effect.lower[npds]
-      att.bsts.hi <- mean(causimp$series$point.effect.upper[intpd:npds], na.rm=T)
-      att.bsts.hi.tot <- causimp$series$cum.effect.upper[npds]
-      
-      # b3.bsts.tot <- sum( res.tbl$bsts.point.effect[intpd:npds], na.rm=T)
-      
-      # b3.did <- x$compare$did[[effect.type]]$agg.es$overall.att
-      
-      attgt <- x$compare$did[[effect.type]]$attgt
-      agg.group <- aggte(attgt, type = 'group', bstrap = T)
-      
-      att.did <- agg.group$overall.att
-      att.did.tot <- sum(res.tbl$did.estimate[intpd:npds], na.rm=T)
-      
-      att.did.lo <- mean(res.tbl$did.point.conf.low[intpd:npds], na.rm=T)
-      att.did.lo.tot <- sum(res.tbl$did.point.conf.low[intpd:npds], na.rm=T)
-      
-      att.did.hi <- mean(res.tbl$did.point.conf.high[intpd:npds], na.rm=T)
-      att.did.hi.tot <- sum(res.tbl$did.point.conf.high[intpd:npds], na.rm=T)
-      
-      att.did.pre.rmse <- sqrt(mean( (res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])^2, na.rm=T ))
-      att.did.pre.abs.err.tot <- sum( abs(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]), na.rm=T)
-     
-      att.did.post.rmse <- sqrt(mean( (res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds])^2, na.rm=T ))
-      att.did.post.abs.err.tot <- sum( abs(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]), na.rm=T)
-      
-      att.did.pre.mape <- mean( abs( (res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]) / res.tbl$did.estimate[1:(intpd-1)] ), na.rm=T )
-      
-      bsts.posterior.p <- causimp$summary$p[1]
-      # bsts.mape <- 
-      bsts.post.rmse <- sqrt(mean( (causimp$series$response[intpd:npds] - causimp$series$point.pred[intpd:npds])^2 )) 
-      bsts.post.abs.err.tot <- sum( abs(causimp$series$response[intpd:npds] - causimp$series$point.pred[intpd:npds]), na.rm=T)
-      
-      bsts.pre.rmse <- sqrt(mean( (causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)])^2 ))
-      bsts.pre.abs.err.tot <- sum( abs(causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)]) , na.rm=T)
-      
-      bsts.pre.1step <- causimp$model$bsts.model$one.step.prediction.errors[,1:(intpd-1)]
-      bsts.pre.1step.tot <- sum(bsts.pre.1step, na.rm=T)
-      bsts.pre.1step.rmse <- sqrt(mean( colMeans(bsts.pre.1step)^2 ))
-      # plot(rowMeans(bsts.pre.1step),type='l')
-      # colMeans(bsts.pre.1step)
-      
-      bsts.pre.mape <- mean( abs( (causimp$series$response[1:(intpd-1)] - causimp$series$point.pred[1:(intpd-1)]) / causimp$series$response[1:(intpd-1)] ), na.rm=T )
-      
-      bsts.niter <- causimp$model$bsts.model$niter
-      
-      bsts.cnt.prior.inclu <- sum( causimp$model$bsts.model$prior$prior.inclusion.probabilities > .5, na.rm=T)
-      
-      
-      ## Period of first cumulative significance (is there an effect at all? If yes, when? )
-      agg.es <- x$compare$did[[effect.type]]$agg.es
-      did.tbl <- tidy(agg.es)
-      did.tbl <- did.tbl[which(did.tbl$event.time >= 0),]
-      idx.did.cumu.sig <- which( cumsum(did.tbl$conf.low) > 0 ) ## lower confidence interval > 0 == significant 
-      tsig.cumu.1.did <- ifelse( length(idx.did.cumu.sig)>0, idx.did.cumu.sig[1], NA)
-      
-      bsts.tbl <- causimp$series[intpd:npds, ]
-      idx.bsts.cumu.sig <- which( bsts.tbl$cum.effect.lower > 0  )
-      tsig.cumu.1.bsts <- ifelse( length(idx.bsts.cumu.sig)>0, idx.bsts.cumu.sig[1], NA)
-      
-      # (x$compare$did[[effect.type]]$agg.es$crit.val.egt * x$compare$did[[effect.type]]$agg.es$overall.se)
-      
-      idf <- data.frame(file=files[i], intpd=intpd, npds=npds, n=n, npds.per.n=npds/n,
-                        npds.postint=npds.int,
-                        effect.type=effect.type, st.sp=st.sp.str, bsts.niter=bsts.niter,
-                        parallel.p=parallel.p, parallel.W=parallel.W, 
-                        att.bsts=att.bsts,  
-                        att.bsts.lo=att.bsts.lo,  
-                        att.bsts.hi=att.bsts.hi, 
-                        att.bsts.tot=att.bsts.tot, 
-                        att.bsts.lo.tot=att.bsts.lo.tot, 
-                        att.bsts.hi.tot=att.bsts.hi.tot,
-                        #
-                        bsts.post.rmse=bsts.post.rmse,  
-                        bsts.post.abs.err.tot=bsts.post.abs.err.tot,
-                        bsts.pre.rmse=bsts.pre.rmse,
-                        bsts.pre.abs.err.tot=bsts.pre.abs.err.tot,
-                        bsts.pre.1step.tot=bsts.pre.1step.tot,
-                        bsts.pre.1step.rmse=bsts.pre.1step.rmse,
-                        #
-                        bsts.pre.mape=bsts.pre.mape,
-                        ##
-                        bsts.posterior.p=bsts.posterior.p, 
-                        bsts.niter=bsts.niter,
-                        bsts.cnt.prior.inclu=bsts.cnt.prior.inclu,
-                        ##
-                        att.did=att.did, 
-                        att.did.tot=att.did.tot,
-                        att.did.lo=att.did.lo, 
-                        att.did.lo.tot=att.did.lo.tot,
-                        att.did.hi=att.did.hi, 
-                        att.did.hi.tot=att.did.hi.tot,
-                        ##
-                        att.did.pre.rmse=att.did.pre.rmse,
-                        att.did.pre.abs.err.tot=att.did.pre.abs.err.tot,
-                        att.did.post.rmse=att.did.post.rmse,
-                        att.did.post.abs.err.tot=att.did.post.abs.err.tot,
-                        #
-                        att.did.pre.mape=att.did.pre.mape,
-                        ##
-                        did.bsts.sigvec.dist.cos=did.bsts.sigvec.dist.cos,
-                        did.bsts.sigvec.dist.ham=did.bsts.sigvec.dist.ham,
-                        did.bsts.sigvec.dist.cos.scaled= did.bsts.sigvec.dist.cos / length(intpd:npds),
-                        did.bsts.sigvec.dist.ham.scaled= did.bsts.sigvec.dist.ham / length(intpd:npds),
-                        ## period of 1st pointwise significance
-                        tsig.1.did=tsig.1.did,
-                        tsig.1.bsts=tsig.1.bsts,
-                        tsig.1.did.lag = tsig.1.did - 1,  ## delay before 1st pointwise significance
-                        tsig.1.bsts.lag = tsig.1.bsts - 1, ## delay before 1st pointwise significance
-                        ## period of last pointwise significance
-                        tsig.last.did = tsig.last.did, 
-                        tsig.last.bsts = tsig.last.bsts,
-                        ## longest pointwise significance period
-                        tsig.long.did=tsig.long.did,
-                        tsig.long.bsts=tsig.long.bsts,
-                        ## 1st not significant period after 1st significant period - For Use in Geometric effect precision illustration
-                        tsig.1.tnotsig.1.did=tsig.1.tnotsig.1.did,
-                        tsig.1.tnotsig.1.bsts=tsig.1.tnotsig.1.bsts,
-                        ##
-                        tsig.cumu.1.did = tsig.cumu.1.did,
-                        tsig.cumu.1.bsts = tsig.cumu.1.bsts,
-                        ## NO ENTROPY? Check if still pointwise significant at end
-                        did.no.entropy = ( tsig.last.did == npds.int ),
-                        bsts.no.entropy = ( tsig.last.bsts == npds.int ),
-                        ##
-                        bias.bsts=(att.bsts - att.dgp), bias.did=(att.did - att.dgp),
-                        bsts.advantage=(abs(att.did - att.dgp) / abs(att.bsts - att.dgp))
-      )
-      sdf <- rbind(sdf, idf)
-      
-    }
-    
-  }
-  
-}
-sdf$agg.span <- max(sdf$npds) / sdf$npds
-sdf$agg.granularity <- sdf$npds / max(sdf$npds) 
-write.csv(sdf, file=file.path(gsdir,'MCC_curve_interact_aggregation_comparison_summary_n200-400.csv'))
-# cdf <- read.csv(file.path(gsdir,'bsts_did_period_aggregation_summary.csv'))
-# cdf <- read.csv(file.path(gsdir,'_prev','bsts_did_period_aggregation_summary.csv'))
-# # att.did <- agg.es$overall.att
-# # att.bsts <- impact_amount$summary$AbsEffect[1]
-
-# cdf$perf.adv.model <- 'DID'
-# cdf$perf.adv.model[cdf$bsts.advantage > 1] <- "BSTS"
-# cdf$total.obs <- cdf$n * cdf$npds
-# cdf$actors <- as.factor(cdf$n)
-
-ns <- c(200, 400)
-aggcor <- data.frame()
-for (i in 1:length(effect.types)) {
-  effect.type <- effect.types[i]
-  for (j in 1:length(ns)) {
-    n <- ns[j]
-    idx <- which( sdf$effect.type==effect.type & sdf$n == n )
-    sdfx <- sdf[idx, ]
-    ##
-    aggcor <- rbind(aggcor, data.frame(
-      n=n,effect.type=effect.type,
-      gran.mean = mean( sdfx$agg.granularity, na.rm=T),
-      gran.sd = sd( sdfx$agg.granularity, na.rm=T),
-      bsts.adv.mean = mean( abs(sdfx$bsts.advantage) , na.rm=T),
-      bsts.adv.sd = sd( abs(sdfx$bsts.advantage) , na.rm=T),
-      bias.bsts.mean = mean( sdfx$bias.bsts, na.rm=T),
-      bias.bsts.sd = sd( sdfx$bias.bsts, na.rm=T),
-      bias.did.mean = mean( sdfx$bias.did, na.rm=T),
-      bias.did.sd = sd( sdfx$bias.did, na.rm=T),
-      
-      cor.bsts.adv.gran= cor(abs(sdfx$bsts.advantage), sdfx$agg.granularity),
-      cor.bsts.adv.gran.testp = cor.test(abs(sdfx$bsts.advantage), sdfx$agg.granularity)$p.value,
-      
-      cor.bsts.bias.gran= cor(sdfx$bias.bsts, sdfx$agg.granularity), 
-      cor.bsts.bias.gran.testp= cor.test(sdfx$bias.bsts, sdfx$agg.granularity)$p.value, 
-      
-      cor.did.bias.gran= cor(sdfx$bias.did, sdfx$agg.granularity),
-      cor.did.bias.gran.testp =   cor.test(sdfx$bias.did, sdfx$agg.granularity)$p.value
-      ))
-  }
-}
-write.csv(aggcor, file=file.path(gsdir, 'bsts_did_period_aggregation_correlation.csv'))
-
-
-
-
-########################################
-########################################
-
-
-
-ggplot(data=sdf, aes(x=npds, y=parallel.p+1, colour=effect.type)) + 
-  geom_point() + facet_wrap( . ~ factor(n))  + 
-  geom_smooth(method='lm') +
-  scale_y_log10()
 
 
 

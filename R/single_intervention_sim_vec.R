@@ -241,18 +241,18 @@ runSimSingleIntervention <- function(
     ##
     sim.id = NA, ## Index or timestamp of simulation for  saving, etc.
     ##
-    noise.level = 0.01,
+    noise.level = 1,
     ## # PEFORMANCE [Y] FUNCTION PARAMETERS
     b0 = .001, ## intercept
     b1 = .001, ## treatment dummy
     b2 = .001, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
     b4 = 0, ## Weight of seasonality effect
-    b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
+    b5 = .04, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates
-    b6 = 1, ## Age [1,2,3,...]
-    b7 = 0, ## type [0,1]
-    b8 = 1, ## level [0,1,2]
+    b6 = 1, ##  c1  ## small variance (.01) random walk
+    b7 = 1, ##  c2  ## large variance (.1) random walk
+    b8 = 1, ##  c3  ## oscillating random walk (c3[t] mean = -1*c3[t-1] )
     ## Autocorrelation
     b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
@@ -344,8 +344,8 @@ runSimSingleIntervention <- function(
       # cat(sprintf(' i = %s \n',i))
     
     ## noise terms
-    v <- rnorm(n=n,mean=0,sd=noise.level)  ##- .5 ##
-    u <- rnorm(n=n,mean=0,sd=noise.level) ## 
+    v <- rnorm(n=n,mean=0,sd=noise.level * .5)  ##- .5 ##
+    u <- rnorm(n=n,mean=0,sd=noise.level * .5) ## 
     
     ##----------  Past Period Variables---------------------
     ## indices of last period observations
@@ -354,18 +354,14 @@ runSimSingleIntervention <- function(
     x3.tm1 <- if (t==1) { rep(0, n) } else { df$x3[idx.tm1] }
     ## focal actor past performance
     y.tm1 <- if (t==1) { rep(ystart, n) } else { df$y[idx.tm1] }
+    ###
+    ##
+    c1.tm1 <- if (t==1) { rep(0, n) } else { df$c1[idx.tm1] }
+    ##
+    c2.tm1 <- if (t==1) { rep(0, n) } else { df$c2[idx.tm1] }
+    ##
+    c3.tm1 <- if (t==1) { rep(0, n) } else { df$c3[idx.tm1] }
     
-    
-    
-    ## --------------- Covariates -------------------------
-    ## Age
-    c1 <- rpois(n, lambda = noise.level*0.8) + 1
-    
-    ## Type  
-    c2 <- sample(0:1, n, replace = T, prob = c(.5,.5))
-    
-    ## value
-    c3 <- rnorm(n, 0, noise.level*1.2)
     
     ##------------------------------------------------------
     ## Get past performance records for treat.rule == 'past'
@@ -469,6 +465,25 @@ runSimSingleIntervention <- function(
       b5 <- b5 / growth.scale
     }
     
+    
+    ## --------------- Covariates -------------------------
+    ## SMALL VARIANCE RANDOM WALK
+    # c1 <- rpois(n, lambda = noise.level*0.8) + 1
+    c1 <- rnorm(n, c1.tm1, sd=noise.level * 0.01 )
+    
+    # LARGE VARIANCE RANDOM WALK
+    # c2 <- sample(0:1, n, replace = T, prob = c(.5,.5))
+    ## noisy temporal trend
+    # c2 <-  rnorm(n, sqrt( t ), noise.level*2)
+    # c2 <- rgamma(n, sqrt( t ), rate = noise.level)
+    c2 <- rnorm(n, c2.tm1, sd=noise.level * 0.1 )
+    
+    # ## Oscillating (large variance)
+    # c3 <- rnorm(n, -c3.tm1, noise.level * 0.1 )
+    ## SKEWED COVARIATE
+    c3 <- rgamma(n, shape = max(c3.tm1, 1), scale = noise.level * 0.1 )
+    
+    
     ## PERFORMANCE
     y <- yFunc(b0=b0, 
                b1=b1, 
@@ -491,6 +506,7 @@ runSimSingleIntervention <- function(
                y.tm1=y.tm1
               )
 
+    
     
     ##--------------------------------------
     ## UPDATE PERIOD DATAFRAME
@@ -780,10 +796,10 @@ runSimSingleInterventionEffectComparison <- function(
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
     b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
-    ## Covariates
-    b6 = 1, ## Age [1,2,3,...]
-    b7 = 0, ## type [0,1]
-    b8 = 1, ## level [0,1,2]
+    ## Covariates 
+    b6 = 1, ## c1  small variance
+    b7 = 1, ## c2  large variance
+    b8 = 1, ## c3  oscillating variance ( -1 * c3[t-1] )
     ## Autocorrelation
     b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 

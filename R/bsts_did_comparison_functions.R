@@ -923,8 +923,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       ## PLOT DID DYNAMIC EFFECT from ATTGT object
       p.agg.es <- ggdid.agg.es(ccattgt) 
       ggsave(filename = file.path(save.img.dir,
-                                  sprintf('%s_did_dynamic_effect_n%s_pd%s_ss%s_%s_%s_%s.png',
-                                          prefix,n,npds,h,key.strip,effect.type,sim.id))
+                                  sprintf('%s_did_dynamic_effect_n%s_pd%s_%s_%s_%s.png',
+                                          prefix,n,npds,key.strip,effect.type,sim.id))
       )
       
       
@@ -1074,14 +1074,15 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      dat <- tsdfw[,c('treatment_y_outcome','control_y_outcome','control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
-                      'control_y_max','control_y_skew', 'control_y_kurt',
-                      'control_c1_mean','control_c2_mean','control_c3_mean',
-                      'control_c1_sd','control_c2_sd','control_c3_sd',
-                      # 'control_c1_skew','control_c2_skew',
-                      'control_c3_skew',
+      dat <- tsdfw[,c('treatment_y_outcome',
+                      'control_y_outcome',
+                      # 'control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
+                      # 'control_y_max','control_y_skew', 'control_y_kurt',
+                      'control_c1_mean','control_c2_mean', 'control_c3_mean',
+                      'control_c1_sd','control_c2_sd',  'control_c3_sd',
+                      'control_c1_skew','control_c2_skew', 'control_c3_skew'#,
                       # 'control_c1_kurt','control_c2_kurt',
-                      'control_c3_kurt'#,
+                      # 'control_c3_kurt'#,
                       # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
                       # 'control_u_mean','control_v_mean'
       )]
@@ -1102,6 +1103,9 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       ## State Space Configuration
       ##----------------------------
       ## LOOP OVER BSTS STATE SPECIFICATIONS FOR THE SAME SIMULATION RUN
+      if (length(bsts.state.specs)<1){
+        stop('\nbsts.state.specs list length = 0. Add BSTS state space specifications.\n')
+      }
       for (h in 1:length(bsts.state.specs)) 
       {
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]] <- list()

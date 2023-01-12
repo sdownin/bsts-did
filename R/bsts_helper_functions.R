@@ -1037,14 +1037,15 @@ fitBstsUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simli
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      dat <- tsdfw[,c('treatment_y_outcome','control_y_outcome','control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
-                      'control_y_max','control_y_skew', 'control_y_kurt',
-                      'control_c1_mean','control_c2_mean','control_c3_mean',
+      dat <- tsdfw[,c('treatment_y_outcome',
+                      'control_y_outcome',
+                      # 'control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
+                      # 'control_y_max','control_y_skew', 'control_y_kurt',
+                      'control_c1_mean','control_c2_mean',  'control_c3_mean',
                       'control_c1_sd','control_c2_sd','control_c3_sd',
-                      # 'control_c1_skew','control_c2_skew',
-                      'control_c3_skew',
+                      'control_c1_skew','control_c2_skew','control_c3_skew'#,
                       # 'control_c1_kurt','control_c2_kurt',
-                      'control_c3_kurt'#,
+                      # 'control_c3_kurt'#,
                       # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
                       # 'control_u_mean','control_v_mean'
       )]
