@@ -85,7 +85,7 @@ dgp.nseasons= 52
 dgp.freq= 1
 
 ## Variables Ranges to grid search (optional)
-ns <- list(100) ## 400
+ns <- list(200) ## 400
 sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )

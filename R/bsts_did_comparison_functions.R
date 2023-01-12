@@ -1056,13 +1056,11 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         cov.df.wide <- .cov.df %>% 
           pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
         max.cov.missing <- 0.8
-        cov.col.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
-           ( sum(!is.na(x)) / length(x)  ) > max.cov.missing & 
-            !is.na(x[1]) & 
-            !is.na(x[length(x)])
+        cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
+           ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
+           ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
         })
         ## KEEP IF First or last row is not NA (for fill() below) 
-        cov.col.keep <- ( cov.cols.nonNApct >  max.cov.missing )
         cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]
         cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
         ##
@@ -1073,23 +1071,24 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         cov.cols.fill <- names(cov.df.wide)[ cov.cols.nonNApct2 < 1 ] 
         cov.df.wide <- cov.df.wide %>% 
           ungroup() %>% 
-          tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') %>%
-          tidyr::fill(all_of(cov.cols.fill), .direction = 'up')
+          tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') #%>%
+          # tidyr::fill(all_of(cov.cols.fill), .direction = 'up')
         # for (key in cov.cols.keep.names) {
         # cov.df.wide <- cov.df.wide %>% dplyr::fill('B|A|B', .direction='down')
           # cov.df.wide <- rbind(
           #   .cov.df %>% fill(.data[[key]], .direction = 'downup')
           # )
         # }
-        
+        ### FILL REMAINING NAs (after 'downup' fill) with zeros
+        cov.df.wide[is.na(cov.df.wide)] <- 0
+        ##
         cat('done.\n')
       }
-      apply(cov.df.wide[,-1],2,function(x)sum(!is.na(x))/length(x))
+ 
       
-      
-      # cov.df.wide <- .cov.df %>% pivot_wider(names_from = , values_from = c('c1'))
-      
-      bsts.df <- bsts.df %>% full_join(cov.df.wide)
+      ## JOIN TREATMENT AND CONTROL (WIDE) DATAFRAME into BSTS INPUT DATA
+      bsts.df <- bsts.df %>% full_join(cov.df.wide, by='t')
+      bsts.df$t <- NULL
       ##############################
       # ## Aggregate into timeseries dataframe
       # tsdf <- simdf %>%
@@ -1160,18 +1159,18 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       #               'c1_kurt','c2_kurt','c3_kurt',
       #               'b1_mean','b2_mean','b3_mean',
       #               'u_mean','v_mean')
-      ts <- unique(tsdf$t)
-      groups <- unique(tsdf$group)
-      ## init timeseries dataframe - wide
-      tsdfw <- data.frame(t=ts,  stringsAsFactors = F)
-      for (jj in 1:length(groups)) {
-        id.j <- which( tsdf$group == groups[ jj ] ) 
-        for (kk in 1:length(val.cols)) {
-          df.col <- data.frame( tsdf[ id.j , val.cols[ kk ] ] )
-          names(df.col) <- sprintf('%s_%s',groups[ jj ],val.cols[ kk ])
-          tsdfw <- cbind(tsdfw,  df.col)
-        }
-      }
+      # ts <- unique(tsdf$t)
+      # groups <- unique(tsdf$group)
+      # ## init timeseries dataframe - wide
+      # tsdfw <- data.frame(t=ts,  stringsAsFactors = F)
+      # for (jj in 1:length(groups)) {
+      #   id.j <- which( tsdf$group == groups[ jj ] ) 
+      #   for (kk in 1:length(val.cols)) {
+      #     df.col <- data.frame( tsdf[ id.j , val.cols[ kk ] ] )
+      #     names(df.col) <- sprintf('%s_%s',groups[ jj ],val.cols[ kk ])
+      #     tsdfw <- cbind(tsdfw,  df.col)
+      #   }
+      # }
       
       
       # Set up pre- and post-treatment period
@@ -1190,17 +1189,18 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      dat <- tsdfw[,c('y_treatment',
-                      'y_control',
-                      'c1_mean','c2_mean','c3_mean',
-                      'c1_sd','c2_sd','c3_sd'
-      )]
+      # dat <- tsdfw[,c('y_treatment',
+      #                 'y_control',
+      #                 'c1_mean','c2_mean','c3_mean',
+      #                 'c1_sd','c2_sd','c3_sd'
+      # )]
+      dat <- bsts.df
       ## Train on y pre-treatment but NA's post-treatment
-      y.pre.treat.NAs.post.treat <- c(dat$treatment_y_outcome[1:(intpd-1)], rep(NA,npds-intpd+1))
+      y.pre.treat.NAs.post.treat <- c(dat$y_treatment[1:(intpd-1)], rep(NA,npds-intpd+1))
       ## Then use the post-treatment response for causal impact estimation
-      post.period.response <- dat$treatment_y_outcome[intpd:npds]
+      post.period.response <- dat$y_treatment[intpd:npds]
       ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
-      predictors <- dat[, ! names(dat) %in% 'treatment_y_outcome'] ## remove response; convert to matrix
+      predictors <- dat[, ! names(dat) %in% 'y_treatment'] ## remove response; convert to matrix
       # ## Covariates (predictors) - Dataframe for "data" argument
       # predictors <- as.matrix(predictors) 
       
