@@ -1048,7 +1048,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             # cov_sum = sum(y, na.rm=T),
             # cov_sd = sd(y, na.rm=T)
           )  
-        .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = '|'))
+        .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
         .cov.df$c1.f <- NULL
         .cov.df$c2.f <- NULL
         .cov.df$c3.f <- NULL
@@ -1204,8 +1204,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # ## Covariates (predictors) - Dataframe for "data" argument
       # predictors <- as.matrix(predictors) 
       
-      ## ADD temporal trend to covariates
-      predictors$covar_temp_trend <- (1:npds) + rnorm(npds, 0, noise.level)   ## * simlist$`0.rand.base`$b5
+      # ## ADD temporal trend to covariates
+      # predictors$covar_temp_trend <- (1:npds) + rnorm(npds, 0, noise.level)   ## * simlist$`0.rand.base`$b5
       
       
       ##----------------------------

@@ -241,8 +241,8 @@ for (d in 1:length(ns)) {
 ##
 effect.types = c('quadratic')  ## constant','geometric
 ##
-bsts.niter.start <- 20000 ## 5000
-bsts.niter.max   <- 20000 ## 8e4
+bsts.niter.start <- 500 ## 5000
+bsts.niter.max   <- 500 ## 8e4
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -258,11 +258,12 @@ simlist.files <- runSimCompareBstsDiD(simlist,
                                       sim.id = sim.id,
                                       save.items.dir= dir_ext,
                                       bsts.niter = bsts.niter.start,
-                                      bsts.max.iter= bsts.niter.max
+                                      bsts.max.iter= bsts.niter.max,
+                                      bsts.n.cov.cats = 3
 )  ## D:\\BSTS_external
 
 
-## GET RESULT FROM STORAGE
+bsts.n.cov.cats## GET RESULT FROM STORAGE
 . <- readRDS(simlist.files[[1]]$file[1])
 bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
 par(mar=c(2,2.5,2,1))

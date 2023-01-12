@@ -250,9 +250,9 @@ runSimSingleIntervention <- function(
     b4 = 0, ## Weight of seasonality effect
     b5 = .04, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates
-    b6 = 1, ##  c1  ## small variance (.01) random walk
-    b7 = 1, ##  c2  ## large variance (.1) random walk
-    b8 = 1, ##  c3  ## oscillating random walk (c3[t] mean = -1*c3[t-1] )
+    b6 = .1, ##  c1  ## small variance (.01) random walk
+    b7 = .1, ##  c2  ## large variance (.1) random walk
+    b8 = .1, ##  c3  ## gamma var
     ## Autocorrelation
     b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
@@ -798,9 +798,9 @@ runSimSingleInterventionEffectComparison <- function(
     b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
     b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
     ## Covariates 
-    b6 = 1, ## c1  small variance
-    b7 = 1, ## c2  large variance
-    b8 = 1, ## c3  oscillating variance ( -1 * c3[t-1] )
+    b6 = .1, ## c1  small variance
+    b7 = .1, ## c2  large variance
+    b8 = .1, ## c3  oscillating variance ( -1 * c3[t-1] )
     ## Autocorrelation
     b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
