@@ -13,7 +13,7 @@
 ##
 ##
 ##=======================================================================
-
+library(e1071)
 
 
 ###
@@ -731,71 +731,71 @@ ggdid.agg.es <- function(attgt,
 }
 
 
-
-
-
-####################################
-##  RUN INTERVENTION SIMULATION IN LOOP OVER EFFECT TYPES
-######################################
-runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
-                                effect.types=c('constant','quadratic','geometric'), 
-                                sim.id=round(10*as.numeric(Sys.time())),
-                                plot.show=F, plot.save=F, verbose=TRUE) {
-  
-  # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
-  # print(simlist)
-  if (length(simlist) > 0 & length(names(simlist))==0) {
-    names(simlist) <- 1:length(simlist)
-  }
-  ##----------------------------
-  ## Run Simulation List
-  ##----------------------------
-  # sim.id <- ifelse( is.na(sim.id), round(as.numeric(Sys.time())), sim.id)
-  for (i in 1:length(simlist)) {
-    key <- names(simlist)[i]
-    sim <- simlist[[key]]
-    if(verbose) cat(sprintf('\nScenario label: %s\n\n', key))
-    ##  
-    set.seed( ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed) )
-    noise.level <- ifelse(is.null(sim$noise.level), 0, sim$noise.level)
-    ##
-    simlist[[key]]$sim <- runSimSingleInterventionEffectComparison(
-      effect.types = effect.types,
-      n = sim$n, ## NUMBER OF FIRMS
-      npds = sim$npds, ## NUMBER OF PERIODS
-      intpd = sim$intpd, ## intervention after first section
-      ystart = 0.1,
-      treat.rule = ifelse(is.null(sim$treat.rule), NA, sim$treat.rule),
-      treat.prob =  ifelse(is.null(sim$treat.prob), NA, sim$treat.prob), #0.95,  ## 0.6
-      treat.threshold = ifelse(is.null(sim$treat.threshold), NA, sim$treat.threshold),  # 0.015
-      sim.id = sim.id, ## defaults to timestamp
-      ##
-      noise.level = noise.level,
-      ##
-      b4 = ifelse(is.null(sim$b4), 0, sim$b4), ## past performance
-      b5 = ifelse(is.null(sim$b5), 0, sim$b5), ## growth (linear function of time t)
-      b9 = ifelse(is.null(sim$b9), 0, sim$b9), ## Autocorrelation
-      ## Dynamic treatment effect polynomial parameters
-      w0 = ifelse(is.null(sim$w0), 2.0 , sim$w0), ## constant
-      w1 = ifelse(is.null(sim$w1), 0.18 , sim$w1), ## linear
-      w2 = ifelse(is.null(sim$w2), -.1 / (sim$npds^.6) , sim$w2), ## ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
-      ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
-      w2.shift = ifelse(is.null(sim$w2.shift), -round( sqrt(sim$npds)*.8 ) , sim$w2.shift),
-      # w2.shift = -round( sqrt(sim$npds)*.8 ),  ## optimal value here is likely a function of the combination of treatment effect function parameters
-      ##
-      nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 
-      season.frequency = ifelse(is.null(sim$dgp.freq), NA, sim$dgp.freq),
-      # ## BSTS expected model size for spike-and-slab priors
-      # expect.mod.size = ifelse(is.null(sim$expect.mod.size), NA, sim$expect.mod.size),
-      ## Plotting
-      plot.show = plot.show, ## TRUE
-      plot.save = plot.save, ## TRUE
-      verbose = verbose ## echo messages to console
-    )
-  }
-  
-  return(simlist)
-}
+#####################################################################
+##*****MOVED*** TO  single_intervention_sim_vec.R file
+# ####################################
+# ##  RUN INTERVENTION SIMULATION IN LOOP OVER EFFECT TYPES
+# ######################################
+# runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
+#                                 effect.types=c('constant','quadratic','geometric'), 
+#                                 sim.id=round(10*as.numeric(Sys.time())),
+#                                 plot.show=F, plot.save=F, verbose=TRUE) {
+#   
+#   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
+#   # print(simlist)
+#   if (length(simlist) > 0 & length(names(simlist))==0) {
+#     names(simlist) <- 1:length(simlist)
+#   }
+#   ##----------------------------
+#   ## Run Simulation List
+#   ##----------------------------
+#   # sim.id <- ifelse( is.na(sim.id), round(as.numeric(Sys.time())), sim.id)
+#   for (i in 1:length(simlist)) {
+#     key <- names(simlist)[i]
+#     sim <- simlist[[key]]
+#     if(verbose) cat(sprintf('\nScenario label: %s\n\n', key))
+#     ##  
+#     set.seed( ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed) )
+#     noise.level <- ifelse(is.null(sim$noise.level), 0, sim$noise.level)
+#     ##
+#     cov.scenario <- if(is.null(sim$cov.scenario)){list(c1=.1, c2=.2, c3=.3)} else{ sim$cov.scenario }
+#     ##
+#     simlist[[key]]$sim <- runSimSingleInterventionEffectComparison(
+#       effect.types = effect.types,
+#       n = sim$n, ## NUMBER OF FIRMS
+#       npds = sim$npds, ## NUMBER OF PERIODS
+#       intpd = sim$intpd, ## intervention after first section
+#       ystart = 0.1,
+#       treat.rule = ifelse(is.null(sim$treat.rule), NA, sim$treat.rule),
+#       treat.prob =  ifelse(is.null(sim$treat.prob), NA, sim$treat.prob), #0.95,  ## 0.6
+#       treat.threshold = ifelse(is.null(sim$treat.threshold), NA, sim$treat.threshold),  # 0.015
+#       sim.id = sim.id, ## defaults to timestamp
+#       cov.scenario = cov.scenario,
+#       ##
+#       noise.level = noise.level,
+#       ##
+#       b4 = ifelse(is.null(sim$b4), 0, sim$b4), ## past performance
+#       b5 = ifelse(is.null(sim$b5), 0, sim$b5), ## growth (linear function of time t)
+#       b9 = ifelse(is.null(sim$b9), 0, sim$b9), ## Autocorrelation
+#       ## Dynamic treatment effect polynomial parameters
+#       w0 = ifelse(is.null(sim$w0), 2.0 , sim$w0), ## constant
+#       w1 = ifelse(is.null(sim$w1), 0.18 , sim$w1), ## linear
+#       w2 = ifelse(is.null(sim$w2), -.1 / (sim$npds^.6) , sim$w2), ## ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
+#       ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
+#       w2.shift = ifelse(is.null(sim$w2.shift), -round( sqrt(sim$npds)*.8 ) , sim$w2.shift),
+#       # w2.shift = -round( sqrt(sim$npds)*.8 ),  ## optimal value here is likely a function of the combination of treatment effect function parameters
+#       ##
+#       nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 
+#       season.frequency = ifelse(is.null(sim$dgp.freq), NA, sim$dgp.freq),
+#       ## Plotting
+#       plot.show = plot.show, ## TRUE
+#       plot.save = plot.save, ## TRUE
+#       verbose = verbose ## echo messages to console
+#     )
+#   }
+#   
+#   return(simlist)
+# }
 
 
 # ## Save simulation list as serialized data file
@@ -817,10 +817,11 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
 runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                  effect.types=c('constant','quadratic','geometric'), 
                                  sim.id=NA,
-                                 save.items.dir=NA, ## save updated simlist items to seprate RDS files
+                                 save.items.dir=NA, ## save updated simlist items to separate RDS files
                                  bsts.niter=5000, 
                                  bsts.max.iter=8e4, ## 80000 
-                                 bsts.n.cov.cats=2,  ## bins for each covariate (c1,c2,c3)
+                                 bsts.ctrl.cats=2,  ## bins for each covariate (c1,c2,c3)
+                                 bsts.expect.mod.size=1,
                                  plot.show=TRUE, plot.save=TRUE,
                                  verbose = TRUE
 ) {
@@ -878,9 +879,6 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     if (length(names(bsts.state.specs))==0) {
       names(bsts.state.specs) <- 1:length(bsts.state.specs)
     }
-    
-    # ## BSTS expected model size for spike-and-slab priors
-    expect.mod.size <- ifelse(is.null(simlist[[key]]$expect.mod.size), NA, simlist[[key]]$expect.mod.size)
     
     
     ## Dynamic Treatment Effect Type shapes
@@ -998,9 +996,30 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # %>%
       #   mutate(t=t,y_outcome=mean, .keep='used')
       
-      if ( is.na(bsts.n.cov.cats) ) { 
-        ### 1 CONTROL GROUP just use untreated actors' mean
+      if ( is.na(bsts.ctrl.cats) ) { 
+        
         ## ONLY 1 WHOLE-CONTROL-GROUP AGGREGATED AS ONE SERIES
+        cov.df.wide <- simdf %>%
+          dplyr::filter( 
+            ! is.na(match_id), 
+            group=='control'
+          ) %>%
+          group_by(t) %>%
+          dplyr::summarize(
+            c1_mean = mean(c1, na.rm=T),
+            c2_mean = mean(c2, na.rm=T),
+            c3_mean = mean(c3, na.rm=T),
+            c1_sd = sd(c1, na.rm=T),
+            c2_sd = sd(c2, na.rm=T),
+            c3_sd = sd(c3, na.rm=T),
+            c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+            c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+            c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+          ) #%>% pivot_wider(names_from, values_from)
+        
+      } else if (bsts.ctrl.cats < 2) {
+        
+        ### 1 CONTROL GROUP plus covariate series
         cov.df.wide <- simdf %>%
           dplyr::filter( 
             ! is.na(match_id), 
@@ -1014,25 +1033,30 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             c3_mean = mean(c3, na.rm=T),
             c1_sd = sd(c1, na.rm=T),
             c2_sd = sd(c2, na.rm=T),
-            c3_sd = sd(c3, na.rm=T)
+            c3_sd = sd(c3, na.rm=T),
+            c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+            c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+            c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
           ) #%>% pivot_wider(names_from, values_from)
+        
       } else {
+        
         ### SYNTHETIC CONTROL GROUPS (intersection of all covariate factors)
         cat('\ncreating synthetic control groups as covariate series...')
         ## create quantile categories (bins) 
         # ## quantile upper limits; Get equal probability sequence from number of categories to create bins
         # quant.up.lims <- (1:ncats)*(1/ncats)
-        c1cats <- cut(simdf$c1, bsts.n.cov.cats)
+        c1cats <- cut(simdf$c1, bsts.ctrl.cats)
         simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
         # c1lvls <- sort(unique(c1cats))
         # simdf$c1.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c1lvls==c1cats[i])],c1cats[i]))
         ##
-        c2cats <- cut(simdf$c2, bsts.n.cov.cats)
+        c2cats <- cut(simdf$c2, bsts.ctrl.cats)
         simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
         # c2lvls <- sort(unique(c2cats))
         # simdf$c2.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c2lvls==c2cats[i])],c2cats[i]))
         ##
-        c3cats <- cut(simdf$c3, bsts.n.cov.cats)
+        c3cats <- cut(simdf$c3, bsts.ctrl.cats)
         simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
         # c3lvls <- sort(unique(c3cats))
         # simdf$c3.f <- sapply(1:nrow.sdf, function(i)sprintf('%s%s',LETTERS[which(c3lvls==c3cats[i])],c3cats[i]))
@@ -1055,20 +1079,20 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ###
         cov.df.wide <- .cov.df %>% 
           pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
-        max.cov.missing <- 0.8
+        max.cov.missing <- 0.7
         cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
            ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
            ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
         })
         ## KEEP IF First or last row is not NA (for fill() below) 
-        cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]
+        cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
         cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
         ##
-        cov.cols.nonNApct2 <- apply(cov.df.wide[,-1], 2, function(x){ 
-          sum(!is.na(x)) / length(x) 
+        cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
+          ( sum(!is.na(x)) / length(x)  ) < 1
         })
-        cov.cols.nonNApct.keep <- (cov.cols.nonNApct2)
-        cov.cols.fill <- names(cov.df.wide)[ cov.cols.nonNApct2 < 1 ] 
+        # cov.cols.nonNApct.keep <- (cov.cols.nonNApct2)
+        cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
         cov.df.wide <- cov.df.wide %>% 
           ungroup() %>% 
           tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') #%>%
@@ -1083,6 +1107,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         cov.df.wide[is.na(cov.df.wide)] <- 0
         ##
         cat('done.\n')
+        
       }
  
       
@@ -1123,7 +1148,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       #     x1_mean = mean(x1, na.rm=T),
       #     x2_mean = mean(x2, na.rm=T),
       #     x3_mean = mean(x3, na.rm=T),
-      #     ##
+      #     ## 
       #     c1_mean = mean(c1, na.rm=T),
       #     c2_mean = mean(c2, na.rm=T),
       #     c3_mean = mean(c3, na.rm=T),
@@ -1135,10 +1160,6 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       #     c1_skew = skewness(c1, na.rm=T, type = 2),
       #     c2_skew = skewness(c2, na.rm=T, type = 2),
       #     c3_skew = skewness(c3, na.rm=T, type = 2),
-      #     #
-      #     c1_kurt = skewness(c1, na.rm=T, type = 2),
-      #     c2_kurt = skewness(c2, na.rm=T, type = 2),
-      #     c3_kurt = skewness(c3, na.rm=T, type = 2),
       #     #
       #     b1_mean = mean(b1, na.rm=T),
       #     b2_mean = mean(b2, na.rm=T),
@@ -1299,7 +1320,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             bsts(formula = bsts.input.form,
                  state.specification = st.sp,
                  data = predictors,
-                 expected.model.size = expect.mod.size,
+                 expected.model.size = bsts.expect.mod.size,
                  niter = bsts.niter,
                  ping = ifelse(verbose, round(bsts.niter/10), 0))
           },
@@ -1322,8 +1343,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
                                           alpha=0.05, model.args = list(niter = bsts.niter))
             ## POSTERIOR PREDICTIVE CHECKS
             ppcheck.filename <- file.path(save.img.dir,
-                                          sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                                  prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+                                          sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
+                                                  prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id))
             convcheck <- postPredChecks(impact_amount, filename=ppcheck.filename, return.val = T)
             ##
             # print(convcheck)
@@ -1393,8 +1414,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
           #                         key,effect.type,sim.id))
           p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
           ggsave(filename = file.path(save.img.dir,
-                                      sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+                                      sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
+                                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id))
           )
           # dev.off()
         }
@@ -1498,8 +1519,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ##PLOT INCLUSION PROBABILITIES
         if (plot.save & bsts.model$has.regression) {
           png(filename = file.path(save.img.dir,
-                                   sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                           prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)))
+                                   sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
+                                           prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)))
           plot(bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
           dev.off()
         }
@@ -1534,9 +1555,15 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # dev.off()
         
         ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
+        ##TODO
+        ##***CHANGE TO 1-STEP AHEAD PREDICTION ERROR BEF
         errdf <- rbind(
-          data.frame(method='BSTS', error=(res.tbl$bsts.point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])),
-          data.frame(method='DiD', error=(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)]))
+          data.frame(method='BSTS', 
+                     error=(res.tbl$bsts.point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
+                     ),  ## MAPE - percentage
+          data.frame(method='DiD',  
+                     error=(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
+                     )
         )
         vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
         p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
@@ -1557,8 +1584,12 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         
         ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
         errdf <- rbind(
-          data.frame(method='BSTS', error=(res.tbl$bsts.point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])),
-          data.frame(method='DiD', error=(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds]))
+          data.frame(method='BSTS', 
+                     error=(res.tbl$bsts.point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])
+                     ),
+          data.frame(method='DiD', 
+                     error=(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds])
+                     )
         )
         vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
         p.err3 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
@@ -1644,8 +1675,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
                             x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
           ggsave(filename = file.path(save.img.dir,
-                                      sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id)),
+                                      sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
+                                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)),
                  height=15, width=9, units = 'in', dpi = 300)
         }
 
@@ -1662,6 +1693,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ##
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$cumu.pred.error <-  cumsum(colSums(abs(bsts.pred.er)))
+        simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$convcheck <- convcheck
         ##
         simlist[[key]]$compare$att.b3 <- att.b3
         simlist[[key]]$compare$att.did <- att.did
@@ -1688,7 +1720,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # maxGb <- .001  ## **DEBUG**
       if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
         ## IF SMALL ENOUGH, Save simulation list as serialized data file
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s.rds', 
+                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]], file = save.file.path)
         ## FREE UP MEMORY
@@ -1698,13 +1731,15 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         save.file.paths <- c()
         ## Save simulation list as serialized data file
         ## 1.  BSTS
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s_simlist-compare-bsts.rds', n, npds, bsts.niter, sim.id, key.strip)
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-compare-bsts.rds', 
+                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]]$compare$bsts, file = save.file.path)
         simlist[[key]]$compare$bsts <- NULL ## save space
         save.file.paths[1] <- save.file.path
         ## 2. rest of simulation object
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_%s_%s_simlist-MAIN.rds', n, npds, bsts.niter, sim.id, key.strip)
+        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-MAIN.rds', 
+                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]], file = save.file.path)
         save.file.paths[2] <- save.file.path

@@ -5,7 +5,8 @@ output: pdf_document
 
 This is a tutorial and illustration for running Bayesian structural time series 
 (BSTS) models, including configuring the state space and checking model diagnostics. 
-```{r initExclude, setup, include=FALSE}
+```{r initExclude, setup, message=FALSE, include=FALSE}
+rm(list=ls())
 library(plyr)
 library(dplyr)
 library(tidyr)
@@ -21,15 +22,6 @@ library(BoomSpikeSlab)
 library(e1071)
 library(forecast)  ## # library(sarima); library(qualV)
 set.seed(987654321)  ## reproducibility
-## Load simulation functions - Actor index vectorized simulation
-source(file.path(dir_r,'single_intervention_sim_vec.R')) 
-## Setting up and adding state space components to state.space list
-source(file.path(dir_r,'bsts_helper_functions.R')) 
-## BSTS vs. DiD comparison and sensitivity analysis
-source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
-
-dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
-knitr::opts_knit$set(root.dir = dir_proj)
 
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
@@ -39,12 +31,23 @@ dir_r <- file.path(dir_proj,'R')
 ##  file prefix for saving images, writing outputs, etc.
 prefix <- 'bsts-illus_vignette_'
 
+## Load simulation functions - Actor index vectorized simulation
+source(file.path(dir_r,'single_intervention_sim_vec.R')) 
+## Setting up and adding state space components to state.space list
+source(file.path(dir_r,'bsts_helper_functions.R')) 
+## BSTS vs. DiD comparison and sensitivity analysis
+source(file.path(dir_r,'bsts_did_comparison_functions.R')) 
+
+## Knitr root dir - PDF rendering of notebook
+knitr::opts_knit$set(root.dir = dir_proj)
+
 ## MAIN SIM SETTINGS
 n <- 100  ## number of actors (i.e., number of time series)
 npds <- 520
 intpd <- round( npds * (5/6) )
 effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
-bsts.niters <- list(sm.start = 500, sm.max = 1000, lg.start = 5000, lg.max = 10000)
+bsts.niters <- list(sm.start = 50, sm.max = 100, lg.start = 500, lg.max = 1000)  ## lg=10k for full run
+bsts.ctrl.cats <- 4
 
 ##
 sim.config <- list(
@@ -73,7 +76,8 @@ sim.config <- list(
   ##
   expect.mod.size = 1  # number of covariates included in BSTS model of counterfactual
 )
-##
+
+## SIMULATION LIST HOLDER
 simlist <- list()
 
 ## state space configuration used as label
@@ -82,11 +86,151 @@ key <- '1_level'
 simlist[[ key ]] <- sim.config
 ## Simulation ID
 sim.id <- round(10*as.numeric(Sys.time()))
-## RUN SIMULATION -  GENERATE TIME SERIES
-simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-                               sim.id = sim.id, plot.show = F, plot.save = F )
-## Save simulation for reuse with multiple BSTS models
-simcopy <- simlist[[key]]
+
+##-------------------------------------------------------
+### CREATING ILLUSTRATION SIMULATION IF NONE EXISTS
+data.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_sim_dataframe.csv')
+if ( ! file.exists(data.filepath) ) {
+  cat(sprintf('Illustration data file not found in project dir:\n %s.\nSimulating new illustration data set.',dir_proj))
+  ## RUN SIMULATION -  GENERATE TIME SERIES
+  simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+                                 sim.id = sim.id, plot.show = F, plot.save = F )
+  # ## Save simulation for reuse with multiple BSTS models
+  # simcopy <- simlist[[key]]
+  ## SAVE SIMULATED DATAFRAME TO FILE
+  simdf <- simlist[[key]]$sim$df
+  cols.to.front <- c('t','actor','y','x1','x2','x3','c1','c2','c3','b1','b2','b3','u','v','season.val')
+  cols.to.back <- c('effect.type','t.post.intpd','group','group.color','match_id','match_pd')
+  simdf <- simdf[, c(cols.to.front, cols.to.back)]
+  write.csv(simdf, file=data.filepath, row.names=F, na='')
+}
+
+##--------------------------------------------------------
+### SUMMARIZE BSTS (single-observation) SERIES - WITH DIFFERENT COVARIATE PREDICTORS
+bsts.df1.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-1-NOctrl_df.csv')
+bsts.df2.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-2-ONEctrl_df.csv')
+bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
+f1exists <- file.exists(bsts.df1.filepath) 
+f2exists <- file.exists(bsts.df2.filepath) 
+f3exists <- file.exists(bsts.df3.filepath) 
+if ( file.exists(data.filepath) & any(!f1exists, !f2exists, !f3exists)) {
+  
+  simdf <- read.csv(data.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+  simdf <- as.tibble(simdf)
+  
+  ## TREATMENT
+  bsts.df <- simdf %>%
+    dplyr::filter( 
+      ! is.na(match_id), 
+      group=='treatment'
+    ) %>%
+    group_by(t) %>%
+    summarize(
+      y_treatment = mean(y, na.rm=T)
+    ) 
+  
+  ## NO UNTREATED CONTROL GROUP - ONLY COVARIATES
+  if (!f1exists) {
+    cov.df.wide <- simdf %>%
+      dplyr::filter( 
+        ! is.na(match_id), 
+        group=='control'
+      ) %>%
+      group_by(t) %>%
+      dplyr::summarize(
+        c1_mean = mean(c1, na.rm=T),
+        c2_mean = mean(c2, na.rm=T),
+        c3_mean = mean(c3, na.rm=T),
+        c1_sd = sd(c1, na.rm=T),
+        c2_sd = sd(c2, na.rm=T),
+        c3_sd = sd(c3, na.rm=T),
+        c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+        c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+        c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+      ) #%>% pivot_wider(names_from, values_from)
+    bsts.df1 <- bsts.df %>% full_join(cov.df.wide, by='t')
+    bsts.df1$t <- NULL
+    write.csv(bsts.df1, file=bsts.df1.filepath, row.names = F, na = '')
+  }
+  
+  ## 1 UNTREATED CONTROL GROUP  +  COVARIATES
+  if (!f2exists) {
+    cov.df.wide <- simdf %>%
+      dplyr::filter( 
+        ! is.na(match_id), 
+        group=='control'
+      ) %>%
+      group_by(t) %>%
+      dplyr::summarize(
+        y_control = mean(y, na.rm=T),
+        c1_mean = mean(c1, na.rm=T),
+        c2_mean = mean(c2, na.rm=T),
+        c3_mean = mean(c3, na.rm=T),
+        c1_sd = sd(c1, na.rm=T),
+        c2_sd = sd(c2, na.rm=T),
+        c3_sd = sd(c3, na.rm=T),
+        c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+        c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+        c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+      ) #%>% pivot_wider(names_from, values_from)
+      bsts.df2 <- bsts.df %>% full_join(cov.df.wide, by='t')
+      bsts.df2$t <- NULL
+      write.csv(bsts.df2, file=bsts.df2.filepath, row.names = F, na = '')
+  }
+  
+  ## SYNETHIC CONTRL GROUPS FROM COVARIATES CATEGORIES MEAN OUTCOME SERIES
+  if (!f3exists) {
+    ## c1 covariates categories
+    c1cats <- cut(simdf$c1, bsts.ctrl.cats)
+    simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
+    ## c2  covariate categories 
+    c2cats <- cut(simdf$c2, bsts.ctrl.cats)
+    simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
+    ##
+    c3cats <- cut(simdf$c3, bsts.ctrl.cats)
+    simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
+    ### SYNTHETIC CONTROL GROUPS
+    .cov.df <- simdf %>%
+      dplyr::filter( 
+        ! is.na(match_id), 
+        group=='control'
+      ) %>%
+      group_by(t, c3.f, c2.f, c1.f) %>%
+      dplyr::summarize( 
+        cov_mean = mean(y, na.rm=T)
+      )  
+    .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
+    .cov.df$c1.f <- NULL
+    .cov.df$c2.f <- NULL
+    .cov.df$c3.f <- NULL 
+    ### HANDLE SPARSE AND EMPTY SERIES (drop if too sparse, fill 'downup' if pct NAs < max.cov.missing)
+    cov.df.wide <- .cov.df %>% 
+      pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
+    max.cov.missing <- 0.7
+    cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
+       ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
+       ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
+    })
+    ## KEEP IF First or last row is not NA (for fill() below) 
+    cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
+    cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
+    ##
+    cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
+      ( sum(!is.na(x)) / length(x)  ) < 1
+    })
+    cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
+    cov.df.wide <- cov.df.wide %>% 
+      ungroup() %>% 
+      tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') 
+    ### FILL REMAINING NAs (after 'downup' fill) with zeros
+    cov.df.wide[is.na(cov.df.wide)] <- 0  
+    ##
+    bsts.df3 <- bsts.df %>% full_join(cov.df.wide, by='t')
+    bsts.df3$t <- NULL
+    write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
+  }
+  
+}
 
 ```
 
@@ -104,19 +248,41 @@ such as the mean absolute error (MAE).
 
 
 
-```{r}
+```{r, message=FALSE}
 ## load BSTS library
 library(bsts)
 library(CausalImpact)
+library(tibble)
 ###***********
 # line for calling data?    LOAD SIMULATED TABLE?   OR CCONMA DATA ?
 ## y.pre
 ## 
+df1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+df1 <- as.tibble(df1)
+print(df1)
+```
+We can plot this to visualize the post-intervention change in the 
+outcome series `y_treatment`.
+```{r outcome_plot, fig.dim = c(6,4), out.width="100%"}
+npds <- nrow(df1)
+intpd <- round(npds * 5/6)
+##
+plot(df1$y_treatment, main='Simulated Time Series (Y)',ylab='Y',xlab='Time')
+abline(v=intpd, lty=2)
+legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
+```
+Create the pre-treatment outcome series `y.pre` to pass into the `bsts()` 
+function. Here we replace the post-intervention periods with `NA`'s that 
+represent missing values within the `R` language.
+```{r}
+y.pre <- df$y_treatment
+pre.int.ids <- (1:npds) < intpd
+y.pre[pre.int.ids] <- NA
 ```
 
-
 Configure the model's state space by adding state components to the 
-state space list `st.sp`. 
+state space list `st.sp`. Here `y.pre` is passed into the state space
+functions (after the state space list `st.sp`) as the outcome series. 
 
 ```{r}
 ## Initiate empty state space configuration list
@@ -128,20 +294,20 @@ st.sp <- AddTrig(st.sp, y.pre, period = 12, frequencies = 1)
 ## Set BSTS MCMC iterations
 bsts.niter <- 1000
 ```
-
+For the baseline case, scenario 1, we use `df1` for the `predictors` argument
+in the `bsts()` function. This `predictors` data table uses `df1`, 
+excluding the first column that contains the outcome (`y_treatment`).
 
 Fit the BSTS model by calling the `bsts()` function to run MCMC estimation 
 for `bsts.niter` draws from the stationary distribution of the Markov chain that 
 specifies the posterior distribution (assuming convergence was reached,
 which will be addressed below.)
-
-
 ```{r}
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
 ## component (all covariates in ‘predictors’ dataframe)
 bsts.fit <- bsts(y.pre ~ . ,
                  state.specification = st.sp,
-                 data = predictors,  ## dataframe of predictors
+                 data = df1[ ,-1],  ## -1 excludes the 1st column
                  niter = bsts.niter)
 ```
 

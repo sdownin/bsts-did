@@ -90,7 +90,9 @@ sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
 prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
-expect.mod.sizes <- list(5)
+cov.scenarios <- list(high=list(c1=.3, c2=.45, c3=.6),
+                      mid=list(c1=.2, c2=.3, c3=.4),
+                      low=list(c1=.1, c2=.15, c3=.2) )
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
@@ -135,8 +137,11 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 
 ##**DEBUG**
 st.sp.lists <- list(
-  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
-  `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression')
+  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression')#,
+  # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
+  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
+  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
+  # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
 
 ##
@@ -184,44 +189,50 @@ for (d in 1:length(ns)) {
               bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
             }
             
-            ## EXPECTED MODEL SIZES
-            for (l in 1:length(expect.mod.sizes)) {
-              expect.mod.size <- expect.mod.sizes[[ l ]]
+            ## COVARIATE SCENARIOS
+            for (l in 1:length(cov.scenarios)) {
+              cov.scenario <- cov.scenarios[[ l ]]
+              cov.scenario.key <- names(cov.scenarios)[[ l ]]
+              # for (m in 1:length(bsts.n.cov.cats.list)) {
+              #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
+                
+                ##--------------------------------------------
+                ## Append simulation configuration to simlist
+                ##--------------------------------------------
+                key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
+                cat(sprintf('\n%s\n',key))
+                # .idx <- sprintf('ar%s',dgp.ar)
+                simlist[[ key ]] <- list(
+                  n = n,    ## Number of firms
+                  npds = npds,  ## Number of periods
+                  intpd = intpd, ## #intervention period
+                  noise.level = noise.level, ## stdev of simulated noise terms
+                  prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+                  treat.rule = treat.rule, 
+                  treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+                  treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+                  cov.scenario = cov.scenario, 
+                  cov.scenario.key = cov.scenario.key,
+                  ## Dynamic treatment effect  (quadratic polynomial)
+                  w0 = 1.5,  ## constant
+                  w1 = 0.13, ## linear
+                  w2 = -.05 / sqrt(npds), ## quadratic
+                  w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
+                  ##
+                  b4 = b4,   ## seasonal component weight
+                  b5 = b5, ##
+                  b9 = dgp.ar  , ## autocorrelation
+                  seasonality = seasonality,
+                  dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+                  dgp.freq= ifelse(seasonality, dgp.freq, NA),
+                  bsts.state.specs=bsts.state.specs,
+                  # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+                  rand.seed = 13579
+                )
+                
+              # }  // end m list n.cov.cats (?)
               
-              ##--------------------------------------------
-              ## Append simulation configuration to simlist
-              ##--------------------------------------------
-              key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
-              cat(sprintf('\n%s\n',key))
-              # .idx <- sprintf('ar%s',dgp.ar)
-              simlist[[ key ]] <- list(
-                n = n,    ## Number of firms
-                npds = npds,  ## Number of periods
-                intpd = intpd, ## #intervention period
-                noise.level = noise.level, ## stdev of simulated noise terms
-                prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
-                treat.rule = treat.rule, 
-                treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-                treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-                ## Dynamic treatment effect  (quadratic polynomial)
-                w0 = 1.5,  ## constant
-                w1 = 0.13, ## linear
-                w2 = -.05 / sqrt(npds), ## quadratic
-                w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
-                ##
-                b4 = b4,   ## seasonal component weight
-                b5 = b5, ##
-                b9 = dgp.ar  , ## autocorrelation
-                seasonality = seasonality,
-                dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
-                dgp.freq= ifelse(seasonality, dgp.freq, NA),
-                bsts.state.specs=bsts.state.specs,
-                expect.mod.size=expect.mod.size,
-                # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                rand.seed = 13579
-              )
-              
-            }
+            } ## // end l loop over cov.scenarios 
             
           } ## // end prior.sd.scenarios loop
           
@@ -236,13 +247,10 @@ for (d in 1:length(ns)) {
 } ## // end ns loop (number of actors)
 
 
-
+##---------------- RUN SIM GENERATE DATA SET -----------------------
 
 ##
-effect.types = c('quadratic')  ## constant','geometric
-##
-bsts.niter.start <- 500 ## 5000
-bsts.niter.max   <- 500 ## 8e4
+effect.types = c('quadratic')  ##cov.cols.need.fill.bool  ## constant','geometric
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -252,20 +260,54 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
                                plot.show = F, plot.save = F )
 
-## RUN BSTS and compare to DID
-simlist.files <- runSimCompareBstsDiD(simlist, 
-                                      effect.types = effect.types,
-                                      sim.id = sim.id,
-                                      save.items.dir= dir_ext,
-                                      bsts.niter = bsts.niter.start,
-                                      bsts.max.iter= bsts.niter.max,
-                                      bsts.n.cov.cats = 3
-)  ## D:\\BSTS_external
+##------------------- RUN BSTS; COMPARE vs. DID ---------------------
+## `bsts.ctrl.cats` control group category definitions:
+##  [NA]  = NO control group -- just covariate time series
+##  [0,1] = 1 control group  with all untreated actors   +  covariate time series    
+##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
+##          num.groups = Cartesian product of all binned covariates, 
+##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
+bsts.ctrl.cats.list <- list(1, NA)  ## NA=no control;
+## BSTS expected model size (for spike-and-slab priors)
+bsts.expect.mod.sizes <- list(7, 1)
+## MCMC Iterations
+bsts.niter.start <- 1e4 ## 5000
+bsts.niter.max   <- 1e4 ## 8e4
+## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
+for (m in 1:length(bsts.ctrl.cats.list)) {
+  for (r in 1:length(bsts.expect.mod.sizes)) {
+    ## RUN BSTS and compare to DID
+    simlist.files <- runSimCompareBstsDiD(
+      simlist, 
+      effect.types = effect.types,
+      sim.id = sim.id,
+      save.items.dir= dir_ext,
+      bsts.niter = bsts.niter.start,
+      bsts.max.iter= bsts.niter.max,
+      bsts.ctrl.cats = bsts.ctrl.cats.list[[ m ]],
+      bsts.expect.mod.size = bsts.expect.mod.sizes[[ r ]]
+    )  ## D:\\BSTS_external
+  }
+}
 
 
-bsts.n.cov.cats## GET RESULT FROM STORAGE
+##----------------------- END ---------------------------------------
+
+
+
+
+
+#######################################################################
+#######################################################################
+
+
+
+
+##========================= DEBUG ===================================
+## GET RESULT FROM STORAGE
 . <- readRDS(simlist.files[[1]]$file[1])
-bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
+bsts.model <- .$quadratic[[1]]$CausalImpact$model$bsts.model
+# bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
 par(mar=c(2,2.5,2,1))
 plot(bsts.model, 'components')
 plot(bsts.model, 'predictors')
@@ -291,7 +333,9 @@ PlotBstsComponents(
 
 
 
-
+################
+a <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__n400_pd520_niter10000_covCats3_16735656074_d1f1g1h1i1j1l1.rds'))
+################
 
 # ## Get the  CausalImpact object from the BSTS vs. DiD comparison simlist object
 # ##
