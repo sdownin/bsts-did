@@ -368,7 +368,7 @@ runSimSingleIntervention <- function(
     b5.tm1 <- if (t==1) { 1.0 } else { mean(df$b5[idx.tm1], na.rm=T) }
     ## OTHER COVARIATES ----------------------
     ## c1  
-    b6.tm1 <- if (t==1) { .6 } else { mean(df$b6[idx.tm1], na.rm=T) }
+    b6.tm1 <- if (t==1) { .5 } else { mean(df$b6[idx.tm1], na.rm=T) }
     ## c2  
     b7.tm1 <- if (t==1) { .02 } else { mean(df$b7[idx.tm1], na.rm=T) }
     ## c3  Temporal drift  (noise on a function of time)
@@ -503,7 +503,7 @@ runSimSingleIntervention <- function(
     # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
     # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = 0 )  ##***CHANGED***
     # c1 <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
-    c1 <- rnorm(n, .002*t, sd = noise.level * .2)
+    c1 <- rnorm(n, .0025*t, sd = noise.level * .2)
     
     ### COVARIATE SERIES 2
     ### OPTION A
