@@ -370,7 +370,7 @@ runSimSingleIntervention <- function(
     ## c1  
     b6.tm1 <- if (t==1) { .5 } else { mean(df$b6[idx.tm1], na.rm=T) }
     ## c2  
-    b7.tm1 <- if (t==1) { .02 } else { mean(df$b7[idx.tm1], na.rm=T) }
+    b7.tm1 <- if (t==1) { .1 } else { mean(df$b7[idx.tm1], na.rm=T) }
     ## c3  Temporal drift  (noise on a function of time)
     b8.tm1 <- if (t==1) { .12} else { mean(df$b8[idx.tm1], na.rm=T) }
     
