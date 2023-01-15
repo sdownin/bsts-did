@@ -496,7 +496,7 @@ runSimSingleIntervention <- function(
     ## START HIGHER = 10
     c2.tm1 <- if (t==1) { rep(.01, n) } else { df$c2[idx.tm1] }
     ## 
-    c3.tm1 <- if (t==1) { rep(.01, n) } else { df$c3[idx.tm1] }
+    c3.tm1 <- if (t==1) { rep(1, n) } else { df$c3[idx.tm1] }
     
     ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # c1 <- rpois(n, lambda = noise.level*0.8) + 1

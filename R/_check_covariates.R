@@ -255,7 +255,7 @@ for (d in 1:length(ns)) {
 ##---------------- RUN SIM GENERATE DATA SET -----------------------
 
 ##
-effect.types = c('quadratic') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
+effect.types = c('quadratic', 'geometric') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -276,8 +276,8 @@ bsts.ctrl.cats.list <- list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
 bsts.expect.mod.sizes <-  list(3) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
-bsts.niter.start <- 1000 ## 5000
-bsts.niter.max   <- 1000 ## 8e4
+bsts.niter.start <- 5000 ## 5000
+bsts.niter.max   <- 5000 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 for (m in 1:length(bsts.ctrl.cats.list)) {
   for (r in 1:length(bsts.expect.mod.sizes)) {
