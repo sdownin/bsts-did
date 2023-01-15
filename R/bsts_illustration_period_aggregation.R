@@ -79,28 +79,47 @@ source(file.path(dir_r,'bsts_did_comparison_functions.R'))
 ##=======================================
 
 
+
+##=======================================
+##
+##
+##  1.  FIND OPTIONAL STATE SPACE CONFIG 
+##      TO SERVE AS DEFAULT 
+##
+##
+##=======================================
 ## Static defaults
-noise.level <- 1.3
-b4 <- 1.0  ## seasonal component weight
-b5 <- 0.04 ## linear growth trend
+noise.level <- 1.0   ### This 
+# b4 <- 1.0  ## seasonal component weight
+# b5 <- 1.0 ## Weight of localLevel component in outcome
 dgp.nseasons= 52
 dgp.freq= 1
+post.intpd.portion <- 0.6  ## after 6 of ten years, the intervention happens
 
 ## Variables Ranges to grid search (optional)
-ns <- list(200, 400) ## 200 ## list( 100, 200 ) ## ** INTERACT SIZE (N) with GRANULARITY
+ns <- list(200) ## 400
 sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
 prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
-expect.mod.sizes <- list(2)
+# cov.scenarios <- list(low =list(c1=.01, c2=.05, c3=.1),
+#                       high=list(c1=.1, c2=.2, c3=.3))   ### try decreasing variance of random walk 0.1 --> 0.01, while increasing their weights to 1.0
+# cov.scenarios <- list(mixed=list(c1=.2, c2=.35, c3=.5))
+# cov.scenarios <- list(high=list(c1=.5, c2=.6, c3=.7), 
+#                       mid=list(c1=.2, c2=.3, c3=.4),
+#                       low=list(c1=.05, c2=.1, c3=.15))
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
-## STATE SPACE CONFIGURATIONS
+
+##**DEBUG**
 st.sp.lists <- list(
-  `8b`=c('AddLocalLevel','AddSeasonal')
+  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression')#,
+  # `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression'),
+  # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
+  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression')#,
+  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
+  # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
-
-
 
 
 ##
@@ -111,7 +130,7 @@ for (d in 1:length(ns)) {
   ## SIMULATION LENGTHS - NUMBER OF PERIODS
   for (f in 1:length(sim.lengths)) {
     npds <- sim.lengths[[ f ]]
-    intpd <-  round( npds * 5/6 ) 
+    intpd <-  round( npds * post.intpd.portion ) 
     ## AUTOCORRELATION VALUES
     for (g in 1:length(dgp.ars)) {
       dgp.ar <- dgp.ars[[ g ]]
@@ -148,44 +167,50 @@ for (d in 1:length(ns)) {
               bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
             }
             
-            ## EXPECTED MODEL SIZES
-            for (l in 1:length(expect.mod.sizes)) {
-              expect.mod.size <- expect.mod.sizes[[ l ]]
-              
-              ##--------------------------------------------
-              ## Append simulation configuration to simlist
-              ##--------------------------------------------
-              key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
-              cat(sprintf('\n%s\n',key))
-              # .idx <- sprintf('ar%s',dgp.ar)
-              simlist[[ key ]] <- list(
-                n = n,    ## Number of firms
-                npds = npds,  ## Number of periods
-                intpd = intpd, ## #intervention period
-                noise.level = noise.level, ## stdev of simulated noise terms
-                prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
-                treat.rule = treat.rule, 
-                treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
-                treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-                ## Dynamic treatment effect  (quadratic polynomial)
-                w0 = 1.5,  ## constant
-                w1 = 0.13, ## linear
-                w2 = -.05 / sqrt(npds), ## quadratic
-                w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
-                ##
-                b4 = b4,   ## seasonal component weight
-                b5 = b5, ##
-                b9 = dgp.ar  , ## autocorrelation
-                seasonality = seasonality,
-                dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
-                dgp.freq= ifelse(seasonality, dgp.freq, NA),
-                bsts.state.specs=bsts.state.specs,
-                expect.mod.size=expect.mod.size,
-                # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                rand.seed = 13579
-              )
-              
-            }
+            # ## COVARIATE SCENARIOS
+            # for (l in 1:length(cov.scenarios)) {
+            #   cov.scenario <- cov.scenarios[[ l ]]
+            #   cov.scenario.key <- names(cov.scenarios)[[ l ]]
+            #   # for (m in 1:length(bsts.n.cov.cats.list)) {
+            #   #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
+            
+            ##--------------------------------------------
+            ## Append simulation configuration to simlist
+            ##--------------------------------------------
+            key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s', d,f,g,h,i,j)
+            cat(sprintf('\n%s\n',key))
+            # .idx <- sprintf('ar%s',dgp.ar)
+            simlist[[ key ]] <- list(
+              n = n,    ## Number of firms
+              npds = npds,  ## Number of periods
+              intpd = intpd, ## #intervention period
+              noise.level = noise.level, ## stdev of simulated noise terms
+              prior.sd.scenario = prior.sd.scenario, ## BSTS Prior SD scenario (high vs. low uncertainty in priors
+              treat.rule = treat.rule, 
+              treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
+              treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
+              # cov.scenario = cov.scenario, 
+              # cov.scenario.key = cov.scenario.key,
+              ## Dynamic treatment effect  (quadratic polynomial)
+              w0 = 1.0,  ## constant
+              w1 = 0.027, ## linear
+              w2 =  -0.0032 /sqrt(npds), ## ## quadratic
+              # w2.shift = -round( sqrt(npds)*.85 ), ## quadratic shift rightward (make all of U-shape after intervention)
+              ##
+              # b4 = b4,   ## seasonal component weight  (default 1)
+              # b5 = b5,   ## local level component weight (default 1)
+              b9 = dgp.ar  , ## autocorrelation
+              seasonality = seasonality,
+              dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
+              dgp.freq= ifelse(seasonality, dgp.freq, NA),
+              bsts.state.specs=bsts.state.specs,
+              # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
+              rand.seed = 12345
+            )
+            
+            # }  // end m list n.cov.cats (?)
+            
+            # } ## // end l loop over cov.scenarios 
             
           } ## // end prior.sd.scenarios loop
           
@@ -200,31 +225,38 @@ for (d in 1:length(ns)) {
 } ## // end ns loop (number of actors)
 
 
+##---------------- RUN SIM GENERATE DATA SET -----------------------
+
 
 ##
-effect.types <- c('constant','geometric','quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
-## Scale bsts iterations in increments (doubling) starting at 10k (more iterations for models that converge more slowly)
-bsts.niter.start <- 5000  ## 10k
-bsts.niter.max   <- 8e4  ## 80k
-##
+effect.types = c('quadratic','geometric','constant') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
+## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
-
-
 
 
 ## RUN SIMULATION -  SIMULATE TIME SERIES
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
-                               plot.show = F, plot.save = FALSE )
+                               plot.show = F, plot.save = F )
+
+##------------------- RUN BSTS; COMPARE vs. DID ---------------------
+## MCMC Iterations
+bsts.niter.start <- 1e2 ## 5000
+bsts.niter.max   <- 1e2 ## 8e4
+## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 
 ## RUN BSTS and compare to DID
-simlist.files <- runSimCompareBstsDiD(simlist, 
-                                      effect.types = effect.types,
-                                      sim.id = sim.id,
-                                      save.items.dir= dir_ext,
-                                      bsts.niter = bsts.niter.max, ## **START at MAX niter for large npds **
-                                      bsts.max.iter= bsts.niter.max
-                                      )  ## D:\\BSTS_external
+simlist.files <- runSimCompareBstsDiD(
+  simlist, 
+  effect.types = effect.types,
+  sim.id = sim.id,
+  save.items.dir= dir_ext,
+  bsts.niter = bsts.niter.start,
+  bsts.max.iter= bsts.niter.max,
+  bsts.ctrl.cats = 1,
+  bsts.expect.mod.size = 3
+)  ## D:\\BSTS_external
+
 
 
 
@@ -250,7 +282,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3) 
 ##----------------------
 ## Aggregate every 40 periods (every 40 weeks) == 13
 ##---------------------
@@ -262,7 +296,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max ) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3 ) 
 ##----------------------
 ## Aggregate every 26 periods (half-yearly or semi-yearly) == 20
 ##---------------------
@@ -274,7 +310,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max ) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3 ) 
 ##----------------------
 ## Aggregate every 20 periods (every 20 weeks) == 26
 ##---------------------
@@ -286,7 +324,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3) 
 ##----------------------
 ## Aggregate every 10 periods (every 10 weeks) == 52
 ##---------------------
@@ -300,7 +340,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3) 
 ##----------------------
 ## Aggregate every 8 periods (bi-monthly, every 2 months) == 65
 ##---------------------
@@ -314,7 +356,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max)
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3)
 ##----------------------
 ## Aggregate every 5 periods (every 5 weeks) == 104
 ##---------------------
@@ -328,7 +372,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max)
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3)
 ##----------------------
 ## Aggregate every 4 periods (monthly, every 4 weeks) == 130
 ##---------------------
@@ -342,7 +388,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max) 
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3) 
 ##----------------------
 ## Aggregate every 2 periods (biweekly, every 2 weeks) == 260
 ##---------------------
@@ -356,7 +404,9 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.max,  ## **START at MAX niter for large npds **
-                                       bsts.max.iter= bsts.niter.max)
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3)
 
 ## *** CAUTION *** CAN THROW ERRORS(?) - RUN LAST
 ##----------------------
@@ -370,7 +420,14 @@ simlistx.files <- runSimCompareBstsDiD(simlistx,
                                        save.items.dir= dir_ext,
                                        sim.id = sim.id,
                                        bsts.niter = bsts.niter.start,
-                                       bsts.max.iter= bsts.niter.max )
+                                       bsts.max.iter= bsts.niter.max,
+                                       bsts.ctrl.cats = 1,
+                                       bsts.expect.mod.size = 3 )
+
+
+
+
+
 
 
 

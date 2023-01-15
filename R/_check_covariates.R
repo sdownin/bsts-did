@@ -274,10 +274,10 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
 bsts.ctrl.cats.list <- list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
-bsts.expect.mod.sizes <-  list(3) # 1  ## list(7, 4, 1)
+bsts.expect.mod.sizes <-  list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
-bsts.niter.start <- 1200 ## 5000
-bsts.niter.max   <- 1200 ## 8e4
+bsts.niter.start <- 200 ## 5000
+bsts.niter.max   <- 200 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 for (m in 1:length(bsts.ctrl.cats.list)) {
   for (r in 1:length(bsts.expect.mod.sizes)) {
