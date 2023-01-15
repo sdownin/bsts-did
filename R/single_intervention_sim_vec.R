@@ -482,7 +482,7 @@ runSimSingleIntervention <- function(
       # nseasons <- ifelse( nseasons == 0 , 1, nseasons )
       # growth.scale <-  npds /  ( nseasons * season.frequency )
       # b5 <- rnorm(1, (b5.tm1 / growth.scale), sd = noise.level * 0.5 )
-      b5 <- rnorm(1, season.val, sd = noise.level * 0.3 )
+      b5 <- rnorm(1, season.val, sd = noise.level * 0.2 )
     }
     
     b6 <- rnorm(1, b6.tm1, sd = noise.level * .01)
