@@ -446,27 +446,27 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   lags.hi <- 3
   lags.lo <- 1
   ## Prior SD
-  sig.hi <- .06
-  sig.lo <- .015
+  sig.hi <- .1
+  sig.lo <- .01
   ## prior SD initial value
-  sig.init.val.hi <- .06
-  sig.init.val.lo <- .015
+  sig.init.val.hi <- .05
+  sig.init.val.lo <- .01
   ## Mean of prior distributions
-  mu.hi <- .005
-  mu.lo <- .001
+  mu.hi <- .1
+  mu.lo <- .01
   ## Autoregressive component
-  ar.mu.hi <- .06
+  ar.mu.hi <- .05
   ar.mu.lo <- .01
   ar.forc.sta <- FALSE
   ar.forc.pos <- FALSE
   ## Weight given to sigma.guess (interpretable as a prior observation count)
-  samp.size.prop.hi <- .06
-  samp.size.prop.lo <- .015
+  samp.size.prop.hi <- .05
+  samp.size.prop.lo <- .01
   ##
   upper.limit <- Inf
   ## Spike and Slab priors on the AddAutoAr (Automatically selected Autoregressive lags)
-  spikslab.init.val.hi <- .06
-  spikslab.init.val.lo <- .015
+  spikslab.init.val.hi <- .05
+  spikslab.init.val.lo <- .01
   ##
   spikslab.disc.fac.hi <- .5
   spikslab.disc.fac.lo <- .25
@@ -475,9 +475,9 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   # spikslab.exp.mod.size.lo <- 2
   ##
   expected.r2.hi <- .5
-  expected.r2.lo <- .1
+  expected.r2.lo <- .2
   ## Latent factors (e.g., AddSharedLocalLevel() )
-  n.latent.factors.hi <- 3
+  n.latent.factors.hi <- 2
   n.latent.factors.lo <- 1
   ## SpikeSlabPrior
   diag.shrinkage.hi <- .5
@@ -570,6 +570,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name='AddLocalLevel',
            sigma.prior = SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, initial.value=sig.init.val.hi, upper.limit=upper.limit),
+           # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.hi, mu.guess.weight = 1, sigma.guess = sig.hi, sigma.guess.weight = 1),
            initial.state.prior = NormalPrior(mu=mu.hi, sigma=sig.hi, initial.value=sig.init.val.hi)#,
            # sdy = args$sdy,
            # initial.y = args$initial.y
@@ -577,6 +578,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     } else if (grepl('sd.lo', scenario, perl = F)) {
       list(name='AddLocalLevel',
            sigma.prior = SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, initial.value=sig.init.val.lo, upper.limit=upper.limit),
+           # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.lo, mu.guess.weight = 1, sigma.guess = sig.lo, sigma.guess.weight = 1),
            initial.state.prior = NormalPrior(mu=mu.lo, sigma=sig.lo, initial.value=sig.init.val.lo)#,
            # sdy = args$sdy,
            # initial.y = args$initial.y

@@ -78,11 +78,12 @@ source(file.path(dir_r,'bsts_did_comparison_functions.R'))
 ##
 ##=======================================
 ## Static defaults
-noise.level <- 1.5
-b4 <- 1.0  ## seasonal component weight
-b5 <- 0.04 ## linear growth trend
+noise.level <- 1.0   ### This 
+# b4 <- 1.0  ## seasonal component weight
+# b5 <- 1.0 ## Weight of localLevel component in outcome
 dgp.nseasons= 52
 dgp.freq= 1
+post.intpd.portion <- 0.6  ## after 6 of ten years, the intervention happens
 
 ## Variables Ranges to grid search (optional)
 ns <- list(200) ## 400
@@ -90,9 +91,12 @@ sim.lengths <- list(520)
 treat.rules <- list('random')  ## 'below.benchmark'
 seasonalities <- list(TRUE)   ## c(TRUE,  FALSE )
 prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
-cov.scenarios <- list(high=list(c1=.3, c2=.45, c3=.6),
-                      mid=list(c1=.2, c2=.3, c3=.4),
-                      low=list(c1=.1, c2=.15, c3=.2) )
+# cov.scenarios <- list(low =list(c1=.01, c2=.05, c3=.1),
+#                       high=list(c1=.1, c2=.2, c3=.3))   ### try decreasing variance of random walk 0.1 --> 0.01, while increasing their weights to 1.0
+# cov.scenarios <- list(mixed=list(c1=.2, c2=.35, c3=.5))
+# cov.scenarios <- list(high=list(c1=.5, c2=.6, c3=.7), 
+#                       mid=list(c1=.2, c2=.3, c3=.4),
+#                       low=list(c1=.05, c2=.1, c3=.15))
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
@@ -138,8 +142,9 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ##**DEBUG**
 st.sp.lists <- list(
   `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression')#,
+  # `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
-  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
+  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
@@ -152,7 +157,7 @@ for (d in 1:length(ns)) {
   ## SIMULATION LENGTHS - NUMBER OF PERIODS
   for (f in 1:length(sim.lengths)) {
     npds <- sim.lengths[[ f ]]
-    intpd <-  round( npds * 5/6 ) 
+    intpd <-  round( npds * post.intpd.portion ) 
     ## AUTOCORRELATION VALUES
     for (g in 1:length(dgp.ars)) {
       dgp.ar <- dgp.ars[[ g ]]
@@ -189,17 +194,17 @@ for (d in 1:length(ns)) {
               bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
             }
             
-            ## COVARIATE SCENARIOS
-            for (l in 1:length(cov.scenarios)) {
-              cov.scenario <- cov.scenarios[[ l ]]
-              cov.scenario.key <- names(cov.scenarios)[[ l ]]
-              # for (m in 1:length(bsts.n.cov.cats.list)) {
-              #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
+            # ## COVARIATE SCENARIOS
+            # for (l in 1:length(cov.scenarios)) {
+            #   cov.scenario <- cov.scenarios[[ l ]]
+            #   cov.scenario.key <- names(cov.scenarios)[[ l ]]
+            #   # for (m in 1:length(bsts.n.cov.cats.list)) {
+            #   #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
                 
                 ##--------------------------------------------
                 ## Append simulation configuration to simlist
                 ##--------------------------------------------
-                key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
+                key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s', d,f,g,h,i,j)
                 cat(sprintf('\n%s\n',key))
                 # .idx <- sprintf('ar%s',dgp.ar)
                 simlist[[ key ]] <- list(
@@ -211,28 +216,28 @@ for (d in 1:length(ns)) {
                   treat.rule = treat.rule, 
                   treat.prob = ifelse(treat.rule=='random', 0.5, 1), 
                   treat.threshold = ifelse(treat.rule=='random', 1, 0.5),
-                  cov.scenario = cov.scenario, 
-                  cov.scenario.key = cov.scenario.key,
+                  # cov.scenario = cov.scenario, 
+                  # cov.scenario.key = cov.scenario.key,
                   ## Dynamic treatment effect  (quadratic polynomial)
-                  w0 = 1.5,  ## constant
-                  w1 = 0.13, ## linear
-                  w2 = -.05 / sqrt(npds), ## quadratic
-                  w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
+                  w0 = 1.0,  ## constant
+                  w1 = 0.027, ## linear
+                  w2 =  -0.0032 /sqrt(npds), ## ## quadratic
+                  # w2.shift = -round( sqrt(npds)*.85 ), ## quadratic shift rightward (make all of U-shape after intervention)
                   ##
-                  b4 = b4,   ## seasonal component weight
-                  b5 = b5, ##
+                  # b4 = b4,   ## seasonal component weight  (default 1)
+                  # b5 = b5,   ## local level component weight (default 1)
                   b9 = dgp.ar  , ## autocorrelation
                   seasonality = seasonality,
                   dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
                   dgp.freq= ifelse(seasonality, dgp.freq, NA),
                   bsts.state.specs=bsts.state.specs,
                   # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                  rand.seed = 13579
+                  rand.seed = 54321
                 )
                 
               # }  // end m list n.cov.cats (?)
               
-            } ## // end l loop over cov.scenarios 
+            # } ## // end l loop over cov.scenarios 
             
           } ## // end prior.sd.scenarios loop
           
@@ -250,7 +255,7 @@ for (d in 1:length(ns)) {
 ##---------------- RUN SIM GENERATE DATA SET -----------------------
 
 ##
-effect.types = c('quadratic')  ##cov.cols.need.fill.bool  ## constant','geometric
+effect.types = c('quadratic') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -267,12 +272,12 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
 ##          num.groups = Cartesian product of all binned covariates, 
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
-bsts.ctrl.cats.list <- list(1, NA)  ## NA=no control;
+bsts.ctrl.cats.list <- list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
-bsts.expect.mod.sizes <- list(7, 1)
+bsts.expect.mod.sizes <-  list(1)  ## list(7, 4, 1)
 ## MCMC Iterations
-bsts.niter.start <- 1e4 ## 5000
-bsts.niter.max   <- 1e4 ## 8e4
+bsts.niter.start <- 1000 ## 5000
+bsts.niter.max   <- 1000 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 for (m in 1:length(bsts.ctrl.cats.list)) {
   for (r in 1:length(bsts.expect.mod.sizes)) {
@@ -287,6 +292,8 @@ for (m in 1:length(bsts.ctrl.cats.list)) {
       bsts.ctrl.cats = bsts.ctrl.cats.list[[ m ]],
       bsts.expect.mod.size = bsts.expect.mod.sizes[[ r ]]
     )  ## D:\\BSTS_external
+    
+    # break   ##**DEBUG**
   }
 }
 

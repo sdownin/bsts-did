@@ -924,10 +924,10 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       
       ## PLOT DID DYNAMIC EFFECT from ATTGT object
       p.agg.es <- ggdid.agg.es(ccattgt) 
-      ggsave(filename = file.path(save.img.dir,
-                                  sprintf('%s_did_dynamic_effect_n%s_pd%s_%s_%s_%s.png',
-                                          prefix,n,npds,key.strip,effect.type,sim.id))
-      )
+      .filename <- sprintf('%s_did_dynamic_effect_n%s_pd%s_%s_%s_%s.png',
+              prefix,n,npds,key.strip,effect.type,sim.id)
+      ggsave(filename = file.path(save.img.dir,  .filename),  
+             width = 9, height = 6, units = 'in',dpi = 300)
       
       
       ## Get first treatment group actor
@@ -1006,6 +1006,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
           ) %>%
           group_by(t) %>%
           dplyr::summarize(
+            # c0_seasonal = mean(season.val, na.rm=T),
             c1_mean = mean(c1, na.rm=T),
             c2_mean = mean(c2, na.rm=T),
             c3_mean = mean(c3, na.rm=T),
@@ -1024,10 +1025,11 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
           dplyr::filter( 
             ! is.na(match_id), 
             group=='control'
-          ) %>%
+          ) %>% 
           group_by(t) %>%
           dplyr::summarize(
             y_control = mean(y, na.rm=T),
+            # c0_seasonal = mean(season.val, na.rm=T),
             c1_mean = mean(c1, na.rm=T),
             c2_mean = mean(c2, na.rm=T),
             c3_mean = mean(c3, na.rm=T),
@@ -1386,15 +1388,12 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         
         if (plot.show) {
           ##
-          plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-          PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+          # plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+          # PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
           # PlotBstsState(bsts.model, main=sprintf('BSTS State: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
           # PlotBstsResiduals(bsts.model, main=sprintf('BSTS Residuals: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
           # PlotBstsPredictionErrors(bsts.model, main=sprintf('BSTS Pred.Err: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
           # PlotBstsForecastDistribution(bsts.model, main=sprintf('BSTS Forecast Dist: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-          if (bsts.model$has.regression) {
-            PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-          }
         }
 
         ##
@@ -1408,18 +1407,57 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # summary(impact_amount$model$bsts.model)
         # plot(impact_amount)
         
-        if (plot.save) {
+        if (plot.save) 
+        {
+          ## ----------- BSTS COMPONENTS PLOT --------------------------------------
+          .filename <- sprintf('%s_bsts_state_components_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
+                               prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)
+          png(file.path(save.img.dir, .filename), width = 10, height = 6, units = 'in', res = 300)
+          PlotBstsComponents(bsts.model, burn = bsts.niter*.2) 
+          dev.off()
+          
+          ## ----------- BSTS MODEL OUTPUT --------------------------------------
+          .filename <- sprintf('%s_bsts_model_pred-obs-circles_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
+                               prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)
+          png(file.path(save.img.dir, .filename), width = 7, height = 6, units = 'in', res = 300)
+          plot(bsts.model, main=sprintf('BSTS Model: %s',paste(state.comps,collapse = ' + ')))
+          dev.off()
+          
+          ## ----------- BSTS CAUSAL IMPACT --------------------------------------
           # summary(impact_amount)
           # png(filename=sprintf('single_intervention_BSTS_CausalImpact_plot_%s_%s_%s.png',
           #                         key,effect.type,sim.id))
+          .filename <- sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
+                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)
           p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
-          ggsave(filename = file.path(save.img.dir,
-                                      sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id))
-          )
+          ggsave(filename = file.path(save.img.dir, .filename), width = 8, height = 12, units = 'in',dpi = 300)
           # dev.off()
+          
+          
+          ## ----------- BSTS REGRESSION  ----------------
+          if (bsts.model$has.regression) {
+            
+            ## ----------- BSTS MODEL SIZE DISTRIBUTION  ----------------
+            .filename <- sprintf('%s_bsts_size_dist_n%s_pd%s_ss%s_niter%s_covCats%s_msize_%s_%s_%s_%s.png',
+                                 prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)
+            png(file.path(save.img.dir, .filename), width = 7, height = 6, units = 'in', res = 300)
+            PlotBstsSize(bsts.model, main=sprintf('BSTS Model Size Distribution (expected = %s)',
+                                                  bsts.expect.mod.size))
+            dev.off()
+            
+            ## ----------- BSTS MODEL SIZE DISTRIBUTION  ----------------
+            .filename <- sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
+                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)
+            png(filename = file.path(save.img.dir, .filename),  width = 7, height = 6, units = 'in', res = 300)
+            plot(bsts.model,'coefficients', main=sprintf('BSTS Inclusion Probabilities (expected size = %s)',
+                                                         bsts.expect.mod.size))
+            dev.off()
+            
+          }
+          
         }
 
+        
         ##-------------------
         ## OVERALL CONFIDENCE INTERVALS AND PVALUES
         ## OVERALL CAUSAL P-VALUE
@@ -1516,168 +1554,161 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         # res.tbl4 <- cbind(res.tbl[, .col.idx],  res.tbl[, -.col.idx] )
         # # View(res.tbl4)
         
-        ##PLOT INCLUSION PROBABILITIES
-        if (plot.save & bsts.model$has.regression) {
-          png(filename = file.path(save.img.dir,
-                                   sprintf('%s_BSTS_inclusion_probs_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
-                                           prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)))
-          plot(bsts.model,'coefficients', main=sprintf('%s %s', key,effect.type))
-          dev.off()
-        }
-        
-        ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
-        dyndf <- rbind(
-          data.frame(event.time=res.tbl$event.time, series='1.BSTS', ATT=res.tbl$bsts.point.effect),
-          data.frame(event.time=res.tbl$event.time, series='2.DiD', ATT=res.tbl$did.estimate),
-          data.frame(event.time=res.tbl$event.time, series='3.DGP', ATT=res.tbl$b3.att)
-        )
-        hue2 <- hue_pal()(2)
-        p.err1 <- ggplot(dyndf, aes(x=event.time, y=ATT, color=series,fill=series,linetype=series,shape=series)) + 
-          geom_line(na.rm=T, size=.9) + geom_point(na.rm=T, size=2) +
-          theme_bw() + xlab('Event Time') + 
-          ggtitle(sprintf('Comparison of Mean ATT Estimates (DGP = %.3f):  BSTS = %.3f; DiD = %.3f',att.b3,att.bsts,att.did)) + 
-          geom_vline(xintercept=-0.5, linetype='dotted')+
-          geom_hline(yintercept = 0) +
-          scale_color_manual(values=c(hue2[1],hue2[2],'black')) + 
-          scale_shape_manual(values=c(17,19,NA)) +
-          scale_linetype_manual(values=c(2,3,1))  + 
-          theme(legend.position='top')
-        # png(filename = file.path(save.img.dir,
-        #                          sprintf('%s_BSTS_dynamic_treatment_effect_comparison_n%s_pd%s_ss%s_%s_%s_%s.png',
-        #                                  prefix,n,npds,h,key.strip,effect.type,sim.id)))
-        # matplot.main <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
-        #                             key.strip, mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
-        # matplot(x = res.tbl$event.time, y=res.tbl[,c('point.effect','estimate','b3.att')],,
-        #         type='o',lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1),
-        #         col=c('red','blue','black'),
-        #         main=matplot.main, ylab='ATT',xlab='t')
-        # legend('topright',legend=c('BSTS','DiD','DGP'),col=c('red','blue','black'),lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1)) 
-        # dev.off()
-        
-        ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
-        ##TODO
-        ##***CHANGE TO 1-STEP AHEAD PREDICTION ERROR BEF
-        errdf <- rbind(
-          data.frame(method='BSTS', 
-                     error=(res.tbl$bsts.point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
-                     ),  ## MAPE - percentage
-          data.frame(method='DiD',  
-                     error=(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
-                     )
-        )
-        vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
-        p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
-          geom_vline(xintercept=0)+
-          geom_density(alpha=0.3, na.rm=T) +
-          geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1.2) +
-          # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
-          ggtitle(sprintf('Pre-Intervention Pointwise Error:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
-                          mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
-                          mean(errdf$error[errdf$method=='DiD'],na.rm=T),
-                          sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
-                          sd(errdf$error[errdf$method=='DiD'],na.rm=T)  )
-          ) + theme_bw() + xlab('Residuals')
-        # ggsave(filename = file.path(save.img.dir,
-        #                             sprintf('%s_ATT_est_pointwise_error_distributions_n%s_pd%s_ss%s_%s_%s_%s.png',
-        #                                     prefix,n,npds,h,key.strip,effect.type,sim.id)))
-        
-        
-        ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
-        errdf <- rbind(
-          data.frame(method='BSTS', 
-                     error=(res.tbl$bsts.point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])
-                     ),
-          data.frame(method='DiD', 
-                     error=(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds])
-                     )
-        )
-        vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
-        p.err3 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
-          geom_vline(xintercept=0)+
-          geom_density(alpha=0.3, na.rm=T) +
-          geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1.2) +
-          # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
-          ggtitle(sprintf('Post-Intervention ATT Bias:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
-                          mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
-                          mean(errdf$error[errdf$method=='DiD'],na.rm=T),
-                          sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
-                          sd(errdf$error[errdf$method=='DiD'],na.rm=T))
-          ) + theme_bw() + xlab('Residuals (Distance of Pointwise ATT Estimate from DGP)')
-        # ggsave(filename = file.path(save.img.dir,
-        #                             sprintf('%s_ATT_est_pointwise_error_distributions_n%s_pd%s_ss%s_%s_%s_%s.png',
-        #                                     prefix,n,npds,h,key.strip,effect.type,sim.id)))
-        
-        # ## SIMULATED DATA GROUPS FOR EFFECT.TYPE=k
-        # df.group.series <-  ddply(sim$df %>% dplyr::filter(effect.type==effect.type), .(t,effect.type,group), summarize,
-        #                           min=min(y, na.rm=T),
-        #                           cl=quantile(y, probs=0.025, na.rm=T),
-        #                           med=median(y, na.rm=T),
-        #                           cu=quantile(y, probs=0.975, na.rm=T),
-        #                           max=max(y, na.rm=T))
-        # ## ## sim$df.summary %>% dplyr::filter(effect.type==effect.type)
-        # p.group.series <- ggplot( df.group.series, aes(x=as.numeric(t), y=med, color=group)) +
-        #   geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
-        #   geom_line(size=1.2) +
-        #   geom_point(aes(x=as.numeric(t), y=min),pch=1,alpha=.3) + geom_point(aes(x=as.numeric(t),y=max),pch=1,alpha=.3) +
-        #   geom_hline(yintercept=0) + geom_vline(xintercept=intpd, lty=2) +
-        #   ylab('Y') +
-        #   # facet_grid( effect.type ~ . ) +
-        #   theme_bw() + theme(legend.position='top') # + ggtitle(plot.main)
-        ## ## ALL SIMULATED ACTOR TIMESERIRES
-        # df.ind.series <- simlist[[key]]$sim$df.plot %>% dplyr::filter(effect.type == effect.type)
-        df.plot <- simlist[[key]]$sim$df
-        df.ind.series <- df.plot[which(df.plot$effect.type == effect.type),]
-        # df.ind.series$t0 <-df.ind.series$t - df.ind.series$t.post.intpd
-        p.ind.series <- ggplot(data=df.ind.series, mapping=aes(x=t,y=y, color=group, group=actor)) +
-          geom_line(size=1.05, alpha=0.2) +
-          # geom_point(, color=rgb(0.2, 0.2, 0.8, 0.1))+
-          geom_hline(yintercept=0)  + # facet_grid( effect.type ~ . ) +
-          geom_vline(xintercept= (intpd - 0.5), linetype='dotted')+
-          scale_color_manual(values = c(rgb(.2,.2,.8,.3), rgb(.8,.2,.2,.3))) +
-          theme_bw() + theme(legend.position='bottom') + ggtitle('Simulated Time Series') #+
-        # guides(color=guide_legend(nrow=3,byrow=TRUE)) #+
-        
-        ## BSTS
-        # ## GROUP SUMMARY TIME SERIES
-        bsts.wide <- as.data.frame(impact_amount$series)
-        bsts.wide$t <- 1:nrow(bsts.wide)
-        bsts.wide$t0 <- bsts.wide$t - intpd 
-        # bsts.long <- gather(bsts.wide, point, val, point.effect:point.effect.upper, factor_key = T)
-        # ##
-        # print(bsts.long)
-        # ia <- as.data.frame(impact_amount$series)
-        # bsts.long <- rbind(
-        #   data.frame(variable='point.effect', value=ia$point.effect),
-        #   data.frame(variable='point.effect.lower', value=ia$point.effect.lower),
-        #   data.frame(variable='point.effect.upper', value=ia$point.effect.upper)
-        # )
-        p.bsts.impact <- ggplot(bsts.wide, aes(x=t0, y=point.effect)) +
-          geom_ribbon(aes(ymin=point.effect.lower,ymax=point.effect.upper), alpha=.25, size=.01, lty=1) +
-          geom_line(size=1.1, lty=1) +
-          # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
-          geom_hline(yintercept=0) + geom_vline(xintercept=-0.5, lty=2) +
-          ylab('ATT') +  xlab('Event Time') + # facet_grid( effect.type ~ . ) +
-          theme_bw() + #theme(legend.position='bottom') + 
-          ggtitle('BSTS CausalImpact: Pointwise Effect By Length of Exposure')
-        # ggtitle(sprintf('BSTS CausalImpact (p = %.3f)',
-        #                 ,pval.bsts.general))
-        
-        ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
-        # ggarrange(p.err2, p.err3, p.err1, ncol=2, nrow=2, widths = , common.legend = F)
-        if (plot.save) {
-          ggdraw() +
-            draw_plot(p.ind.series, x= 0 , y= 4/5, width=1, height=1/5) +
-            draw_plot(p.agg.es, x=0, y=3/5, width=1, height=1/5) +  ## *** DiD ***
-            draw_plot(p.bsts.impact, x=0, y=2/5, width=1, height=1/5) +  ## *** BSTS ***
-            draw_plot(p.err1, x = 0,  y = 1/5, width = 1, height = 1/5) +
-            draw_plot(p.err2, x = 0,  y = 0, width = .5, height = 1/5) +
-            draw_plot(p.err3, x = .5, y = 0, width = .5, height = 1/5) +
-            draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
-                            x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
-          ggsave(filename = file.path(save.img.dir,
-                                      sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)),
-                 height=15, width=9, units = 'in', dpi = 300)
+        if (plot.save) 
+        {
+          ## PLOT DYNAMIC EFFECTS COMPARISON - DID vs. BSTS vs. DGP
+          dyndf <- rbind(
+            data.frame(event.time=res.tbl$event.time, series='1.BSTS', ATT=res.tbl$bsts.point.effect),
+            data.frame(event.time=res.tbl$event.time, series='2.DiD', ATT=res.tbl$did.estimate),
+            data.frame(event.time=res.tbl$event.time, series='3.DGP', ATT=res.tbl$b3.att)
+          )
+          hue2 <- hue_pal()(2)
+          p.err1 <- ggplot(dyndf, aes(x=event.time, y=ATT, color=series,fill=series,linetype=series,shape=series)) + 
+            geom_line(na.rm=T, size=.9) + geom_point(na.rm=T, size=2) +
+            theme_bw() + xlab('Event Time') + 
+            ggtitle(sprintf('Comparison of Mean ATT Estimates (DGP = %.3f):  BSTS = %.3f; DiD = %.3f',att.b3,att.bsts,att.did)) + 
+            geom_vline(xintercept=-0.5, linetype='dotted')+
+            geom_hline(yintercept = 0) +
+            scale_color_manual(values=c(hue2[1],hue2[2],'black')) + 
+            scale_shape_manual(values=c(17,19,NA)) +
+            scale_linetype_manual(values=c(2,3,1))  + 
+            theme(legend.position='top')
+          # png(filename = file.path(save.img.dir,
+          #                          sprintf('%s_BSTS_dynamic_treatment_effect_comparison_n%s_pd%s_ss%s_%s_%s_%s.png',
+          #                                  prefix,n,npds,h,key.strip,effect.type,sim.id)))
+          # matplot.main <- sprintf('%s: DGP = %.3f; DiD = %.3f;  BSTS = %.3f',
+          #                             key.strip, mean(b3diff$diff[intpd:nrow(b3diff)]), agg.es$overall.att, impact_amount$summary$AbsEffect[1])
+          # matplot(x = res.tbl$event.time, y=res.tbl[,c('point.effect','estimate','b3.att')],,
+          #         type='o',lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1),
+          #         col=c('red','blue','black'),
+          #         main=matplot.main, ylab='ATT',xlab='t')
+          # legend('topright',legend=c('BSTS','DiD','DGP'),col=c('red','blue','black'),lty=c(2,3,1),pch=c(1,20,NA),lwd=c(1,1,1)) 
+          # dev.off()
+          
+          ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
+          ##TODO
+          ##***CHANGE TO 1-STEP AHEAD PREDICTION ERROR BEF
+          errdf <- rbind(
+            data.frame(method='BSTS', 
+                       error=(res.tbl$bsts.point.effect[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
+                       ),  ## MAPE - percentage
+            data.frame(method='DiD',  
+                       error=(res.tbl$did.estimate[1:(intpd-1)] - res.tbl$b3.att[1:(intpd-1)])
+                       )
+          )
+          vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
+          p.err2 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
+            geom_vline(xintercept=0)+
+            geom_density(alpha=0.3, na.rm=T) +
+            geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1.2) +
+            # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
+            ggtitle(sprintf('Pre-Intervention Pointwise Error:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
+                            mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                            mean(errdf$error[errdf$method=='DiD'],na.rm=T),
+                            sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                            sd(errdf$error[errdf$method=='DiD'],na.rm=T)  )
+            ) + theme_bw() + xlab('Residuals')
+          # ggsave(filename = file.path(save.img.dir,
+          #                             sprintf('%s_ATT_est_pointwise_error_distributions_n%s_pd%s_ss%s_%s_%s_%s.png',
+          #                                     prefix,n,npds,h,key.strip,effect.type,sim.id)))
+          
+          
+          ## PLOT ATT ESTIMATE ERROR DISTRIBUTIONS COMPARISON 
+          errdf <- rbind(
+            data.frame(method='BSTS', 
+                       error=(res.tbl$bsts.point.effect[intpd:npds] - res.tbl$b3.att[intpd:npds])
+                       ),
+            data.frame(method='DiD', 
+                       error=(res.tbl$did.estimate[intpd:npds] - res.tbl$b3.att[intpd:npds])
+                       )
+          )
+          vline.dat <- errdf %>% dplyr::group_by(method) %>% dplyr::summarize(grp.mean=mean(error,na.rm=T))
+          p.err3 <- ggplot(errdf, aes(x=error, colour=method,fill=method)) + 
+            geom_vline(xintercept=0)+
+            geom_density(alpha=0.3, na.rm=T) +
+            geom_vline(data=vline.dat, aes(xintercept=grp.mean, color=method), linetype="dashed",size=1.2) +
+            # geom_histogram(alpha=0.2, position = 'identity', na.rm = T) +
+            ggtitle(sprintf('Post-Intervention ATT Bias:\n Mean: BSTS = %.3f; DiD = %.3f\n SD:   BSTS = %.3f; DiD = %.3f',
+                            mean(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                            mean(errdf$error[errdf$method=='DiD'],na.rm=T),
+                            sd(errdf$error[errdf$method=='BSTS'],na.rm=T), 
+                            sd(errdf$error[errdf$method=='DiD'],na.rm=T))
+            ) + theme_bw() + xlab('Residuals (Distance of Pointwise ATT Estimate from DGP)')
+          # ggsave(filename = file.path(save.img.dir,
+          #                             sprintf('%s_ATT_est_pointwise_error_distributions_n%s_pd%s_ss%s_%s_%s_%s.png',
+          #                                     prefix,n,npds,h,key.strip,effect.type,sim.id)))
+          
+          # ## SIMULATED DATA GROUPS FOR EFFECT.TYPE=k
+          # df.group.series <-  ddply(sim$df %>% dplyr::filter(effect.type==effect.type), .(t,effect.type,group), summarize,
+          #                           min=min(y, na.rm=T),
+          #                           cl=quantile(y, probs=0.025, na.rm=T),
+          #                           med=median(y, na.rm=T),
+          #                           cu=quantile(y, probs=0.975, na.rm=T),
+          #                           max=max(y, na.rm=T))
+          # ## ## sim$df.summary %>% dplyr::filter(effect.type==effect.type)
+          # p.group.series <- ggplot( df.group.series, aes(x=as.numeric(t), y=med, color=group)) +
+          #   geom_ribbon(aes(ymin=cl,ymax=cu,fill=group), alpha=.15, size=.01, lty=1) +
+          #   geom_line(size=1.2) +
+          #   geom_point(aes(x=as.numeric(t), y=min),pch=1,alpha=.3) + geom_point(aes(x=as.numeric(t),y=max),pch=1,alpha=.3) +
+          #   geom_hline(yintercept=0) + geom_vline(xintercept=intpd, lty=2) +
+          #   ylab('Y') +
+          #   # facet_grid( effect.type ~ . ) +
+          #   theme_bw() + theme(legend.position='top') # + ggtitle(plot.main)
+          ## ## ALL SIMULATED ACTOR TIMESERIRES
+          # df.ind.series <- simlist[[key]]$sim$df.plot %>% dplyr::filter(effect.type == effect.type)
+          df.plot <- simlist[[key]]$sim$df
+          df.ind.series <- df.plot[which(df.plot$effect.type == effect.type),]
+          # df.ind.series$t0 <-df.ind.series$t - df.ind.series$t.post.intpd
+          p.ind.series <- ggplot(data=df.ind.series, mapping=aes(x=t,y=y, color=group, group=actor)) +
+            geom_line(size=1.05, alpha=0.2) +
+            # geom_point(, color=rgb(0.2, 0.2, 0.8, 0.1))+
+            geom_hline(yintercept=0)  + # facet_grid( effect.type ~ . ) +
+            geom_vline(xintercept= (intpd - 0.5), linetype='dotted')+
+            scale_color_manual(values = c(rgb(.2,.2,.8,.3), rgb(.8,.2,.2,.3))) +
+            theme_bw() + theme(legend.position='bottom') + ggtitle('Simulated Time Series') #+
+          # guides(color=guide_legend(nrow=3,byrow=TRUE)) #+
+          
+          ## BSTS
+          # ## GROUP SUMMARY TIME SERIES
+          bsts.wide <- as.data.frame(impact_amount$series)
+          bsts.wide$t <- 1:nrow(bsts.wide)
+          bsts.wide$t0 <- bsts.wide$t - intpd 
+          # bsts.long <- gather(bsts.wide, point, val, point.effect:point.effect.upper, factor_key = T)
+          # ##
+          # print(bsts.long)
+          # ia <- as.data.frame(impact_amount$series)
+          # bsts.long <- rbind(
+          #   data.frame(variable='point.effect', value=ia$point.effect),
+          #   data.frame(variable='point.effect.lower', value=ia$point.effect.lower),
+          #   data.frame(variable='point.effect.upper', value=ia$point.effect.upper)
+          # )
+          p.bsts.impact <- ggplot(bsts.wide, aes(x=t0, y=point.effect)) +
+            geom_ribbon(aes(ymin=point.effect.lower,ymax=point.effect.upper), alpha=.25, size=.01, lty=1) +
+            geom_line(size=1.1, lty=1) +
+            # geom_point(aes(x=t, y=min),pch=1,alpha=.3) + geom_point(aes(x=t,y=max),pch=1,alpha=.3) +
+            geom_hline(yintercept=0) + geom_vline(xintercept=-0.5, lty=2) +
+            ylab('ATT') +  xlab('Event Time') + # facet_grid( effect.type ~ . ) +
+            theme_bw() + #theme(legend.position='bottom') + 
+            ggtitle('BSTS CausalImpact: Pointwise Effect By Length of Exposure')
+          # ggtitle(sprintf('BSTS CausalImpact (p = %.3f)',
+          #                 ,pval.bsts.general))
+          
+          ##----------------------------------
+          ## COMBINE TIMESERIES COMPARISON AND ERROR DISTRIBUTION PLOTS OUTPUT
+          # ggarrange(p.err2, p.err3, p.err1, ncol=2, nrow=2, widths = , common.legend = F)
+            ggdraw() +
+              draw_plot(p.ind.series, x= 0 , y= 4/5, width=1, height=1/5) +
+              draw_plot(p.agg.es, x=0, y=3/5, width=1, height=1/5) +  ## *** DiD ***
+              draw_plot(p.bsts.impact, x=0, y=2/5, width=1, height=1/5) +  ## *** BSTS ***
+              draw_plot(p.err1, x = 0,  y = 1/5, width = 1, height = 1/5) +
+              draw_plot(p.err2, x = 0,  y = 0, width = .5, height = 1/5) +
+              draw_plot(p.err3, x = .5, y = 0, width = .5, height = 1/5) +
+              draw_plot_label(label = c("A", "B", "C",'D','E','F'), size = 15,
+                              x = c(0, 0, 0, 0, 0, .5), y = c(5/5, 4/5, 3/5, 2/5, 1/5, 1/5))
+            ggsave(filename = file.path(save.img.dir,
+                                        sprintf('%s_ATT_pointwise_error_distribution_compare_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
+                                                prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id)),
+                   height=15, width=9, units = 'in', dpi = 300)
         }
 
         
@@ -1720,8 +1751,8 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # maxGb <- .001  ## **DEBUG**
       if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
         ## IF SMALL ENOUGH, Save simulation list as serialized data file
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s.rds', 
-                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
+        simlist.file <- sprintf('__%s_GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s.rds', 
+                                prefix, n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]], file = save.file.path)
         ## FREE UP MEMORY
@@ -1731,15 +1762,15 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         save.file.paths <- c()
         ## Save simulation list as serialized data file
         ## 1.  BSTS
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-compare-bsts.rds', 
-                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
+        simlist.file <- sprintf('__%s_GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-compare-bsts.rds', 
+                                prefix, n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]]$compare$bsts, file = save.file.path)
         simlist[[key]]$compare$bsts <- NULL ## save space
         save.file.paths[1] <- save.file.path
         ## 2. rest of simulation object
-        simlist.file <- sprintf('__GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-MAIN.rds', 
-                                n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
+        simlist.file <- sprintf('__%s_GRIDSEARCH_output__n%s_pd%s_niter%s_covCats%s_msize%s_%s_%s_simlist-MAIN.rds', 
+                                prefix, n, npds, bsts.niter, bsts.ctrl.cats, bsts.expect.mod.size, sim.id, key.strip)
         save.file.path <-  file.path(save.items.dir, simlist.file)
         saveRDS(simlist[[key]], file = save.file.path)
         save.file.paths[2] <- save.file.path

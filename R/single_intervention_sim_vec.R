@@ -61,8 +61,9 @@ getSinBySeasons <- function(period.values, nseasons, freq=1,
 ## MAIN VARIABLE FUNCTIONS
 ##--------------------------------
 ## outcome
-yFunc <- function(b0,b1,b2,b3,b4,b5,b6,b7,b8,b9, x1, x2, season.val, t, u, c1, c2, c3, y.tm1) {
-  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*season.val + b5*t + u + b6*c1 + b7*c2 + b8*c3 + b9*y.tm1
+yFunc <- function(b0,b1,b2,b3,b4,b5,b6,b7,b8,b9, x1, x2, season.val, t, u, c1, c2, c3, y.tm1, localLevel) {
+  # b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*season.val + b5*t + u + b6*c1 + b7*c2 + b8*c3 + b9*y.tm1
+  b0 + b1*x1 + b2*x2 + b3*x1*x2 + b4*season.val + b5*localLevel + u + b6*c1 + b7*c2 + b8*c3 + b9*y.tm1
 }
 
 
@@ -159,7 +160,7 @@ x2Func <- function(t, intpd, n) {
 ## Treatment effect
 b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
                    type='quadratic', 
-                   w0=1.0, w1=.3, w2=-.012, w2.shift=0,
+                   w0=1.0, w1=.3, w2=-.012, #w2.shift=0,
                    non.negative=TRUE) {
   
   n <- length(t.post.intpd) ## t.post.intpd, x2 <-- must be same length vectors
@@ -194,13 +195,14 @@ b3Func <- function(t.post.intpd, x1, x2, ## must be same length vectors
     else if (type == 'quadratic') {
       # cat('b3Func() t[idx]', t[idx])
       # cat('\n')
-      tx <- t[idx] + w2.shift ## ? TODO: check sensitivity for gradual treatment effect increase (negative number shifts curve rightward)
-      new <-  w2*(tx^2) + w1*tx + w0    ## length == n.idx
+      tx <- t[idx] # + w2.shift ## ? TODO: check sensitivity for gradual treatment effect increase (negative number shifts curve rightward)
+      new <-  w2*(tx^2) + w1*tx + 0 ## replace w0 with 0    ## length == n.idx
     }
     else if (type == 'geometric') {
       denom <- t[idx]  ## length == n.idx
       denom[denom==0] <- 1  ## prevent division by zero
-      new <- w0 / denom
+      geom.effect.multiplier <- 7  ## how much larger is geom shape initial effect than constant effect level
+      new <- geom.effect.multiplier * w0 / denom
     }
     else {
       cat(sprintf('\neffect type %s not known\n',type))
@@ -247,18 +249,18 @@ runSimSingleIntervention <- function(
     b2, ##.001, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
     b4, ##0, ## Weight of seasonality effect
-    b5, ##.04, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
+    # b5, ##.04, ## LEVEL: Random Walk 
     ## Covariates
-    b6, ##.2, ##  c1  ## small variance (.01) random walk
-    b7, ##.2, ##  c2  ## large variance (.1) random walk
-    b8, ##.2, ##  c3  ## gamma var
+    # b6, ##.2, ##  c1  ## small variance (.01) random walk
+    # b7, ##.2, ##  c2  ## large variance (.1) random walk
+    # b8, ##.2, ##  c3  ## gamma var
     ## Autocorrelation
     b9, ##0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
     w0, ##1.2, ## constant
     w1, ##0.3, ## linear
     w2, ##-0.12, ## quadratic
-    w2.shift, ##-12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    # w2.shift, ##-12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
     ## SEASONALITY 
     nseasons, ##  NA omits seasonality; integer values incluce seasonality with nseasons
     season.frequency, ##1, ## number of completed sin waves within 1 cycle of nseasons
@@ -343,8 +345,8 @@ runSimSingleIntervention <- function(
       # cat(sprintf(' i = %s \n',i))
     
     ## noise terms
-    v <- rnorm(n=n,mean=0,sd=noise.level * 1.0 )  ##- .5 ##
-    u <- rnorm(n=n,mean=0,sd=noise.level * 1.0 ) ## 
+    v <- rnorm(n=n,mean=0, sd=noise.level * 1 )  ##- .5 ##
+    u <- rnorm(n=n,mean=0, sd=noise.level * 1 ) ## 
     
     ##----------  Past Period Variables---------------------
     ## indices of last period observations
@@ -355,6 +357,22 @@ runSimSingleIntervention <- function(
     y.tm1 <- if (t==1) { rep(ystart, n) } else { df$y[idx.tm1] }
     ###
     
+    ## State Space local level 
+    # ## LEVEL TERM RANDOM WALK
+    localLevel.tm1 <- if(t==1) {rep(0, n)} else { mean(df$localLevel[idx.tm1], na.rm=T) } 
+    
+    ## DYNAMIC REGRESSION BETAS --------------
+    ##   (same for all n; using mean( cov[t-1] ) should be same as selection first item [1])
+    ## FULL SEASONALITY COMPONENT IS INCLUDED IN OUTCOME ( b5 := 1 )
+    ## cov_season (seasonality = sinusoid with 52 pds, 1 frequency)
+    b5.tm1 <- if (t==1) { 1.0 } else { mean(df$b5[idx.tm1], na.rm=T) }
+    ## OTHER COVARIATES ----------------------
+    ## c1  
+    b6.tm1 <- if (t==1) { .3 } else { mean(df$b6[idx.tm1], na.rm=T) }
+    ## c2  
+    b7.tm1 <- if (t==1) { .2 } else { mean(df$b7[idx.tm1], na.rm=T) }
+    ## c3  Temporal drift  (noise on a function of time)
+    b8.tm1 <- if (t==1) { .1} else { mean(df$b8[idx.tm1], na.rm=T) }
     
     ##------------------------------------------------------
     ## Get past performance records for treat.rule == 'past'
@@ -438,53 +456,77 @@ runSimSingleIntervention <- function(
     ##
     # shift.t.post.intpd <- t.post.intpd - intpd
     b3 <- b3Func(t.post.intpd, x1, x2, type=effect.type,
-                 w0=ifelse(effect.type=='geometric', w0*6, w0),
-                 w1=w1, w2=w2, w2.shift=w2.shift)
+                 w0=w0, w1=w1, w2=w2) ## w2.shift=w2.shift
     
+    
+    ##-------------------------------------------
+    ## ALL VALUES ARE THE SAME (indexed only at time; not by individual )
+    # localLevel.mu <- mean(localLevel.tm1, na.rm=T) ## should be the same as taking item [1]
+    localLevel <- rnorm(n, localLevel.tm1, sd= noise.level * 0.01 )  ## save level value u[t] for all actors (not u[i,t])
+    
+    
+    ##-------------------------------------------
     ## Seasonal Component and scaling yearly growth to period-growth
     if ( is.null(nseasons) | is.null(season.frequency) | is.na(nseasons) | is.na(season.frequency) ) {
       season.val <- 0
       ## *** DEFAULT SETTING assumes yearly growth rate = (b5 / (pds/yr)), where pds/yr = 52 weeks
       ##     That is, the simulation assumes weekly periods for growth rate, even if seasonality component is missing from DGP.
-      b5 <-  b5 / (npds / 52) 
+      b5 <-  rnorm(1, ( b5.tm1 / (npds / 52)  ), sd = noise.level * 0.1 )
     } else {
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
-                                     noise.mean=0, noise.sd=noise.level * .5)
+                                     noise.mean=0, noise.sd = 0, # add noise below
+                                     vert.scale =  7  ) 
       season.val <- season.vals[t]
       ## Scale linear growth to equal b5 value for every completed seasonal cycle (e.g., 1 year)
-      season.frequency <- ifelse(season.frequency == 0, 1, season.frequency)
-      nseasons <- ifelse( nseasons == 0 , 1, nseasons )
-      growth.scale <-  npds /  ( nseasons * season.frequency )
-      b5 <- b5 / growth.scale
+      # season.frequency <- ifelse(season.frequency == 0, 1, season.frequency)
+      # nseasons <- ifelse( nseasons == 0 , 1, nseasons )
+      # growth.scale <-  npds /  ( nseasons * season.frequency )
+      # b5 <- rnorm(1, (b5.tm1 / growth.scale), sd = noise.level * 0.5 )
+      b5 <- rnorm(1, season.val, sd = noise.level * 0.2 )
     }
+    
+    b6 <- rnorm(1, b6.tm1, sd = noise.level * .01)
+    b7 <- rnorm(1, b7.tm1, sd = noise.level * .01)
+    b8 <- rnorm(1, b8.tm1, sd = noise.level * .01)
     
     
     ## --------------- Covariates -------------------------
     ## INITIAL VALUES OF COVARIATES
-    c1.tm1 <- if (t==1) { rep(0.01, n) } else { df$c1[idx.tm1] }
+    c1.tm1 <- if (t==1) { rep(.1, n) } else { df$c1[idx.tm1] }
     ## START HIGHER = 10
-    c2.tm1 <- if (t==1) { rep(0.01, n) } else { df$c2[idx.tm1] }
+    c2.tm1 <- if (t==1) { rep(.1, n) } else { df$c2[idx.tm1] }
     ## 
-    c3.tm1 <- if (t==1) { rep(0.01, n) } else { df$c3[idx.tm1] }
+    c3.tm1 <- if (t==1) { rep(1, n) } else { df$c3[idx.tm1] }
     
     ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # c1 <- rpois(n, lambda = noise.level*0.8) + 1
-    c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
-    c1 <- rnorm(n, c1.tm1.drifted.mean, sd = noise.level * 0.5 )
+    # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
+    # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = 0 )  ##***CHANGED***
+    # c1 <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
+    c1 <- rnorm(n, .001*t, sd = noise.level * .2)
     
-    ### NEGATIVE OSCILLATION - RANDOM WALK
+    ### COVARIATE SERIES 2
     ### OPTION A
     # c2 <- rnorm(n, -c2.tm1, sd=noise.level * 0.5 )
     ## OPTION B - direct comparison with different correlations with y (outcome affects by b7, y(b7) )
-    c2.tm1.drifted.mean <- rnorm(n, c2.tm1, sd = noise.level * 0.1 )
-    c2 <- rnorm(n, c2.tm1.drifted.mean, sd = noise.level * 0.5 )
+    # c2.tm1.drifted.mean <- rnorm(n, c2.tm1, sd = noise.level * 0.1 )
+    # c2 <- rnorm(n, c2.tm1, sd = noise.level * 0.01 )
+    # c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
+    c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
+                                   freq= ifelse(is.na(season.frequency),1, season.frequency / 4),
+                                   noise.mean=0, noise.sd = 0, # add noise below
+                                   vert.scale =  runif(1, 0, 1)  )
+    .id <- ifelse(t<2, 1, t-1)
+    c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.2)  
     
-    # # ## Skewed heteroskedastic variance (large variance)
+    # # ## COVARIATE SERIES 3
     # ## OPTION A
-    # c3 <- rgamma(n, shape = log(t + 1), scale = noise.level * 0.5 )
+    # c3 <- rgamma(n, shape = log(t + 1) + .1, scale = noise.level * 0.1 )
     # ## OPTION B - direct comparison with different correlations with y (outcome affects by b8, y(b8) )
-    c3.tm1.drifted.mean <- rnorm(n, c3.tm1, sd = noise.level * 0.1 )
-    c3 <- rnorm(n, c3.tm1.drifted.mean, sd = noise.level * 0.5 )
+    # c3.tm1.drifted.mean <- rnorm(n, c3.tm1, sd = noise.level * 0.1 )
+    # c3 <- rnorm(n, -.001*(t/2), sd = noise.level * 0.1 )
+    c3 <- rnorm(n, c3.tm1, sd = noise.level )
+    # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
     ##-------------------------------------
     ## PERFORMANCE
@@ -506,10 +548,11 @@ runSimSingleIntervention <- function(
                c1=c1,
                c2=c2, 
                c3=c3,
-               y.tm1=y.tm1
+               y.tm1=y.tm1,
+               localLevel=localLevel
               )
     ##--------------------------------------
-    
+  
     
     ##--------------------------------------
     ## UPDATE PERIOD DATAFRAME
@@ -519,7 +562,15 @@ runSimSingleIntervention <- function(
                        effect.type=rep(effect.type, n),
                        y=y, x1=x1, x2=x2, x3=x1*x2,
                        season.val=season.val,
-                       b1=rep(b1, n), b2=rep(b2, n), b3=b3, 
+                       b1=rep(b1, n), 
+                       b2=rep(b2, n), 
+                       b3=b3, ## DYNAMIC TREATMENT EFFECT by GROUP (differs between treatment, control; needs time-varying covariates storage)
+                       b4=rep(b4, n), 
+                       b5=rep(b5, n),
+                       b6=rep(b6, n),
+                       b7=rep(b7, n),
+                       b8=rep(b8, n),
+                       localLevel=localLevel,
                        c1=c1, c2=c2, c3=c3,
                        u=u, v=v,
                        stringsAsFactors = F)
@@ -783,12 +834,12 @@ runSimSingleInterventionEffectComparison <- function(
     ## Simulation base settings
     n = 100, ## NUMBER OF actors  
     npds = 520, ## NUMBER OF PERIODS
-    intpd = round(520 * 5/6),
+    intpd = 520 * 0.6,
     ystart = 0,
     treat.rule = 'below.benchmark',
     treat.prob = 1.0, ## probability of self-selecting into treatment, if below treat.threshold 
     treat.threshold = 0.5, ## threshold of treatment criterion, below which actor self-selects into treatment with probability = treat.prob
-    cov.scenario= list(c1=.1,c2=.2,c3=.3), ## list of vectors of covariances of c1,c2,c3 with outcome
+    # cov.scenario= list(c1=.1,c2=.2,c3=.3), ## list of vectors of covariances of c1,c2,c3 with outcome
     benchmark.type = 'self', ## 'all', 'self'
     rand.seed = 54321,  ## pseudo-random number generator seed for replication
     ##
@@ -798,19 +849,19 @@ runSimSingleInterventionEffectComparison <- function(
     b1 = .01, ## treatment dummy
     b2 = .01, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
-    b4 = 0, ## spillover of past performance on current performance (how much of treatment effect persists across periods)
-    b5 = .01, ## growth rate (linear effect of time: proportion of time t added to linear combination in yFunc() performance )
+    b4 = 0, ## weight of seasonal component
+    b5 = 1, ## Weight of LEVEL component in outcome function 
     ## Covariates 
-    b6 = .15, ## c1  
-    b7 = .25, ## c2  
-    b8 = .35, ## c3  
+    # b6 = .1, ## c1  
+    # b7 = .2, ## c2  
+    # b8 = .3, ## c3  
     ## Autocorrelation
     b9 = 0,
     ## # TREATMENT EFFECT FUNCTION WEIGHTS 
-    w0 = 1.2, ## constant
-    w1 = 0.3, ## linear
-    w2 = -0.12, ## quadratic
-    w2.shift = -12, ## shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
+    w0 = 1.5, ## constant
+    w1 = 0.13, ## linear
+    w2 =  -0.007/sqrt(520), ## = -0.01/sqrt(npds) , ## quadratic
+    # w2.shift = -16, ## =  -round( sqrt(npds)*.7 ) shift quadratic curve to allow gradual treatment effect increase (negative shifts curve rightward)
     ## SEASONALITY 
     nseasons = NA, ##  NA omits seasonality; integer values incluce seasonality with nseasons
     season.frequency = 1, ## number of completed sin waves within 1 cycle of nseasons
@@ -858,20 +909,20 @@ runSimSingleInterventionEffectComparison <- function(
       benchmark.type = benchmark.type, 
       rand.seed = rand.seed, 
       sim.id=SIMID, 
-      cov.scenario=cov.scenario,
+      # cov.scenario=cov.scenario,
       b0=b0, 
       b1=b1, 
       b2=b2,     
       b4=b4, 
       b5=b5, 
-      b6=cov.scenario[['c1']], ## covariate c1 weight in y (correlation with outcome)
-      b7=cov.scenario[['c2']], ## covariate c2 weight in y (correlation with outcome)
-      b8=cov.scenario[['c3']], ## covariate c3 weight in y (correlation with outcome)
+      # b6=cov.scenario[['c1']], ## covariate c1 weight in y (correlation with outcome)
+      # b7=cov.scenario[['c2']], ## covariate c2 weight in y (correlation with outcome)
+      # b8=cov.scenario[['c3']], ## covariate c3 weight in y (correlation with outcome)
       b9=b9,
       w0=w0, 
       w1=w1, 
       w2=w2, 
-      w2.shift=w2.shift, 
+      # w2.shift=w2.shift, 
       nseasons=nseasons, 
       season.frequency=season.frequency,
       g0=g0, 
@@ -1128,8 +1179,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
     set.seed( ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed) )
     noise.level <- ifelse(is.null(sim$noise.level), 0, sim$noise.level)
     ##
-    cov.scenario <- if(is.null(sim$cov.scenario)){list(c1=.1, c2=.2, c3=.3)} else{ sim$cov.scenario }
-    cov.scenario.key <- ifelse(is.null(sim$cov.scenario.key), 'mid', sim$cov.scenario.key)
+    # cov.scenario <- if(is.null(sim$cov.scenario)){list(c1=.1, c2=.2, c3=.3)} else{ sim$cov.scenario }
+    # cov.scenario.key <- ifelse(is.null(sim$cov.scenario.key), 'mid', sim$cov.scenario.key)
     ##
     simlist[[key]]$sim <- runSimSingleInterventionEffectComparison(
       effect.types = effect.types,
@@ -1141,20 +1192,20 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       treat.prob =  ifelse(is.null(sim$treat.prob), NA, sim$treat.prob), #0.95,  ## 0.6
       treat.threshold = ifelse(is.null(sim$treat.threshold), NA, sim$treat.threshold),  # 0.015
       sim.id = sim.id, ## defaults to timestamp
-      cov.scenario = cov.scenario,
-      cov.scenario.key = cov.scenario.key,
+      # cov.scenario = cov.scenario,
+      # cov.scenario.key = cov.scenario.key,
       ##
       noise.level = noise.level,
       ##
       b4 = ifelse(is.null(sim$b4), 0, sim$b4), ## past performance
-      b5 = ifelse(is.null(sim$b5), 0, sim$b5), ## growth (linear function of time t)
+      b5 = ifelse(is.null(sim$b5), 1, sim$b5), ## weight of level component in y outcome
       b9 = ifelse(is.null(sim$b9), 0, sim$b9), ## Autocorrelation
       ## Dynamic treatment effect polynomial parameters
-      w0 = ifelse(is.null(sim$w0), 2.0 , sim$w0), ## constant
-      w1 = ifelse(is.null(sim$w1), 0.18 , sim$w1), ## linear
-      w2 = ifelse(is.null(sim$w2), -.1 / (sim$npds^.6) , sim$w2), ## ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
-      ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
-      w2.shift = ifelse(is.null(sim$w2.shift), -round( sqrt(sim$npds)*.8 ) , sim$w2.shift),
+      w0 = ifelse(is.null(sim$w0), 1.5 , sim$w0), ## constant
+      w1 = ifelse(is.null(sim$w1), 0.13 , sim$w1), ## linear
+      w2 = ifelse(is.null(sim$w2), -.01 / sqrt(sim$npds) , sim$w2), ## ,  ##-0.009,  ## quadratic  ## -0.005, ## ***** made steeper curve= -0.008 *****
+      # ## TODO: CHECK w2.shift SENSITIVITY - this shifts quadratic curve several periods to the right so that treatment effect increases slowly  
+      # w2.shift = ifelse(is.null(sim$w2.shift), -round( sqrt(sim$npds)*.8 ) , sim$w2.shift),
       # w2.shift = -round( sqrt(sim$npds)*.8 ),  ## optimal value here is likely a function of the combination of treatment effect function parameters
       ##
       nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 

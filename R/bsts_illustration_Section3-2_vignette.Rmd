@@ -265,7 +265,7 @@ We can plot this to visualize the post-intervention change in the
 outcome series `y_treatment`.
 ```{r outcome_plot, fig.dim = c(6,4), out.width="100%"}
 npds <- nrow(df1)
-intpd <- round(npds * 5/6)
+intpd <- round(npds * 0.6)
 ##
 plot(df1$y_treatment, main='Simulated Time Series (Y)',ylab='Y',xlab='Time')
 abline(v=intpd, lty=2)
@@ -273,7 +273,8 @@ legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
 ```
 Create the pre-treatment outcome series `y.pre` to pass into the `bsts()` 
 function. Here we replace the post-intervention periods with `NA`'s that 
-represent missing values within the `R` language.
+represent missing values within the `R` language. This is because the 
+BSTS model is trained on the pre-intervention outcome (y) data. 
 ```{r}
 y.pre <- df$y_treatment
 pre.int.ids <- (1:npds) < intpd
@@ -304,10 +305,10 @@ specifies the posterior distribution (assuming convergence was reached,
 which will be addressed below.)
 ```{r}
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
-## component (all covariates in ‘predictors’ dataframe)
+## component (all covariates in df1[,-1] dataframe)
 bsts.fit <- bsts(y.pre ~ . ,
                  state.specification = st.sp,
-                 data = df1[ ,-1],  ## -1 excludes the 1st column
+                 data = df1[ ,-1],  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 ```
 
