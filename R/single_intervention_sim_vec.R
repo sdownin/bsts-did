@@ -514,9 +514,9 @@ runSimSingleIntervention <- function(
     # c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
     ######
     c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
-                                   freq= ifelse(is.na(season.frequency),1, season.frequency * 2),
+                                   freq= ifelse(is.na(season.frequency),1, season.frequency * 8),
                                    noise.mean=0, noise.sd = 0, # add noise below
-                                   vert.scale =  runif(1, .001, .01)  )
+                                   vert.scale =  runif(1, .01, .1)  )
     .id <- ifelse(t<2, 1, t-1)
     c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.1)
     
