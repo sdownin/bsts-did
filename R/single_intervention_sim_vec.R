@@ -305,7 +305,7 @@ runSimSingleIntervention <- function(
       pb <- txtProgressBar(min = 0,      # Minimum value of the progress bar
                        max = sim.count, # Maximum value of the progress bar
                        style = 3,    # Progress bar style (also available style = 1 and style = 2)
-                       width = 80,   # Progress bar width. Defaults to getOption("width")
+                       width = 50,   # Progress bar width. Defaults to getOption("width")
                        char = "=")   # Character used to create the bar
   }
 
