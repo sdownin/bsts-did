@@ -303,46 +303,46 @@ for (m in 1:length(bsts.ctrl.cats.list)) {
 
 
 
-
-#######################################################################
-#######################################################################
-
-
-
-
-##========================= DEBUG ===================================
-## GET RESULT FROM STORAGE
-. <- readRDS(simlist.files[[1]]$file[1])
-bsts.model <- .$quadratic[[1]]$CausalImpact$model$bsts.model
-# bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
-par(mar=c(2,2.5,2,1))
-plot(bsts.model, 'components')
-plot(bsts.model, 'predictors')
-plot(bsts.model, 'coefficients')
-
-
-l <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__n100_pd520_niter30000_16734236256_d1f1g1h1i1j1l1.rds'))
-# compare <- l$compare
-# l$compare <- NULL
-# l$compare <- compare
-# compare <- NULL
-
-# l$bsts.state.specs
-
-CompareBstsModels(list(getBstsModelFromSimlist(list(l), key=1, effect.type = 'constant'),
-                       getBstsModelFromSimlist(list(l), key=1, effect.type = 'geometric'),
-                       getBstsModelFromSimlist(list(l), key=1, effect.type = 'quadratic')
-                       ))
-
-PlotBstsComponents(
-  getBstsModelFromSimlist(list(l), key=1, effect.type = 'constant'),
-)
-
-
-
-################
-a <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__n400_pd520_niter10000_covCats3_16735656074_d1f1g1h1i1j1l1.rds'))
-################
+# 
+# #######################################################################
+# #######################################################################
+# 
+# 
+# 
+# 
+# ##========================= DEBUG ===================================
+# ## GET RESULT FROM STORAGE
+# . <- readRDS(simlist.files[[1]]$file[1])
+# bsts.model <- .$quadratic[[1]]$CausalImpact$model$bsts.model
+# # bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
+# par(mar=c(2,2.5,2,1))
+# plot(bsts.model, 'components')
+# plot(bsts.model, 'predictors')
+# plot(bsts.model, 'coefficients')
+# 
+# 
+# l <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__n100_pd520_niter30000_16734236256_d1f1g1h1i1j1l1.rds'))
+# # compare <- l$compare
+# # l$compare <- NULL
+# # l$compare <- compare
+# # compare <- NULL
+# 
+# # l$bsts.state.specs
+# 
+# CompareBstsModels(list(getBstsModelFromSimlist(list(l), key=1, effect.type = 'constant'),
+#                        getBstsModelFromSimlist(list(l), key=1, effect.type = 'geometric'),
+#                        getBstsModelFromSimlist(list(l), key=1, effect.type = 'quadratic')
+#                        ))
+# 
+# PlotBstsComponents(
+#   getBstsModelFromSimlist(list(l), key=1, effect.type = 'constant'),
+# )
+# 
+# 
+# 
+# ################
+# a <- readRDS(file.path(dir_ext, '__GRIDSEARCH_output__n400_pd520_niter10000_covCats3_16735656074_d1f1g1h1i1j1l1.rds'))
+# ################
 
 # ## Get the  CausalImpact object from the BSTS vs. DiD comparison simlist object
 # ##
