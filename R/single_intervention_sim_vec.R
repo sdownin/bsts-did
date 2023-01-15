@@ -475,7 +475,7 @@ runSimSingleIntervention <- function(
     } else {
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
                                      noise.mean=0, noise.sd = 0, # add noise below
-                                     vert.scale =  7  ) 
+                                     vert.scale =  10  ) 
       season.val <- season.vals[t]
       ## Scale linear growth to equal b5 value for every completed seasonal cycle (e.g., 1 year)
       # season.frequency <- ifelse(season.frequency == 0, 1, season.frequency)
