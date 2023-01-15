@@ -141,12 +141,12 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 
 ##**DEBUG**
 st.sp.lists <- list(
-  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
-  `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression'),
+  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression')#,
+  # `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression'),
   # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
   # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
-  `16`=c('AddAr','AddSeasonal', 'AddRegression')
+  # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
 
 ##
@@ -274,7 +274,7 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
 bsts.ctrl.cats.list <- list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
-bsts.expect.mod.sizes <-  list(1, 4) # 1  ## list(7, 4, 1)
+bsts.expect.mod.sizes <-  list(3) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
 bsts.niter.start <- 1500 ## 5000
 bsts.niter.max   <- 1500 ## 8e4
