@@ -370,7 +370,7 @@ runSimSingleIntervention <- function(
     ## c1  
     b6.tm1 <- if (t==1) { .3 } else { mean(df$b6[idx.tm1], na.rm=T) }
     ## c2  
-    b7.tm1 <- if (t==1) { .2 } else { mean(df$b7[idx.tm1], na.rm=T) }
+    b7.tm1 <- if (t==1) { .01 } else { mean(df$b7[idx.tm1], na.rm=T) }
     ## c3  Temporal drift  (noise on a function of time)
     b8.tm1 <- if (t==1) { .1} else { mean(df$b8[idx.tm1], na.rm=T) }
     
@@ -492,11 +492,11 @@ runSimSingleIntervention <- function(
     
     ## --------------- Covariates -------------------------
     ## INITIAL VALUES OF COVARIATES
-    c1.tm1 <- if (t==1) { rep(.1, n) } else { df$c1[idx.tm1] }
+    c1.tm1 <- if (t==1) { rep(.01, n) } else { df$c1[idx.tm1] }
     ## START HIGHER = 10
-    c2.tm1 <- if (t==1) { rep(.1, n) } else { df$c2[idx.tm1] }
+    c2.tm1 <- if (t==1) { rep(.01, n) } else { df$c2[idx.tm1] }
     ## 
-    c3.tm1 <- if (t==1) { rep(1, n) } else { df$c3[idx.tm1] }
+    c3.tm1 <- if (t==1) { rep(.01, n) } else { df$c3[idx.tm1] }
     
     ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # c1 <- rpois(n, lambda = noise.level*0.8) + 1
@@ -511,14 +511,14 @@ runSimSingleIntervention <- function(
     ## OPTION B - direct comparison with different correlations with y (outcome affects by b7, y(b7) )
     # c2.tm1.drifted.mean <- rnorm(n, c2.tm1, sd = noise.level * 0.1 )
     # c2 <- rnorm(n, c2.tm1, sd = noise.level * 0.01 )
-    c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
+    # c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
     ######
-    # c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
-    #                                freq= ifelse(is.na(season.frequency),1, season.frequency * 2),
-    #                                noise.mean=0, noise.sd = 0, # add noise below
-    #                                vert.scale =  runif(1, .5, 1)  )
-    # .id <- ifelse(t<2, 1, t-1)
-    # c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.2)  
+    c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
+                                   freq= ifelse(is.na(season.frequency),1, season.frequency * 2),
+                                   noise.mean=0, noise.sd = 0, # add noise below
+                                   vert.scale =  runif(1, .01, .1)  )
+    .id <- ifelse(t<2, 1, t-1)
+    c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.1)
     
     # # ## COVARIATE SERIES 3
     # ## OPTION A
