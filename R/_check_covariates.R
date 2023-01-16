@@ -272,12 +272,12 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
 ##          num.groups = Cartesian product of all binned covariates, 
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
-bsts.ctrl.cats.list <- list(1, NA) ## NA=no control;
+bsts.ctrl.cats.list <- list(1)  #list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
-bsts.expect.mod.sizes <-  list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
+bsts.expect.mod.sizes <- list(3)  #list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
-bsts.niter.start <- 200 ## 5000
-bsts.niter.max   <- 200 ## 8e4
+bsts.niter.start <- 1000 ## 5000
+bsts.niter.max   <- 1000 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 for (m in 1:length(bsts.ctrl.cats.list)) {
   for (r in 1:length(bsts.expect.mod.sizes)) {
@@ -300,8 +300,21 @@ for (m in 1:length(bsts.ctrl.cats.list)) {
 
 ##----------------------- END ---------------------------------------
 
-
-
+# n  <- 100
+# c1 <- rnorm(n, 1, .5)
+# c2 <- rnorm(n, 1, .5)
+# c3 <- rnorm(n, 1, .5)
+# X  <- cbind(c1, c2, c3)
+# sig.mat <- matrix(c( 1,.3,.1,
+#                     .3, 1,.2,
+#                     .1,.2, 1), ncol=3, byrow = T)
+# mu.vec <- c(.4, .6, .5)
+# rmv.mat <- mvtnorm::rmvnorm(3, 
+#                             mean = mu.vec, 
+#                             sigma = sig.mat) 
+# # corplot
+# 
+# Xmvt <- cbind(x1,x2,x3) %*% sig
 
 # 
 # #######################################################################

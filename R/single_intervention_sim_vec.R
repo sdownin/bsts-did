@@ -498,36 +498,51 @@ runSimSingleIntervention <- function(
     ## 
     c3.tm1 <- if (t==1) { rep(1, n) } else { df$c3[idx.tm1] }
     
-    ## RANDOM WALKW WITH DRIFT (noise in the local level)
-    # c1 <- rpois(n, lambda = noise.level*0.8) + 1
-    # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
-    # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = 0 )  ##***CHANGED***
-    # c1 <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
-    c1 <- rnorm(n, .0025*t, sd = noise.level * .2)
+    # ## RANDOM WALKW WITH DRIFT (noise in the local level)
+    # # c1 <- rpois(n, lambda = noise.level*0.8) + 1
+    # # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
+    # # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = 0 )  ##***CHANGED***
+    # # c1 <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
+    # c1 <- rnorm(n, .0025*t, sd = noise.level * .2)
+    # 
+    # ### COVARIATE SERIES 2
+    # ### OPTION A
+    # # c2 <- rnorm(n, -c2.tm1, sd=noise.level * 0.5 )
+    # ## OPTION B - direct comparison with different correlations with y (outcome affects by b7, y(b7) )
+    # # c2.tm1.drifted.mean <- rnorm(n, c2.tm1, sd = noise.level * 0.1 )
+    # # c2 <- rnorm(n, c2.tm1, sd = noise.level * 0.01 )
+    # # c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
+    # ######
+    # c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
+    #                                freq= ifelse(is.na(season.frequency),1, season.frequency * 8),
+    #                                noise.mean=0, noise.sd = 0, # add noise below
+    #                                vert.scale =  runif(1, .01, .1)  )
+    # .id <- ifelse(t<2, 1, t-1)
+    # c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.1)
+    # 
+    # # # ## COVARIATE SERIES 3
+    # # ## OPTION A
+    # # c3 <- rgamma(n, shape = log(t + 1) + .1, scale = noise.level * 0.1 )
+    # # ## OPTION B - direct comparison with different correlations with y (outcome affects by b8, y(b8) )
+    # # c3.tm1.drifted.mean <- rnorm(n, c3.tm1, sd = noise.level * 0.1 )
+    # # c3 <- rnorm(n, -.001*(t/2), sd = noise.level * 0.1 )
+    # c3 <- rnorm(n, c3.tm1, sd = noise.level )
+    # # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
-    ### COVARIATE SERIES 2
-    ### OPTION A
-    # c2 <- rnorm(n, -c2.tm1, sd=noise.level * 0.5 )
-    ## OPTION B - direct comparison with different correlations with y (outcome affects by b7, y(b7) )
-    # c2.tm1.drifted.mean <- rnorm(n, c2.tm1, sd = noise.level * 0.1 )
-    # c2 <- rnorm(n, c2.tm1, sd = noise.level * 0.01 )
-    # c2 <- rnorm(n,  c2.tm1, sd = noise.level * 0.1 )
-    ######
-    c2.sin.vals <- getSinBySeasons(1:npds,  nseasons = 52,
-                                   freq= ifelse(is.na(season.frequency),1, season.frequency * 8),
-                                   noise.mean=0, noise.sd = 0, # add noise below
-                                   vert.scale =  runif(1, .01, .1)  )
-    .id <- ifelse(t<2, 1, t-1)
-    c2 <- rnorm(n, c2.sin.vals[.id], sd = noise.level * 0.1)
-    
-    # # ## COVARIATE SERIES 3
-    # ## OPTION A
-    # c3 <- rgamma(n, shape = log(t + 1) + .1, scale = noise.level * 0.1 )
-    # ## OPTION B - direct comparison with different correlations with y (outcome affects by b8, y(b8) )
-    # c3.tm1.drifted.mean <- rnorm(n, c3.tm1, sd = noise.level * 0.1 )
-    # c3 <- rnorm(n, -.001*(t/2), sd = noise.level * 0.1 )
-    c3 <- rnorm(n, c3.tm1, sd = noise.level )
-    # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
+    ##**MULTIVARIATE NORMAL CORRELATED RANDOM NOISE COVARIATES**
+    c1 <- rnorm(n, .5, noise.level * .5)
+    c2 <- rnorm(n, .5, noise.level * .5)
+    c3 <- rnorm(n, .5, noise.level * .5)
+    ## 
+    sig.mat <- matrix(c( 1,.3,.4,
+                         .3, 1,.2,
+                         .4,.2, 1), ncol=3, byrow = T)
+    mu.vec <- c(.4, .6, .5)
+    rmv.mat <- mvtnorm::rmvnorm(n, 
+                                mean = mu.vec, 
+                                sigma = sig.mat) 
+    # correlated random variables
+    Cmvt <- cbind(c1, c2, c3) %*% sig.mat
     
     ##-------------------------------------
     ## PERFORMANCE
@@ -546,9 +561,9 @@ runSimSingleIntervention <- function(
                season.val=season.val, 
                t=t, 
                u=u, 
-               c1=c1,
-               c2=c2, 
-               c3=c3,
+               c1=Cmvt[,1],
+               c2=Cmvt[,2], 
+               c3=Cmvt[,3],
                y.tm1=y.tm1,
                localLevel=localLevel
               )

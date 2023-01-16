@@ -241,8 +241,8 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 
 ##------------------- RUN BSTS; COMPARE vs. DID ---------------------
 ## MCMC Iterations
-bsts.niter.start <- 1e4 ## 5000
-bsts.niter.max   <- 1e4 ## 8e4
+bsts.niter.start <- 4e4 ## 5000
+bsts.niter.max   <- 4e4 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 
 ## RUN BSTS and compare to DID
