@@ -69,10 +69,6 @@ sim.config <- list(
   w1 = 0.027, ## linear
   w2 = -.0032 / sqrt(npds), ## quadratic
   w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
-  ## focal parameters of outcome function (manipulated in sensitivity analysis)
-  b4 = 1.0,   ## seasonal component weight
-  b5 = 0.04,  ## yearly growth rate
-  b9 = 0,     ## autocorrelation
   ##
   expect.mod.size = 3  # number of covariates included in BSTS model of counterfactual
 )
@@ -87,167 +83,216 @@ simlist[[ key ]] <- sim.config
 ## Simulation ID
 sim.id <- round(10*as.numeric(Sys.time()))
 
-##-------------------------------------------------------
-### CREATING ILLUSTRATION SIMULATION IF NONE EXISTS
-data.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_df.csv')
-if ( ! file.exists(data.filepath) ) {
-  cat(sprintf('Illustration data file 1 not found in project dir:\n %s.\n Simulating new illustration data set.\n',dir_proj))
-  ## RUN SIMULATION -  GENERATE TIME SERIES
-  simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-                                 sim.id = sim.id, plot.show = F, plot.save = F,     
-                                 dgp.prior.sd.weight=.01)
-  # ## Save simulation for reuse with multiple BSTS models
-  # simcopy <- simlist[[key]]
-  ## SAVE SIMULATED DATAFRAME TO FILE
-  simdf <- simlist[[key]]$sim$df
-  cols.to.front <- c('t','actor','y','x1','x2','x3','c1','c2','c3','b1','b2','b3','u','v','season.val')
-  cols.to.back <- c('effect.type','t.post.intpd','group','group.color','match_id','match_pd')
-  simdf <- simdf[, c(cols.to.front, cols.to.back)]
-  write.csv(simdf, file=data.filepath, row.names=F, na='')
-  cat(sprintf('Saved simulated data to file:\n %s',data.filepath))
-} else {
-  cat(sprintf('Loading data file:\n %s',data.filepath))
+
+
+
+
+###
+## Function to simulate time series data or load saved simulation data
+###
+processSimData <- function(simlist, key, effect.types, 
+                           dgp.prior.sd.weight, sim.id=NA)
+{
+  
+      ##-------------------------------------------------------
+    ### CREATING ILLUSTRATION SIMULATION IF NONE EXISTS
+    data.filepath <- file.path(dir_proj, sprintf('__bsts_vignette_1_sim-priorSd%s_df.csv',
+                                                 dgp.prior.sd.weight))
+    if ( ! file.exists(data.filepath) ) {
+      cat(sprintf('\nIllustration data file 1 not found in project dir:\n %s.\n Simulating new illustration data set.\n',dir_proj))
+      ## RUN SIMULATION -  GENERATE TIME SERIES
+      simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+                                     sim.id = sim.id, plot.show = F, plot.save = F,     
+                                     dgp.prior.sd.weight=dgp.prior.sd.weight)
+      # ## Save simulation for reuse with multiple BSTS models
+      # simcopy <- simlist[[key]]
+      ## SAVE SIMULATED DATAFRAME TO FILE
+      simdf <- simlist[[key]]$sim$df
+      cols.to.front <- c('t','actor','y','x1','x2','x3','c1','c2','c3','b1','b2','b3','u','v','season.val')
+      cols.to.back <- c('effect.type','t.post.intpd','group','group.color','match_id','match_pd')
+      simdf <- simdf[, c(cols.to.front, cols.to.back)]
+      write.csv(simdf, file=data.filepath, row.names=F, na='')
+      cat(sprintf('Saved simulated data to file:\n %s',data.filepath))
+    } else {
+      cat(sprintf('Loading data file:\n %s',data.filepath))
+    }
+    
+    ##--------------------------- INITS ----------------------
+    bsts.df <- NULL
+    bsts.df1 <- NULL
+    bsts.df2 <- NULL
+    cov.df.wide1 <- NULL
+    cov.df.wide2 <- NULL
+    ##--------------------------------------------------------
+    ### SUMMARIZE BSTS (single-observation) SERIES - WITH DIFFERENT COVARIATE PREDICTORS
+    bsts.df1.filepath <- file.path(dir_proj,
+                                   sprintf('__bsts_vignette_1_sim-priorSd%s_agg_bsts_df1-NOctrl.csv',
+                                   dgp.prior.sd.weight))
+    bsts.df2.filepath <- file.path(dir_proj,
+                                   sprintf('__bsts_vignette_1_sim-priorSd%s_agg_bsts_df2-ONEctrl.csv',
+                                   dgp.prior.sd.weight))
+    # bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
+    f1exists <- file.exists(bsts.df1.filepath) 
+    f2exists <- file.exists(bsts.df2.filepath) 
+    # f3exists <- file.exists(bsts.df3.filepath) 
+    if ( file.exists(data.filepath) & any(!f1exists, !f2exists)) {  # !f3exists
+      
+      simdf <- read.csv(data.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+      simdf <- as_tibble(simdf)
+      
+      ## TREATMENT
+      bsts.df <- simdf %>%
+        dplyr::filter( 
+          ! is.na(match_id), 
+          group=='treatment'
+        ) %>%
+        group_by(t) %>%
+        summarize(
+          y_treatment = mean(y, na.rm=T)
+        ) 
+      
+      ## NO UNTREATED CONTROL GROUP - ONLY COVARIATES
+      if (!f1exists) {
+          cat(sprintf('\nIllustration data file 2 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
+        cov.df.wide1 <- simdf %>%
+          dplyr::filter( 
+            ! is.na(match_id), 
+            group=='control'
+          ) %>%
+          group_by(t) %>%
+          dplyr::summarize(
+            c1_mean = mean(c1, na.rm=T),
+            c2_mean = mean(c2, na.rm=T),
+            c3_mean = mean(c3, na.rm=T),
+            c1_sd = sd(c1, na.rm=T),
+            c2_sd = sd(c2, na.rm=T),
+            c3_sd = sd(c3, na.rm=T),
+            c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+            c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+            c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+          ) #%>% pivot_wider(names_from, values_from)
+        bsts.df1 <- bsts.df %>% full_join(cov.df.wide1, by='t')
+        bsts.df1$t <- NULL
+        write.csv(bsts.df1, file=bsts.df1.filepath, row.names = F, na = '')
+        cat(sprintf('Saved aggregated simulation data to file:\n %s',bsts.df1.filepath))
+      } else {
+          cat(sprintf('Loading data file:\n %s',bsts.df1.filepath))
+          cov.df.wide1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F)
+      }
+      
+      ## 1 UNTREATED CONTROL GROUP  +  COVARIATES
+      if (!f2exists) {
+          cat(sprintf('\nIllustration data file 3 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
+        cov.df.wide2 <- simdf %>%
+          dplyr::filter( 
+            ! is.na(match_id), 
+            group=='control'
+          ) %>%
+          group_by(t) %>%
+          dplyr::summarize(
+            y_control = mean(y, na.rm=T),
+            c1_mean = mean(c1, na.rm=T),
+            c2_mean = mean(c2, na.rm=T),
+            c3_mean = mean(c3, na.rm=T),
+            c1_sd = sd(c1, na.rm=T),
+            c2_sd = sd(c2, na.rm=T),
+            c3_sd = sd(c3, na.rm=T),
+            c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+            c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+            c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+          ) #%>% pivot_wider(names_from, values_from)
+          bsts.df2 <- bsts.df %>% full_join(cov.df.wide2, by='t')
+          bsts.df2$t <- NULL
+          write.csv(bsts.df2, file=bsts.df2.filepath, row.names = F, na = '')
+          cat(sprintf('Saved aggregated simulation data to file:\n %s\n',bsts.df2.filepath))
+      } else {
+          cat(sprintf('Loading data file:\n %s\n',bsts.df2.filepath))
+          cov.df.wide2 <- read.csv(bsts.df2.filepath, stringsAsFactors = F)
+      }
+      
+   
+      
+    }
+    
+    return(list(
+      bsts.df1.filepath=bsts.df1.filepath,
+      bsts.df2.filepath=bsts.df2.filepath,
+      bsts.df1=bsts.df1,
+      bsts.df2=bsts.df2
+    ))
+      
 }
 
-##--------------------------------------------------------
-### SUMMARIZE BSTS (single-observation) SERIES - WITH DIFFERENT COVARIATE PREDICTORS
-bsts.df1.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_agg_bsts_df1-NOctrl.csv')
-bsts.df2.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_agg_bsts_df2-ONEctrl.csv')
-# bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
-f1exists <- file.exists(bsts.df1.filepath) 
-f2exists <- file.exists(bsts.df2.filepath) 
-# f3exists <- file.exists(bsts.df3.filepath) 
-if ( file.exists(data.filepath) & any(!f1exists, !f2exists)) {  # !f3exists
-  
-  simdf <- read.csv(data.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
-  simdf <- as_tibble(simdf)
-  
-  ## TREATMENT
-  bsts.df <- simdf %>%
-    dplyr::filter( 
-      ! is.na(match_id), 
-      group=='treatment'
-    ) %>%
-    group_by(t) %>%
-    summarize(
-      y_treatment = mean(y, na.rm=T)
-    ) 
-  
-  ## NO UNTREATED CONTROL GROUP - ONLY COVARIATES
-  if (!f1exists) {
-      cat(sprintf('Illustration data file 2 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
-    cov.df.wide1 <- simdf %>%
-      dplyr::filter( 
-        ! is.na(match_id), 
-        group=='control'
-      ) %>%
-      group_by(t) %>%
-      dplyr::summarize(
-        c1_mean = mean(c1, na.rm=T),
-        c2_mean = mean(c2, na.rm=T),
-        c3_mean = mean(c3, na.rm=T),
-        c1_sd = sd(c1, na.rm=T),
-        c2_sd = sd(c2, na.rm=T),
-        c3_sd = sd(c3, na.rm=T),
-        c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
-        c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
-        c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
-      ) #%>% pivot_wider(names_from, values_from)
-    bsts.df1 <- bsts.df %>% full_join(cov.df.wide1, by='t')
-    bsts.df1$t <- NULL
-    write.csv(bsts.df1, file=bsts.df1.filepath, row.names = F, na = '')
-    cat(sprintf('Saved aggregated simulation data to file:\n %s',bsts.df1.filepath))
-  } else {
-      cat(sprintf('Loading data file:\n %s',bsts.df1.filepath))
-      cov.df.wide1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F)
-  }
-  
-  ## 1 UNTREATED CONTROL GROUP  +  COVARIATES
-  if (!f2exists) {
-      cat(sprintf('Illustration data file 3 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
-    cov.df.wide2 <- simdf %>%
-      dplyr::filter( 
-        ! is.na(match_id), 
-        group=='control'
-      ) %>%
-      group_by(t) %>%
-      dplyr::summarize(
-        y_control = mean(y, na.rm=T),
-        c1_mean = mean(c1, na.rm=T),
-        c2_mean = mean(c2, na.rm=T),
-        c3_mean = mean(c3, na.rm=T),
-        c1_sd = sd(c1, na.rm=T),
-        c2_sd = sd(c2, na.rm=T),
-        c3_sd = sd(c3, na.rm=T),
-        c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
-        c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
-        c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
-      ) #%>% pivot_wider(names_from, values_from)
-      bsts.df2 <- bsts.df %>% full_join(cov.df.wide2, by='t')
-      bsts.df2$t <- NULL
-      write.csv(bsts.df2, file=bsts.df2.filepath, row.names = F, na = '')
-      cat(sprintf('Saved aggregated simulation data to file:\n %s\n',bsts.df2.filepath))
-  } else {
-      cat(sprintf('Loading data file:\n %s\n',bsts.df2.filepath))
-      cov.df.wide2 <- read.csv(bsts.df2.filepath, stringsAsFactors = F)
-  }
-  
-  
-  # ## SYNETHIC CONTRL GROUPS FROM COVARIATES CATEGORIES MEAN OUTCOME SERIES
-  # if (!f3exists) {
-  #   ## c1 covariates categories
-  #   c1cats <- cut(simdf$c1, bsts.ctrl.cats)
-  #   simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
-  #   ## c2  covariate categories 
-  #   c2cats <- cut(simdf$c2, bsts.ctrl.cats)
-  #   simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
-  #   ##
-  #   c3cats <- cut(simdf$c3, bsts.ctrl.cats)
-  #   simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
-  #   ### SYNTHETIC CONTROL GROUPS
-  #   .cov.df <- simdf %>%
-  #     dplyr::filter( 
-  #       ! is.na(match_id), 
-  #       group=='control'
-  #     ) %>%
-  #     group_by(t, c3.f, c2.f, c1.f) %>%
-  #     dplyr::summarize( 
-  #       cov_mean = mean(y, na.rm=T)
-  #     )  
-  #   .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
-  #   .cov.df$c1.f <- NULL
-  #   .cov.df$c2.f <- NULL
-  #   .cov.df$c3.f <- NULL 
-  #   ### HANDLE SPARSE AND EMPTY SERIES (drop if too sparse, fill 'downup' if pct NAs < max.cov.missing)
-  #   cov.df.wide <- .cov.df %>% 
-  #     pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
-  #   max.cov.missing <- 0.7
-  #   cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
-  #      ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
-  #      ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
-  #   })
-  #   ## KEEP IF First or last row is not NA (for fill() below) 
-  #   cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
-  #   cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
-  #   ##
-  #   cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
-  #     ( sum(!is.na(x)) / length(x)  ) < 1
-  #   })
-  #   cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
-  #   cov.df.wide <- cov.df.wide %>% 
-  #     ungroup() %>% 
-  #     tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') 
-  #   ### FILL REMAINING NAs (after 'downup' fill) with zeros
-  #   cov.df.wide[is.na(cov.df.wide)] <- 0  
-  #   ##
-  #   bsts.df3 <- bsts.df %>% full_join(cov.df.wide, by='t')
-  #   bsts.df3$t <- NULL
-  #   write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
-  # }
-  
-}
+# ## SYNETHIC CONTRL GROUPS FROM COVARIATES CATEGORIES MEAN OUTCOME SERIES
+# if (!f3exists) {
+#   ## c1 covariates categories
+#   c1cats <- cut(simdf$c1, bsts.ctrl.cats)
+#   simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
+#   ## c2  covariate categories 
+#   c2cats <- cut(simdf$c2, bsts.ctrl.cats)
+#   simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
+#   ##
+#   c3cats <- cut(simdf$c3, bsts.ctrl.cats)
+#   simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
+#   ### SYNTHETIC CONTROL GROUPS
+#   .cov.df <- simdf %>%
+#     dplyr::filter( 
+#       ! is.na(match_id), 
+#       group=='control'
+#     ) %>%
+#     group_by(t, c3.f, c2.f, c1.f) %>%
+#     dplyr::summarize( 
+#       cov_mean = mean(y, na.rm=T)
+#     )  
+#   .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
+#   .cov.df$c1.f <- NULL
+#   .cov.df$c2.f <- NULL
+#   .cov.df$c3.f <- NULL 
+#   ### HANDLE SPARSE AND EMPTY SERIES (drop if too sparse, fill 'downup' if pct NAs < max.cov.missing)
+#   cov.df.wide <- .cov.df %>% 
+#     pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
+#   max.cov.missing <- 0.7
+#   cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
+#      ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
+#      ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
+#   })
+#   ## KEEP IF First or last row is not NA (for fill() below) 
+#   cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
+#   cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
+#   ##
+#   cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
+#     ( sum(!is.na(x)) / length(x)  ) < 1
+#   })
+#   cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
+#   cov.df.wide <- cov.df.wide %>% 
+#     ungroup() %>% 
+#     tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') 
+#   ### FILL REMAINING NAs (after 'downup' fill) with zeros
+#   cov.df.wide[is.na(cov.df.wide)] <- 0  
+#   ##
+#   bsts.df3 <- bsts.df %>% full_join(cov.df.wide, by='t')
+#   bsts.df3$t <- NULL
+#   write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
+# }
 
 ```
+
+First we simulate the data for the simulation scenario 1, in which 
+the prior SD is 0.01. 
+
+```{r}
+## SCENARIOS------------------
+## PRIOR SD WEIGHT
+dgp.prior.sd.weight.low <- .01
+## PRIOR SD WEIGHT
+dgp.prior.sd.weight.high <- .1
+##----------------------------
+## SIMULATE DATA AND RETURN DATA LIST OBJECT
+dat1 <- processSimData(simlist, key, effect.types, 
+                       dgp.prior.sd.weight.low, 
+                       sim.id)
+```
+
 
 
 ## 1. Fit Basic BSTS Model
@@ -269,10 +314,10 @@ library(bsts)
 library(CausalImpact)
 library(tibble)
 ###***********
-# line for calling data?    LOAD SIMULATED TABLE?   OR CCONMA DATA ?
-## y.pre
-## 
-df1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+## LOAD FROM FILE
+df1 <- read.csv(dat1$bsts.df1.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+# ## OR USE CACHED DATA OBJECT IF JUST CREATED
+# df1 <- dat1$bsts.df1
 df1 <- as_tibble(df1)
 print(df1)
 ```
@@ -295,10 +340,11 @@ BSTS model is trained on the pre-intervention outcome (y) data.
 # post.ids.NA <- (1:npds) > intpd
 # y.pre[post.ids.NA] <- NA
 
-
+## INDICES OF PRE-INTERVENTION and POST-INTERVENTION WINDOWS
 pre.idx <- 1:intpd
 post.idx <- (intpd+1):npds
 
+## Outcome (response) series
 y <- df1$y_treatment
 
 ## Train on y pre-treatment but NA's post-treatment
@@ -414,21 +460,32 @@ bsts.fit2 <- bsts(y.pre.treat.NAs.post ~ . ,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 
-summary(bsts.fit2)
-plot(bsts.fit2)
-plot(bsts.fit2, 'components')
-plot(bsts.fit2, 'coefficients')
-qqdist(bsts.fit2$one.step.prediction.errors)
-AcfDist(bsts.fit2$one.step.prediction.errors)
-checks2 <- bstsPostPredChecks(bsts.fit2, save.plot = F, return.val = T)
-cat(checks2$summary)
 
+###
+## Define a funciton to call all of our plotting, 
+##    diagnostics and converngence checks functions
+###
+getBstsDiagnosticSummary <- function(bsts.fit) {
+  # print(bsts.fit)
+  checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+  cat(checks$summary)
+  plot(bsts.fit)
+  plot(bsts.fit, 'components')
+  plot(bsts.fit, 'coefficients')
+  qqdist(bsts.fit$one.step.prediction.errors)
+  AcfDist(bsts.fit$one.step.prediction.errors)
+}
+
+## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+getBstsDiagnosticSummary(bsts.fit2)
 ```
 
 ## Compare different state space trends
 
 
-Local Linear trend 
+### Local Linear trend 
+
+The local linear trend is useful for short term predictions of se
 ```{r}
 ## Initiate empty state space configuration list
 st.sp3 <- list()
@@ -464,14 +521,8 @@ bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 
-summary(bsts.fit3)
-plot(bsts.fit3)
-plot(bsts.fit3, 'components')
-plot(bsts.fit3, 'coefficients')
-qqdist(bsts.fit3$one.step.prediction.errors)
-AcfDist(bsts.fit3$one.step.prediction.errors)
-checks3 <- bstsPostPredChecks(bsts.fit3, save.plot = F, return.val = T)
-cat(checks3$summary)
+## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+getBstsDiagnosticSummary(bsts.fit3)
 ```
 
 
@@ -480,7 +531,8 @@ cat(checks3$summary)
 
 
 
-Semilocal Linear trend 
+### Semilocal Linear trend 
+
 Useful for longer-term forecasts (linear trend persists longer, 
 tighter prediction bounds over longer post-intervention window)
 ```{r}
@@ -525,53 +577,318 @@ bsts.fit4 <- bsts(y.pre.treat.NAs.post ~ . ,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 
-summary(bsts.fit4)
-plot(bsts.fit4)
-plot(bsts.fit4, 'components')
-plot(bsts.fit4, 'coefficients')
-qqdist(bsts.fit4$one.step.prediction.errors)
-AcfDist(bsts.fit4$one.step.prediction.errors)
-checks4 <- bstsPostPredChecks(bsts.fit4, save.plot = F, return.val = T)
-cat(checks4$summary)
+## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+getBstsDiagnosticSummary(bsts.fit4)
 ```
 
 
 
 
 ```{r}
-CompareBstsModels(list(level=bsts.fit, 
-                       seasonal=bsts.fit2, 
-                       localLinearTrend=bsts.fit3,
-                       SemilocalLinearTrend=bsts.fit4
-                       ))
-```
-
-
-
-
-```{r 2_season, message=FALSE, include=FALSE}
-key <- '2_season'
-simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
-simlist[[key]]$bsts.state.specs <- list(
-  list(
-    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low'),
-    getStateSpaceConfBySimScenario('AddSeasonal', 'sd.low')
-  )
+reslist <- list()
+## SD LOW SCENARIO KEY
+scenario_key1 <- 'sdlow'
+reslist[[scenario_key1]] <- list(
+  level=bsts.fit, 
+  seasonal=bsts.fit2, 
+  localLinearTrend=bsts.fit3,
+  SemilocalLinearTrend=bsts.fit4
 )
-## RUN BSTS and compare to DID
-keyid <- which(names(simlist) == key)
-simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
-                               effect.types = effect.types,
-                               sim.id = sim.id,
-                               save.items.dir= dir_ext,
-                               bsts.niter = bsts.niters$sm.max, ## **START at MAX niter for large npds **
-                               bsts.max.iter= bsts.niters$sm.max,
-                               plot.show = F, plot.save=F, verbose=F,
-                               save.sim.rds=F) 
-##
-bsts.model <- getBstsModelFromSimlist(simlist, key)
-plotBstsStateComps(bsts.model, intpd)
+## Compare BSTS models' cumulative one-step ahead prediciton error
+CompareBstsModels(reslist.sdlow)
 ```
+
+
+## Scenario 2: High prior SD
+
+Repeat the above analyses with data simulated using a larger prior SD
+
+```{r}
+## SIMULATE DATA AND RETURN DATA LIST OBJECT
+dat2 <- processSimData(simlist, key, effect.types, 
+                       dgp.prior.sd.weight.high, 
+                       sim.id = sim.id)
+```
+```{r}
+df2 <- read.csv(dat2$bsts.df1.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
+df2 <- as_tibble(df2)
+print(df2)
+```
+
+
+```{r}
+
+##
+##  Define a function to run all the analyses we just introduced above for
+##   new data from a different scenario and including additional covariates 
+##   (control series)
+##
+runSimulationScenarioBstsModelComparison <- function(df)
+{
+    ## Outcome (response) series
+    y <- df$y_treatment
+    ## Train on y pre-treatment but NA's post-treatment
+    y.pre.treat.NAs.post <- c( y[pre.idx], rep(NA,length(post.idx)) )
+    ## Then use the post-treatment response for causal impact estimation
+    post.period.response <- y[post.idx]
+    ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
+    predictors <- df[, ! names(df) %in% 'y_treatment'] ## remove response; convert to matrix
+    # ## Covariates (predictors) - Dataframe for "data" argument
+    # predictors <- as.matrix(predictors) 
+          
+    ## Initiate empty state space configuration list
+    st.sp <- list()
+    ## Add local level to trend component of state space
+    st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post, 
+                           initial.state.prior = NormalPrior(mu=0, sigma = .01))
+    
+    ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+    ## component (all covariates in df[,-1] dataframe)
+    bsts.fit <- bsts(y.pre.treat.NAs.post ~ . ,
+                     state.specification = st.sp,
+                     data = predictors,  ## -1 excludes the outcome in 1st column 
+                     niter = bsts.niter)
+    				 
+    summary(bsts.fit)
+    plot(bsts.fit)
+    plot(bsts.fit, 'components')
+    plot(bsts.fit, 'coefficients')
+    
+    qqdist(bsts.fit$one.step.prediction.errors)
+    AcfDist(bsts.fit$one.step.prediction.errors)
+    
+    checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+    cat(checks$summary)
+    
+    ## Causal impact estimation: fitted BSTS model forecasts the counterfactual
+    impact.amount <- CausalImpact(bsts.model = bsts.fit,
+                                  post.period.response = post.period.response,
+                                  alpha=0.05, model.args=list(niter = bsts.niter))
+    							  
+    summary(impact.amount)
+    plot(impact.amount)
+    
+    
+    
+    
+    
+    ##------------------------------------------------------------
+    ## 2. Add Seasonality
+    
+    ## Initiate empty state space configuration list
+    st.sp2 <- list()
+    ## Add local level to trend component of state space
+    st.sp2 <- AddLocalLevel(st.sp2, y.pre.treat.NAs.post, 
+                           initial.state.prior = NormalPrior(mu=0, sigma = .01))
+    ## Add trigonometric seasonality to state space
+    st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post, 
+                         nseasons = 12, season.duration = 1)
+    
+    
+    ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+    ## component (all covariates in df[,-1] dataframe)
+    bsts.fit2 <- bsts(y.pre.treat.NAs.post ~ . ,
+                     state.specification = st.sp2,
+                     data = predictors,  ## -1 excludes the outcome in 1st column 
+                     niter = bsts.niter)
+    
+    
+    ###
+    ## Define a funciton to call all of our plotting, 
+    ##    diagnostics and converngence checks functions
+    ###
+    getBstsDiagnosticSummary <- function(bsts.fit) {
+      # print(bsts.fit)
+      checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+      cat(checks$summary)
+      plot(bsts.fit)
+      plot(bsts.fit, 'components')
+      plot(bsts.fit, 'coefficients')
+      qqdist(bsts.fit$one.step.prediction.errors)
+      AcfDist(bsts.fit$one.step.prediction.errors)
+    }
+    
+    ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+    getBstsDiagnosticSummary(bsts.fit2)
+    
+    
+    
+    ##---------------------------------------------------------------------------
+    ## Compare different state space trends
+    
+    
+    ###---------------------------------------------------------
+    ### 3. Local Linear trend 
+    
+    
+    
+    ## Initiate empty state space configuration list
+    st.sp3 <- list()
+    ## Add local level to trend component of state space
+    st.sp3 <- AddLocalLinearTrend(st.sp3, y.pre.treat.NAs.post, 
+      level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01), 
+      slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01), 
+      initial.level.prior=NormalPrior(mu=0, sigma=.01, initial.value=.01), 
+      initial.slope.prior=NormalPrior(mu=0, sigma=.01, initial.value=.01)
+    )
+    ## Add trigonometric seasonality to state space
+    st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
+      nseasons = 12, 
+      season.duration = 1, 
+      sigma.prior = SdPrior(
+        sigma.guess = 0.01,    ## guess
+        sample.size = 2,    ## default
+        initial.value= 0.01,    ## defaults to sigma.guess
+        upper.limit= 1.5 * sd(y, na.rm = T)
+      ), 
+      initial.state.prior = NormalPrior(
+        mu= 0,   ##guess
+        sigma=0.01,  ## guess
+        initial.value=0  ## default to mu
+      )
+    )
+    
+    
+    ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+    ## component (all covariates in df[,-1] dataframe)
+    bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
+                     state.specification = st.sp3,
+                     data = predictors,  ## -1 excludes the outcome in 1st column 
+                     niter = bsts.niter)
+    
+    ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+    getBstsDiagnosticSummary(bsts.fit3)
+    
+    
+    
+    ###-----------------------------------------------------
+  
+    ### 2. Semilocal Linear trend 
+    
+    
+    ## Initiate empty state space configuration list
+    st.sp4 <- list()
+    ## Add local level to trend component of state space
+    st.sp4 <- AddSemilocalLinearTrend(st.sp4, y.pre.treat.NAs.post, 
+      level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
+      slope.mean.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0), 
+      slope.ar1.prior=Ar1CoefficientPrior(mu = 0, 
+                                          sigma = .01, 
+                                          force.stationary = FALSE, 
+                                          force.positive = FALSE, 
+                                          initial.value = 0
+                                          ),
+      slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
+      initial.level.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0),
+      initial.slope.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0)
+    )
+    ## Add trigonometric seasonality to state space
+    st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post, 
+      nseasons = 12, 
+      season.duration = 1, 
+      sigma.prior = SdPrior(
+        sigma.guess = 0.01,    ## guess
+        sample.size = 2,    ## default
+        initial.value= 0.01,    ## defaults to sigma.guess
+        upper.limit= 1.5 * sd(y, na.rm = T)
+      ), 
+      initial.state.prior = NormalPrior(
+        mu= 0,   ##guess
+        sigma=0.01,  ## guess
+        initial.value=0  ## default to mu
+      )
+    )
+    
+    
+    ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+    ## component (all covariates in df[,-1] dataframe)
+    bsts.fit4 <- bsts(y.pre.treat.NAs.post ~ . ,
+                     state.specification = st.sp4,
+                     data = predictors,  ## -1 excludes the outcome in 1st column 
+                     niter = bsts.niter)
+    
+    ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+    getBstsDiagnosticSummary(bsts.fit4)
+    
+    
+    ##-------------------------------------
+    reslist <- list(
+      level=bsts.fit, 
+      seasonal=bsts.fit2, 
+      localLinearTrend=bsts.fit3,
+      SemilocalLinearTrend=bsts.fit4
+    )
+    
+    CompareBstsModels(reslist)
+    
+    return(reslist)
+}
+
+
+## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
+res.sdhigh <- runSimulationScenarioBstsModelComparison(df2)
+
+```
+
+
+
+
+
+## Including a Control Group Series (in addition to other covariate series)
+
+```{r}
+## SD LOW - WITH CONTROL GROUP
+df12 <- read.csv(dat1$bsts.df2.filepath, stringsAsFactors = F)
+## SD HIGH - WITH CONTROL GROUP
+df22 <- read.csv(dat2$bsts.df2.filepath, stringsAsFactors = F)
+```
+
+
+
+## df12
+
+```{r res.ctrl.sdlow}
+
+## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
+res.ctrl.sdlow <- runSimulationScenarioBstsModelComparison(df12)
+```
+
+
+
+
+## df22
+
+
+
+```{r res.ctrl.sdhigh}
+
+## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
+res.ctrl.sdhigh <- runSimulationScenarioBstsModelComparison(df22)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## 3. Check MCMC Convergence and Diagnostics 

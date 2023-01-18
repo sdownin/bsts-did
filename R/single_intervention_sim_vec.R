@@ -367,6 +367,8 @@ runSimSingleIntervention <- function(
     ## FULL SEASONALITY COMPONENT IS INCLUDED IN OUTCOME ( b5 := 1 )
     ## cov_season (seasonality = sinusoid with 52 pds, 1 frequency)
     b4.tm1 <- if (t==1) { 1 } else { mean(df$b4[idx.tm1], na.rm=T) }
+    ## LOCAL LEVEL ---------------------------
+    b5.tm1 <- if (t==1) { 1 } else { mean(df$b5[idx.tm1], na.rm=T) }
     ## OTHER COVARIATES ----------------------
     ## c1  
     b6.tm1 <- if (t==1) { 1 } else { mean(df$b6[idx.tm1], na.rm=T) }
@@ -487,8 +489,8 @@ runSimSingleIntervention <- function(
     }
     
     ## Weight of local level
-    b5 <- 1 ## default to unit weight of the local level (see Brodersen et al 2015)
-    # b5 <- rnorm(1, b6.tm1, sd = noise.level * dgp.prior.sd.weight)
+    # b5 <- 1 ## default to unit weight of the local level (see Brodersen et al 2015)
+    b5 <- rnorm(1, b5.tm1, sd = noise.level * dgp.prior.sd.weight)
     ## Weight of covariates: Dynamic covariate betas (see Brodersen et al 2015)
     b6 <- rnorm(1, b6.tm1, sd = noise.level * dgp.prior.sd.weight)
     b7 <- rnorm(1, b7.tm1, sd = noise.level * dgp.prior.sd.weight)
@@ -497,11 +499,11 @@ runSimSingleIntervention <- function(
     
     ## --------------- Covariates -------------------------
     ## INITIAL VALUES OF COVARIATES
-    c1.tm1 <- if (t==1) { rep(.1, n) } else { df$c1[idx.tm1] }
+    c1.tm1 <- if (t==1) { rep(0, n) } else { df$c1[idx.tm1] }
     ## START HIGHER = 10
-    c2.tm1 <- if (t==1) { rep(.1, n) } else { df$c2[idx.tm1] }
+    c2.tm1 <- if (t==1) { rep(0, n) } else { df$c2[idx.tm1] }
     ## 
-    c3.tm1 <- if (t==1) { rep(.1, n) } else { df$c3[idx.tm1] }
+    c3.tm1 <- if (t==1) { rep(0, n) } else { df$c3[idx.tm1] }
     
     # ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # # c1 <- rpois(n, lambda = noise.level*0.8) + 1
@@ -539,10 +541,10 @@ runSimSingleIntervention <- function(
     c2 <- rnorm(n, .02 * t, noise.level * 1.5)
     c3 <- rnorm(n, -.01 * t, noise.level * .5)
     ## 
-    sig.mat <- matrix( c( 1,.3,.1,
-                         .3, 1,.2,
+    sig.mat <- matrix( c( 1,.15,.1,
+                         .15, 1,.2,
                          .1,.2, 1), ncol=3, byrow = T)
-    mu.vec <- c(.1, .2, .15)
+    mu.vec <- c(.1, .15, .05)
     rmv.mat <- mvtnorm::rmvnorm(n, 
                                 mean = mu.vec, 
                                 sigma = sig.mat) 
