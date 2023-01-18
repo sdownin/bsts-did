@@ -44,10 +44,10 @@ knitr::opts_knit$set(root.dir = dir_proj)
 ## MAIN SIM SETTINGS
 n <- 100  ## number of actors (i.e., number of time series)
 npds <- 520
-intpd <- round( npds * (5/6) )
+intpd <- round( npds * .6 )
 effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
 bsts.niters <- list(sm.start = 50, sm.max = 100, lg.start = 500, lg.max = 1000)  ## lg=10k for full run
-bsts.ctrl.cats <- 4
+bsts.ctrl.cats <- NA
 
 ##
 sim.config <- list(
@@ -55,7 +55,7 @@ sim.config <- list(
   n = n,    ## Number of firms
   npds = npds,  ## Number of periods
   intpd = intpd, ## #intervention period = (5/6)'ths of the total periods 
-  noise.level = 1.3, ## stdev of simulated noise terms
+  noise.level = 1.0, ## stdev of simulated noise terms
   prior.sd.scenario = 'sd.low', ## BSTS Prior SD scenario (high vs. low uncertainty in priors
   treat.rule = 'random', 
   treat.prob =  0.5,  ## ifelse(treat.rule=='random', 0.5, 1), 
@@ -65,16 +65,16 @@ sim.config <- list(
   dgp.freq=  1, ##ifelse(seasonality, dgp.freq, NA),
   rand.seed = 13579,
   ## Dynamic treatment effect  (quadratic polynomial)
-  w0 = 1.5,  ## constant
-  w1 = 0.13, ## linear
-  w2 = -.05 / sqrt(npds), ## quadratic
+  w0 = 1.0,  ## constant
+  w1 = 0.027, ## linear
+  w2 = -.0032 / sqrt(npds), ## quadratic
   w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
   ## focal parameters of outcome function (manipulated in sensitivity analysis)
   b4 = 1.0,   ## seasonal component weight
   b5 = 0.04,  ## yearly growth rate
   b9 = 0,     ## autocorrelation
   ##
-  expect.mod.size = 1  # number of covariates included in BSTS model of counterfactual
+  expect.mod.size = 3  # number of covariates included in BSTS model of counterfactual
 )
 
 ## SIMULATION LIST HOLDER
@@ -89,12 +89,13 @@ sim.id <- round(10*as.numeric(Sys.time()))
 
 ##-------------------------------------------------------
 ### CREATING ILLUSTRATION SIMULATION IF NONE EXISTS
-data.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_sim_dataframe.csv')
+data.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_df.csv')
 if ( ! file.exists(data.filepath) ) {
-  cat(sprintf('Illustration data file not found in project dir:\n %s.\nSimulating new illustration data set.',dir_proj))
+  cat(sprintf('Illustration data file 1 not found in project dir:\n %s.\n Simulating new illustration data set.\n',dir_proj))
   ## RUN SIMULATION -  GENERATE TIME SERIES
   simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
-                                 sim.id = sim.id, plot.show = F, plot.save = F )
+                                 sim.id = sim.id, plot.show = F, plot.save = F,     
+                                 dgp.prior.sd.weight=.01)
   # ## Save simulation for reuse with multiple BSTS models
   # simcopy <- simlist[[key]]
   ## SAVE SIMULATED DATAFRAME TO FILE
@@ -103,17 +104,20 @@ if ( ! file.exists(data.filepath) ) {
   cols.to.back <- c('effect.type','t.post.intpd','group','group.color','match_id','match_pd')
   simdf <- simdf[, c(cols.to.front, cols.to.back)]
   write.csv(simdf, file=data.filepath, row.names=F, na='')
+  cat(sprintf('Saved simulated data to file:\n %s',data.filepath))
+} else {
+  cat(sprintf('Loading data file:\n %s',data.filepath))
 }
 
 ##--------------------------------------------------------
 ### SUMMARIZE BSTS (single-observation) SERIES - WITH DIFFERENT COVARIATE PREDICTORS
-bsts.df1.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-1-NOctrl_df.csv')
-bsts.df2.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-2-ONEctrl_df.csv')
-bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
+bsts.df1.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_agg_bsts_df1-NOctrl.csv')
+bsts.df2.filepath <- file.path(dir_proj, '__bsts_vignette_illustra_sim_agg_bsts_df2-ONEctrl.csv')
+# bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
 f1exists <- file.exists(bsts.df1.filepath) 
 f2exists <- file.exists(bsts.df2.filepath) 
-f3exists <- file.exists(bsts.df3.filepath) 
-if ( file.exists(data.filepath) & any(!f1exists, !f2exists, !f3exists)) {
+# f3exists <- file.exists(bsts.df3.filepath) 
+if ( file.exists(data.filepath) & any(!f1exists, !f2exists)) {  # !f3exists
   
   simdf <- read.csv(data.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
   simdf <- as.tibble(simdf)
@@ -131,7 +135,8 @@ if ( file.exists(data.filepath) & any(!f1exists, !f2exists, !f3exists)) {
   
   ## NO UNTREATED CONTROL GROUP - ONLY COVARIATES
   if (!f1exists) {
-    cov.df.wide <- simdf %>%
+      cat(sprintf('Illustration data file 2 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
+    cov.df.wide1 <- simdf %>%
       dplyr::filter( 
         ! is.na(match_id), 
         group=='control'
@@ -148,14 +153,19 @@ if ( file.exists(data.filepath) & any(!f1exists, !f2exists, !f3exists)) {
         c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
         c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
       ) #%>% pivot_wider(names_from, values_from)
-    bsts.df1 <- bsts.df %>% full_join(cov.df.wide, by='t')
+    bsts.df1 <- bsts.df %>% full_join(cov.df.wide1, by='t')
     bsts.df1$t <- NULL
     write.csv(bsts.df1, file=bsts.df1.filepath, row.names = F, na = '')
+    cat(sprintf('Saved aggregated simulation data to file:\n %s',bsts.df1.filepath))
+  } else {
+      cat(sprintf('Loading data file:\n %s',bsts.df1.filepath))
+      cov.df.wide1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F)
   }
   
   ## 1 UNTREATED CONTROL GROUP  +  COVARIATES
   if (!f2exists) {
-    cov.df.wide <- simdf %>%
+      cat(sprintf('Illustration data file 3 not found in project dir:\n %s.\n Aggregating new illustration data set.\n',dir_proj))
+    cov.df.wide2 <- simdf %>%
       dplyr::filter( 
         ! is.na(match_id), 
         group=='control'
@@ -173,62 +183,67 @@ if ( file.exists(data.filepath) & any(!f1exists, !f2exists, !f3exists)) {
         c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
         c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
       ) #%>% pivot_wider(names_from, values_from)
-      bsts.df2 <- bsts.df %>% full_join(cov.df.wide, by='t')
+      bsts.df2 <- bsts.df %>% full_join(cov.df.wide2, by='t')
       bsts.df2$t <- NULL
       write.csv(bsts.df2, file=bsts.df2.filepath, row.names = F, na = '')
+      cat(sprintf('Saved aggregated simulation data to file:\n %s\n',bsts.df2.filepath))
+  } else {
+      cat(sprintf('Loading data file:\n %s\n',bsts.df2.filepath))
+      cov.df.wide2 <- read.csv(bsts.df2.filepath, stringsAsFactors = F)
   }
   
-  ## SYNETHIC CONTRL GROUPS FROM COVARIATES CATEGORIES MEAN OUTCOME SERIES
-  if (!f3exists) {
-    ## c1 covariates categories
-    c1cats <- cut(simdf$c1, bsts.ctrl.cats)
-    simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
-    ## c2  covariate categories 
-    c2cats <- cut(simdf$c2, bsts.ctrl.cats)
-    simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
-    ##
-    c3cats <- cut(simdf$c3, bsts.ctrl.cats)
-    simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
-    ### SYNTHETIC CONTROL GROUPS
-    .cov.df <- simdf %>%
-      dplyr::filter( 
-        ! is.na(match_id), 
-        group=='control'
-      ) %>%
-      group_by(t, c3.f, c2.f, c1.f) %>%
-      dplyr::summarize( 
-        cov_mean = mean(y, na.rm=T)
-      )  
-    .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
-    .cov.df$c1.f <- NULL
-    .cov.df$c2.f <- NULL
-    .cov.df$c3.f <- NULL 
-    ### HANDLE SPARSE AND EMPTY SERIES (drop if too sparse, fill 'downup' if pct NAs < max.cov.missing)
-    cov.df.wide <- .cov.df %>% 
-      pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
-    max.cov.missing <- 0.7
-    cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
-       ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
-       ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
-    })
-    ## KEEP IF First or last row is not NA (for fill() below) 
-    cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
-    cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
-    ##
-    cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
-      ( sum(!is.na(x)) / length(x)  ) < 1
-    })
-    cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
-    cov.df.wide <- cov.df.wide %>% 
-      ungroup() %>% 
-      tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') 
-    ### FILL REMAINING NAs (after 'downup' fill) with zeros
-    cov.df.wide[is.na(cov.df.wide)] <- 0  
-    ##
-    bsts.df3 <- bsts.df %>% full_join(cov.df.wide, by='t')
-    bsts.df3$t <- NULL
-    write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
-  }
+  
+  # ## SYNETHIC CONTRL GROUPS FROM COVARIATES CATEGORIES MEAN OUTCOME SERIES
+  # if (!f3exists) {
+  #   ## c1 covariates categories
+  #   c1cats <- cut(simdf$c1, bsts.ctrl.cats)
+  #   simdf$c1.f <- LETTERS[as.integer(as.factor(c1cats))]
+  #   ## c2  covariate categories 
+  #   c2cats <- cut(simdf$c2, bsts.ctrl.cats)
+  #   simdf$c2.f <- LETTERS[as.integer(as.factor(c2cats))]
+  #   ##
+  #   c3cats <- cut(simdf$c3, bsts.ctrl.cats)
+  #   simdf$c3.f <- LETTERS[as.integer(as.factor(c3cats))]
+  #   ### SYNTHETIC CONTROL GROUPS
+  #   .cov.df <- simdf %>%
+  #     dplyr::filter( 
+  #       ! is.na(match_id), 
+  #       group=='control'
+  #     ) %>%
+  #     group_by(t, c3.f, c2.f, c1.f) %>%
+  #     dplyr::summarize( 
+  #       cov_mean = mean(y, na.rm=T)
+  #     )  
+  #   .cov.df$cov_cat.f <- apply(.cov.df[,c('c1.f','c2.f','c3.f')], 1, function(x)paste(x,collapse = ''))
+  #   .cov.df$c1.f <- NULL
+  #   .cov.df$c2.f <- NULL
+  #   .cov.df$c3.f <- NULL 
+  #   ### HANDLE SPARSE AND EMPTY SERIES (drop if too sparse, fill 'downup' if pct NAs < max.cov.missing)
+  #   cov.df.wide <- .cov.df %>% 
+  #     pivot_wider(names_from = cov_cat.f, values_from=c(cov_mean))
+  #   max.cov.missing <- 0.7
+  #   cov.cols.keep <- apply(cov.df.wide[,-1], 2, function(x){ 
+  #      ( ( sum(!is.na(x)) / length(x)  ) > max.cov.missing ) & ## have enough non-missing values
+  #      ( !is.na(x[1]) | !is.na(x[length(x)]) )    ## has either first or last row non-missing
+  #   })
+  #   ## KEEP IF First or last row is not NA (for fill() below) 
+  #   cov.cols.keep.names <- names(cov.df.wide[,-1])[cov.cols.keep]  ##exclude the 1st column 't'
+  #   cov.df.wide <- cov.df.wide %>% dplyr::select(all_of(c('t', cov.cols.keep.names)))
+  #   ##
+  #   cov.cols.need.fill.bool <- apply(cov.df.wide[,-1], 2, function(x){ 
+  #     ( sum(!is.na(x)) / length(x)  ) < 1
+  #   })
+  #   cov.cols.fill <- names(cov.df.wide)[ cov.cols.need.fill.bool ] 
+  #   cov.df.wide <- cov.df.wide %>% 
+  #     ungroup() %>% 
+  #     tidyr::fill(all_of(cov.cols.fill), .direction = 'downup') 
+  #   ### FILL REMAINING NAs (after 'downup' fill) with zeros
+  #   cov.df.wide[is.na(cov.df.wide)] <- 0  
+  #   ##
+  #   bsts.df3 <- bsts.df %>% full_join(cov.df.wide, by='t')
+  #   bsts.df3$t <- NULL
+  #   write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
+  # }
   
 }
 

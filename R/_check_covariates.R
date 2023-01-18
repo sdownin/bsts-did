@@ -141,11 +141,11 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 
 ##**DEBUG**
 st.sp.lists <- list(
-  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression')#,
+  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
   # `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression'),
   # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
-  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression')#,
-  # `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
+  `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
+  `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
 
@@ -232,7 +232,7 @@ for (d in 1:length(ns)) {
                   dgp.freq= ifelse(seasonality, dgp.freq, NA),
                   bsts.state.specs=bsts.state.specs,
                   # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
-                  rand.seed = 12345
+                  rand.seed = 321
                 )
                 
               # }  // end m list n.cov.cats (?)
@@ -263,7 +263,8 @@ sim.id <- round(10*as.numeric(Sys.time()))
 ## RUN SIMULATION -  SIMULATE TIME SERIES
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
-                               plot.show = F, plot.save = F )
+                               plot.show = F, plot.save = F,
+                               dgp.prior.sd.weight=.01)
 
 ##------------------- RUN BSTS; COMPARE vs. DID ---------------------
 ## `bsts.ctrl.cats` control group category definitions:
@@ -272,7 +273,7 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
 ##          num.groups = Cartesian product of all binned covariates, 
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
-bsts.ctrl.cats.list <- list(1)  #list(1, NA) ## NA=no control;
+bsts.ctrl.cats.list <- list(NA, 1)  #list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
 bsts.expect.mod.sizes <- list(3)  #list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations

@@ -281,6 +281,7 @@ runSimSingleIntervention <- function(
     plot.sq.h=9,
     plot.dpi=300,
     verbose=TRUE,
+    dgp.prior.sd.weight=.01,
     ...
   ) {
   
@@ -345,8 +346,8 @@ runSimSingleIntervention <- function(
       # cat(sprintf(' i = %s \n',i))
     
     ## noise terms
-    v <- rnorm(n=n,mean=0, sd=noise.level * 1 )  ##- .5 ##
-    u <- rnorm(n=n,mean=0, sd=noise.level * 1 ) ## 
+    v <- rnorm(n=n,mean=0, sd=noise.level )  ##- .5 ##
+    u <- rnorm(n=n,mean=0, sd=noise.level ) ## 
     
     ##----------  Past Period Variables---------------------
     ## indices of last period observations
@@ -365,14 +366,14 @@ runSimSingleIntervention <- function(
     ##   (same for all n; using mean( cov[t-1] ) should be same as selection first item [1])
     ## FULL SEASONALITY COMPONENT IS INCLUDED IN OUTCOME ( b5 := 1 )
     ## cov_season (seasonality = sinusoid with 52 pds, 1 frequency)
-    b5.tm1 <- if (t==1) { 1.0 } else { mean(df$b5[idx.tm1], na.rm=T) }
+    b4.tm1 <- if (t==1) { 1 } else { mean(df$b4[idx.tm1], na.rm=T) }
     ## OTHER COVARIATES ----------------------
     ## c1  
-    b6.tm1 <- if (t==1) { .5 } else { mean(df$b6[idx.tm1], na.rm=T) }
+    b6.tm1 <- if (t==1) { 1 } else { mean(df$b6[idx.tm1], na.rm=T) }
     ## c2  
-    b7.tm1 <- if (t==1) { .1 } else { mean(df$b7[idx.tm1], na.rm=T) }
+    b7.tm1 <- if (t==1) { 1 } else { mean(df$b7[idx.tm1], na.rm=T) }
     ## c3  Temporal drift  (noise on a function of time)
-    b8.tm1 <- if (t==1) { .12} else { mean(df$b8[idx.tm1], na.rm=T) }
+    b8.tm1 <- if (t==1) { 1 } else { mean(df$b8[idx.tm1], na.rm=T) }
     
     ##------------------------------------------------------
     ## Get past performance records for treat.rule == 'past'
@@ -462,7 +463,7 @@ runSimSingleIntervention <- function(
     ##-------------------------------------------
     ## ALL VALUES ARE THE SAME (indexed only at time; not by individual )
     # localLevel.mu <- mean(localLevel.tm1, na.rm=T) ## should be the same as taking item [1]
-    localLevel <- rnorm(n, localLevel.tm1, sd= noise.level * 0.01 )  ## save level value u[t] for all actors (not u[i,t])
+    localLevel <- rnorm(n, localLevel.tm1, sd= noise.level * dgp.prior.sd.weight )  ## save level value u[t] for all actors (not u[i,t])
     
     
     ##-------------------------------------------
@@ -471,32 +472,36 @@ runSimSingleIntervention <- function(
       season.val <- 0
       ## *** DEFAULT SETTING assumes yearly growth rate = (b5 / (pds/yr)), where pds/yr = 52 weeks
       ##     That is, the simulation assumes weekly periods for growth rate, even if seasonality component is missing from DGP.
-      b5 <-  rnorm(1, ( b5.tm1 / (npds / 52)  ), sd = noise.level * 0.1 )
+      b4 <-  rnorm(1, ( b4.tm1 / (npds / 52)  ), sd = noise.level * .5 )
     } else {
       season.vals <- getSinBySeasons(1:npds, nseasons, freq=season.frequency,
                                      noise.mean=0, noise.sd = 0, # add noise below
-                                     vert.scale =  10  ) 
+                                     vert.scale =  1.5  ) 
       season.val <- season.vals[t]
       ## Scale linear growth to equal b5 value for every completed seasonal cycle (e.g., 1 year)
       # season.frequency <- ifelse(season.frequency == 0, 1, season.frequency)
       # nseasons <- ifelse( nseasons == 0 , 1, nseasons )
       # growth.scale <-  npds /  ( nseasons * season.frequency )
       # b5 <- rnorm(1, (b5.tm1 / growth.scale), sd = noise.level * 0.5 )
-      b5 <- rnorm(1, season.val, sd = noise.level * 0.2 )
+      b4 <- rnorm(1, season.val, sd = noise.level * .5 )
     }
     
-    b6 <- rnorm(1, b6.tm1, sd = noise.level * .01)
-    b7 <- rnorm(1, b7.tm1, sd = noise.level * .01)
-    b8 <- rnorm(1, b8.tm1, sd = noise.level * .01)
+    ## Weight of local level
+    b5 <- 1 ## default to unit weight of the local level (see Brodersen et al 2015)
+    # b5 <- rnorm(1, b6.tm1, sd = noise.level * dgp.prior.sd.weight)
+    ## Weight of covariates: Dynamic covariate betas (see Brodersen et al 2015)
+    b6 <- rnorm(1, b6.tm1, sd = noise.level * dgp.prior.sd.weight)
+    b7 <- rnorm(1, b7.tm1, sd = noise.level * dgp.prior.sd.weight)
+    b8 <- rnorm(1, b8.tm1, sd = noise.level * dgp.prior.sd.weight)
     
     
     ## --------------- Covariates -------------------------
     ## INITIAL VALUES OF COVARIATES
-    c1.tm1 <- if (t==1) { rep(1, n) } else { df$c1[idx.tm1] }
+    c1.tm1 <- if (t==1) { rep(.1, n) } else { df$c1[idx.tm1] }
     ## START HIGHER = 10
-    c2.tm1 <- if (t==1) { rep(.01, n) } else { df$c2[idx.tm1] }
+    c2.tm1 <- if (t==1) { rep(.1, n) } else { df$c2[idx.tm1] }
     ## 
-    c3.tm1 <- if (t==1) { rep(1, n) } else { df$c3[idx.tm1] }
+    c3.tm1 <- if (t==1) { rep(.1, n) } else { df$c3[idx.tm1] }
     
     # ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # # c1 <- rpois(n, lambda = noise.level*0.8) + 1
@@ -530,14 +535,14 @@ runSimSingleIntervention <- function(
     # # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
     ##**MULTIVARIATE NORMAL CORRELATED RANDOM NOISE COVARIATES**
-    c1 <- rnorm(n, .5, noise.level * .5)
-    c2 <- rnorm(n, .5, noise.level * .5)
-    c3 <- rnorm(n, .5, noise.level * .5)
+    c1 <- rnorm(n, .5, noise.level * 1)
+    c2 <- rnorm(n, .02 * t, noise.level * 1.5)
+    c3 <- rnorm(n, -.01 * t, noise.level * .5)
     ## 
-    sig.mat <- matrix(c( 1,.3,.4,
+    sig.mat <- matrix( c( 1,.3,.1,
                          .3, 1,.2,
-                         .4,.2, 1), ncol=3, byrow = T)
-    mu.vec <- c(.4, .6, .5)
+                         .1,.2, 1), ncol=3, byrow = T)
+    mu.vec <- c(.1, .2, .15)
     rmv.mat <- mvtnorm::rmvnorm(n, 
                                 mean = mu.vec, 
                                 sigma = sig.mat) 
@@ -865,8 +870,8 @@ runSimSingleInterventionEffectComparison <- function(
     b1 = .01, ## treatment dummy
     b2 = .01, ## post intervention dummy
     # b3 = .001, ## treatment effect (replaced by function b3Func() for dynamic treatment effect)
-    b4 = 0, ## weight of seasonal component
-    b5 = 1, ## Weight of LEVEL component in outcome function 
+    b4 = 1, ## 
+    b5 = 1, ## 
     ## Covariates 
     # b6 = .1, ## c1  
     # b7 = .2, ## c2  
@@ -899,6 +904,7 @@ runSimSingleInterventionEffectComparison <- function(
     plot.dpi=300,
     ## 
     verbose=TRUE,
+    dgp.prior.sd.weight=.01,
     ...
   ) {   #effect.types, sim.id, plot.show, plot.save, 
   
@@ -955,6 +961,7 @@ runSimSingleInterventionEffectComparison <- function(
       plot.sq.h=plot.sq.h, 
       plot.dpi=plot.dpi,
       verbose=verbose,
+      dgp.prior.sd.weight=dgp.prior.sd.weight,
        ...
     )
     ##
@@ -1176,6 +1183,7 @@ runSimSingleInterventionEffectComparison <- function(
 runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
                                 effect.types=c('constant','quadratic','geometric'), 
                                 sim.id=round(10*as.numeric(Sys.time())),
+                                dgp.prior.sd.weight=.01,
                                 plot.show=F, plot.save=F, verbose=TRUE) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
@@ -1226,6 +1234,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       ##
       nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 
       season.frequency = ifelse(is.null(sim$dgp.freq), NA, sim$dgp.freq),
+      ##
+      dgp.prior.sd.weight=dgp.prior.sd.weight,
       ## Plotting
       plot.show = plot.show, ## TRUE
       plot.save = plot.save, ## TRUE

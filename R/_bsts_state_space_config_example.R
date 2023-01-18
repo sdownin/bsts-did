@@ -356,16 +356,89 @@ effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('q
 
 
 
+# 
+# ##========================= DEBUG ===================================
+# ## GET RESULT FROM STORAGE
+# . <- readRDS(simlist.files[[1]]$file[1])
+# bsts.model <- .$quadratic[[1]]$CausalImpact$model$bsts.model
+# # bsts.model <- getBstsModelFromSimlist(list(.), key = 1, effect.type = 'quadratic')
+# par(mar=c(2,2.5,2,1))
+# plot(bsts.model, 'components')
+# plot(bsts.model, 'predictors')
+# plot(bsts.model, 'coefficients')
 
 
+# filex <- '____DEBUG__bsts-illus_default-st-sp__GRIDSEARCH_output__n200_pd520_niter1500_covCats1_msize3_16739259770_d1f1g1h1i1j1.rds'
+# filex <- '____DEBUG__bsts-illus_default-st-sp__GRIDSEARCH_output__n200_pd520_niter1000_covCatsNA_msize3_16739448493_d1f1g1h1i1j1.rds'
+# filex <- '____DEBUG__bsts-illus_default-st-sp__GRIDSEARCH_output__n200_pd520_niter1000_covCatsNA_msize3_16739456005_d1f1g1h1i1j1.rds'
+filex <- '____DEBUG__bsts-illus_default-st-sp__GRIDSEARCH_output__n200_pd520_niter1000_covCatsNA_msize3_16739463285_d1f1g1h1i1j1.rds'
+#
+. <- readRDS(file.path(dir_ext, filex))
+# bsts.model <- .$quadratic[[1]]$CausalImpact$model$bsts.model
 
-##**ASSUMES y is the outcome series**
+
+simdfx <- .$sim$df
+
+### 1 CONTROL GROUP plus covariate series
+dfc <- simdfx %>%
+  dplyr::filter( 
+    ! is.na(match_id), 
+    group=='control'
+  ) %>% 
+  group_by(t) %>%
+  dplyr::summarize(
+    y = mean(y, na.rm=T),
+    # c0_seasonal = mean(season.val, na.rm=T),
+    c1_mean = mean(c1, na.rm=T),
+    c2_mean = mean(c2, na.rm=T),
+    c3_mean = mean(c3, na.rm=T),
+    c1_sd = sd(c1, na.rm=T),
+    c2_sd = sd(c2, na.rm=T),
+    c3_sd = sd(c3, na.rm=T),
+    c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+    c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+    c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+  ) #%>% pivot_wider(names_from, values_from)
+dfc$t <- NULL
+
+# dft <- simdfx %>%
+#   dplyr::filter( 
+#     ! is.na(match_id), 
+#     group=='treatment'
+#   ) %>% 
+#   group_by(t) %>%
+#   dplyr::summarize(
+#     y_control = mean(y, na.rm=T),
+#     # c0_seasonal = mean(season.val, na.rm=T),
+#     c1_mean = mean(c1, na.rm=T),
+#     c2_mean = mean(c2, na.rm=T),
+#     c3_mean = mean(c3, na.rm=T),
+#     c1_sd = sd(c1, na.rm=T),
+#     c2_sd = sd(c2, na.rm=T),
+#     c3_sd = sd(c3, na.rm=T),
+#     c1_skew = ifelse(length(c1)<=1, NA, skewness(c1, na.rm = T, type = 2)),
+#     c2_skew = ifelse(length(c2)<=1, NA, skewness(c2, na.rm = T, type = 2)),
+#     c3_skew = ifelse(length(c3)<=1, NA, skewness(c3, na.rm = T, type = 2))#,
+#   ) #%>% pivot_wider(names_from, values_from)
+# dft$t <- NULL
+
+##------------- CONTROL GROUP OUTCOME SERIES --------------------------
+
+bsts.niter <- 1000
+
+##**ASSUMES outcome series if the untreated control group series**
 ##   intpd = intervention period
 ##   npds = number of periods in time series
-y.pre <- y
+##
+y.pre <- dfc$y
+##
 y.pre[intpd:npds] <- NA
 
+## PREDICTORS
+predictors <- as.data.frame( dfc[, -1] )  ## exclude outcome series, drop first column
 
+
+##------------------------------------------------------------
 ## Initiate empty state space configuration list
 st.sp <- list()
 
@@ -412,30 +485,141 @@ print(st.sp)
 bsts.fit <- bsts(y.pre ~ . ,  ## This specifies including regression (all columns in pre)
                  state.specification = st.sp,
                  data = predictors,  
-                 niter = 1000)
+                 niter = bsts.niter)
+
+plot(bsts.fit)
+plot(bsts.fit, 'components')
+plot(bsts.fit, 'coefficients')
+plot(bsts.fit, 'predictors')
+
+##---------------------------------------------------------------------
+## Initiate empty state space configuration list
+st.sp2 <- list()
+
+## Add local level to trend component of state space
+# st.sp <- AddLocalLevel(st.sp, y.pre, 
+#                        sigma.prior = SdPrior(
+#                          sigma.guess = 0.01,    ## guess
+#                          sample.size = 0.01,    ## default
+#                          initial.value= 0.01,    ## defaults to sigma.guess
+#                          upper.limit=Inf
+#                        ), 
+#                        initial.state.prior = NormalPrior(
+#                          mu= 0.01,   ##guess
+#                          sigma=0.01,  ## guess
+#                          initial.value=0.01  ## default to mu
+#                        )
+# )
+st.sp2 <- AddSemilocalLinearTrend(st.sp2, y.pre)
+
+## Add Seasonality to state space
+st.sp2 <- AddSeasonal(st.sp2, y.pre, nseasons = 52, season.duration = 1,
+                     sigma.prior = SdPrior(
+                       sigma.guess = 0.01,    ## guess
+                       sample.size = 0.01,    ## default
+                       initial.value= 0.01,    ## defaults to sigma.guess
+                       upper.limit=Inf
+                     ), 
+                     initial.state.prior = NormalPrior(
+                       mu= 0.01,   ##guess
+                       sigma=0.01,  ## guess
+                       initial.value=0.01  ## default to mu
+                     )
+)
+print(st.sp2)
+
+
+bsts.fit2 <- bsts(y.pre ~ . ,  ## This specifies including regression (all columns in pre)
+                 state.specification = st.sp2,
+                 data = predictors,  
+                 niter = bsts.niter)
+
+plot(bsts.fit2)
+
+CompareBstsModels(list(level=bsts.fit, linearTrend=bsts.fit2))
 
 
 
+##------------------------------------------------------------
+
+## Initiate empty state space configuration list
+st.sp3 <- list()
+
+## Add local level to trend component of state space
+# st.sp <- AddLocalLevel(st.sp, y.pre, 
+#                        sigma.prior = SdPrior(
+#                          sigma.guess = 0.01,    ## guess
+#                          sample.size = 0.01,    ## default
+#                          initial.value= 0.01,    ## defaults to sigma.guess
+#                          upper.limit=Inf
+#                        ), 
+#                        initial.state.prior = NormalPrior(
+#                          mu= 0.01,   ##guess
+#                          sigma=0.01,  ## guess
+#                          initial.value=0.01  ## default to mu
+#                        )
+# )
+st.sp3 <- AddLocalLinearTrend(st.sp3, y.pre)
+
+## Add Seasonality to state space
+st.sp3 <- AddSeasonal(st.sp3, y.pre, nseasons = 52, season.duration = 1,
+                      sigma.prior = SdPrior(
+                        sigma.guess = 0.01,    ## guess
+                        sample.size = 0.01,    ## default
+                        initial.value= 0.01,    ## defaults to sigma.guess
+                        upper.limit=Inf
+                      ), 
+                      initial.state.prior = NormalPrior(
+                        mu= 0.01,   ##guess
+                        sigma=0.01,  ## guess
+                        initial.value=0.01  ## default to mu
+                      )
+)
+print(st.sp3)
+
+
+bsts.fit3 <- bsts(y.pre ~ . ,  ## This specifies including regression (all columns in pre)
+                  state.specification = st.sp3,
+                  data = predictors,  
+                  niter = bsts.niter)
+
+plot(bsts.fit3)
+CompareBstsModels(list(level=bsts.fit, semilocalLinear=bsts.fit2, linear=bsts.fit3))
+
+
+###-----------------------------------------------------------
 
 ## Post period response
-y.post <- y
-y.post[1:(npds-1)] <- NA  ## SETTING values before intervention to missing
+y.post <- dfc$y
+y.post[1:(intpd-1)] <- NA  ## SETTING values before intervention to missing
 
 
-## Causal impact estimation: fitted BSTS model forecasts the counterfactual
+## Causal impact estimation: fitted BSTS model  forecasts the counterfactual
 causimp <- CausalImpact(bsts.model = bsts.fit,
-                        post.period.response = y.post,
-                        alpha=0.05, model.args=list(niter = 1000))
+                        post.period.response = y.post[!is.na(y.post)],
+                        alpha=0.05, model.args=list(niter = bsts.niter))
 
+causimp2 <- CausalImpact(bsts.model = bsts.fit2,
+                        post.period.response = y.post[!is.na(y.post)],
+                        alpha=0.05, model.args=list(niter = bsts.niter))
 
+causimp3 <- CausalImpact(bsts.model = bsts.fit3,
+                         post.period.response = y.post[!is.na(y.post)],
+                         alpha=0.05, model.args=list(niter = bsts.niter))
 
+causimp
+causimp2
+causimp3
 
+plot(causimp)
+plot(causimp2)
+plot(causimp3)
 
 ## RUN CONVERGENCE CHECKS AND DIAGNOSTICS
-convcheck <- postPredChecks(causimp, save.plot=T, return.val = T)
-print(convcheck)
+convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
+cat(convcheck$summary)
 
-
+convcheck <- postPredChecks(causimp2, save.plot=F, return.val = T)
 
 
 
