@@ -343,7 +343,17 @@ bsts.fit <- bsts(y.pre.treat.NAs.post ~ . ,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 ```
+```{r}
+summary(bsts.fit)
+plot(bsts.fit)
+plot(bsts.fit, 'components')
+plot(bsts.fit, 'coefficients')
+```
 
+```{r}
+qqdist(bsts.fit$one.step.prediction.errors)
+AcfDist(bsts.fit$one.step.prediction.errors)
+```
 
 This fitted bsts model `bsts.fit` can now be passed into the `CausalImpact()`
 function. This will use `bsts.fit`, which was fitted on the pre-intervention 
@@ -369,15 +379,8 @@ impact.amount <- CausalImpact(bsts.model = bsts.fit,
 
 ```{r}
 summary(impact.amount)
-```
-```{r}
 plot(impact.amount)
 ```
-
-```{r}
-
-```
-
 
 
 ```{r 1_level, message=FALSE, include=FALSE}
