@@ -120,7 +120,7 @@ f2exists <- file.exists(bsts.df2.filepath)
 if ( file.exists(data.filepath) & any(!f1exists, !f2exists)) {  # !f3exists
   
   simdf <- read.csv(data.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
-  simdf <- as.tibble(simdf)
+  simdf <- as_tibble(simdf)
   
   ## TREATMENT
   bsts.df <- simdf %>%
@@ -273,7 +273,7 @@ library(tibble)
 ## y.pre
 ## 
 df1 <- read.csv(bsts.df1.filepath, stringsAsFactors = F) ## don't auto convert chars to factor type
-df1 <- as.tibble(df1)
+df1 <- as_tibble(df1)
 print(df1)
 ```
 We can plot this to visualize the post-intervention change in the 
@@ -291,9 +291,24 @@ function. Here we replace the post-intervention periods with `NA`'s that
 represent missing values within the `R` language. This is because the 
 BSTS model is trained on the pre-intervention outcome (y) data. 
 ```{r}
-y.pre <- df$y_treatment
-pre.int.ids <- (1:npds) < intpd
-y.pre[pre.int.ids] <- NA
+# y.pre <- df1$y_treatment
+# post.ids.NA <- (1:npds) > intpd
+# y.pre[post.ids.NA] <- NA
+
+
+pre.idx <- 1:intpd
+post.idx <- (intpd+1):npds
+
+## Train on y pre-treatment but NA's post-treatment
+y.pre.treat.NAs.post <- c( df1$y_treatment[pre.idx], rep(NA,length(post.idx)) )
+## Then use the post-treatment response for causal impact estimation
+post.period.response <- df1$y_treatment[post.idx]
+## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
+predictors <- df1[, ! names(df1) %in% 'y_treatment'] ## remove response; convert to matrix
+# ## Covariates (predictors) - Dataframe for "data" argument
+# predictors <- as.matrix(predictors) 
+      
+
 ```
 
 Configure the model's state space by adding state components to the 
@@ -304,9 +319,11 @@ functions (after the state space list `st.sp`) as the outcome series.
 ## Initiate empty state space configuration list
 st.sp <- list()
 ## Add local level to trend component of state space
-st.sp <- AddLocalLevel(st.sp, y.pre)
+st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post, 
+                       initial.state.prior = NormalPrior(mu=0, sigma = .01))
 ## Add trigonometric seasonality to state space
-st.sp <- AddTrig(st.sp, y.pre, period = 12, frequencies = 1)
+st.sp <- AddSeasonal(st.sp, y.pre.treat.NAs.post, 
+                     nseasons = 12, season.duration = 1)
 ## Set BSTS MCMC iterations
 bsts.niter <- 1000
 ```
@@ -321,9 +338,9 @@ which will be addressed below.)
 ```{r}
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
 ## component (all covariates in df1[,-1] dataframe)
-bsts.fit <- bsts(y.pre ~ . ,
+bsts.fit <- bsts(y.pre.treat.NAs.post ~ . ,
                  state.specification = st.sp,
-                 data = df1[ ,-1],  ## -1 excludes the outcome in 1st column 
+                 data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 ```
 
@@ -339,16 +356,27 @@ The cumulative impact estimate is the cumulative sum of the
 pointwise impact estimates. 
 
 ```{r}
-
+# ## Post period response
+# y.post <- df1$y_treatment
+# y.post[1:(intpd-1)] <- NA  ## SETTING values before intervention to missing
 ## Causal impact estimation: fitted BSTS model forecasts the counterfactual
 impact.amount <- CausalImpact(bsts.model = bsts.fit,
-                              post.period.response = y.post,
+                              post.period.response = post.period.response,
                               alpha=0.05, model.args=list(niter = bsts.niter))
 
 ```
 
 
+```{r}
+summary(impact.amount)
+```
+```{r}
+plot(impact.amount)
+```
 
+```{r}
+
+```
 
 
 
