@@ -299,10 +299,12 @@ BSTS model is trained on the pre-intervention outcome (y) data.
 pre.idx <- 1:intpd
 post.idx <- (intpd+1):npds
 
+y <- df1$y_treatment
+
 ## Train on y pre-treatment but NA's post-treatment
-y.pre.treat.NAs.post <- c( df1$y_treatment[pre.idx], rep(NA,length(post.idx)) )
+y.pre.treat.NAs.post <- c( y[pre.idx], rep(NA,length(post.idx)) )
 ## Then use the post-treatment response for causal impact estimation
-post.period.response <- df1$y_treatment[post.idx]
+post.period.response <- y[post.idx]
 ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
 predictors <- df1[, ! names(df1) %in% 'y_treatment'] ## remove response; convert to matrix
 # ## Covariates (predictors) - Dataframe for "data" argument
@@ -321,9 +323,6 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post, 
                        initial.state.prior = NormalPrior(mu=0, sigma = .01))
-## Add trigonometric seasonality to state space
-st.sp <- AddSeasonal(st.sp, y.pre.treat.NAs.post, 
-                     nseasons = 12, season.duration = 1)
 ## Set BSTS MCMC iterations
 bsts.niter <- 1000
 ```
@@ -355,6 +354,12 @@ qqdist(bsts.fit$one.step.prediction.errors)
 AcfDist(bsts.fit$one.step.prediction.errors)
 ```
 
+```{r, out.width="100%"}
+checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+cat(checks$summary)
+```
+
+
 This fitted bsts model `bsts.fit` can now be passed into the `CausalImpact()`
 function. This will use `bsts.fit`, which was fitted on the pre-intervention 
 data, in order to forecast (i.e., predict outside of the sample time window) 
@@ -383,29 +388,6 @@ plot(impact.amount)
 ```
 
 
-```{r 1_level, message=FALSE, include=FALSE}
-##  BSTS state specifications (list configurations of state space parameters)
-simlist[[key]]$bsts.state.specs <- list(
-  list(
-    getStateSpaceConfBySimScenario('AddLocalLevel', 'sd.low')
-  )
-)
-## RUN BSTS and compare to DID
-keyid <- which(names(simlist) == key)
-simlist[keyid:keyid] <- fitBstsUpdateSimlist(simlist[keyid:keyid],  ## temp list of only 1 item name==key
-                               effect.types = effect.types,
-                               sim.id = sim.id,
-                               save.items.dir= dir_ext,
-                               bsts.niter = bsts.niters$sm.max, ## **START at MAX niter for large npds **
-                               bsts.max.iter= bsts.niters$sm.max,
-                               plot.show = F, plot.save=F, verbose=F,
-                               save.sim.rds=F)  
-##
-bsts.model <- getBstsModelFromSimlist(simlist, key)
-plotBstsStateComps(bsts.model, intpd)
-```
-
-
 ## 2. Add Seasonality
 
 To account for seasonality in the time series data generating process, 
@@ -414,6 +396,159 @@ This produces a state contribution of seasonal cycles (e.g., weekly periods each
 added to the other state components. The augmented state space then improves 
 model performance in terms of the mean absolute error (MAE) of 
 one-step ahead predictions during the pre-intervention window. 
+```{r}
+## Initiate empty state space configuration list
+st.sp2 <- list()
+## Add local level to trend component of state space
+st.sp2 <- AddLocalLevel(st.sp2, y.pre.treat.NAs.post, 
+                       initial.state.prior = NormalPrior(mu=0, sigma = .01))
+## Add trigonometric seasonality to state space
+st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post, 
+                     nseasons = 12, season.duration = 1)
+
+
+## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+## component (all covariates in df1[,-1] dataframe)
+bsts.fit2 <- bsts(y.pre.treat.NAs.post ~ . ,
+                 state.specification = st.sp2,
+                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 niter = bsts.niter)
+
+summary(bsts.fit2)
+plot(bsts.fit2)
+plot(bsts.fit2, 'components')
+plot(bsts.fit2, 'coefficients')
+qqdist(bsts.fit2$one.step.prediction.errors)
+AcfDist(bsts.fit2$one.step.prediction.errors)
+checks2 <- bstsPostPredChecks(bsts.fit2, save.plot = F, return.val = T)
+cat(checks2$summary)
+
+```
+
+## Compare different state space trends
+
+
+Local Linear trend 
+```{r}
+## Initiate empty state space configuration list
+st.sp3 <- list()
+## Add local level to trend component of state space
+st.sp3 <- AddLocalLinearTrend(st.sp3, y.pre.treat.NAs.post, 
+  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01), 
+  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01), 
+  initial.level.prior=NormalPrior(mu=0, sigma=.01, initial.value=.01), 
+  initial.slope.prior=NormalPrior(mu=0, sigma=.01, initial.value=.01)
+)
+## Add trigonometric seasonality to state space
+st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
+  nseasons = 12, 
+  season.duration = 1, 
+  sigma.prior = SdPrior(
+    sigma.guess = 0.01,    ## guess
+    sample.size = 2,    ## default
+    initial.value= 0.01,    ## defaults to sigma.guess
+    upper.limit= 1.5 * sd(y, na.rm = T)
+  ), 
+  initial.state.prior = NormalPrior(
+    mu= 0,   ##guess
+    sigma=0.01,  ## guess
+    initial.value=0  ## default to mu
+  )
+)
+
+
+## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+## component (all covariates in df1[,-1] dataframe)
+bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
+                 state.specification = st.sp3,
+                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 niter = bsts.niter)
+
+summary(bsts.fit3)
+plot(bsts.fit3)
+plot(bsts.fit3, 'components')
+plot(bsts.fit3, 'coefficients')
+qqdist(bsts.fit3$one.step.prediction.errors)
+AcfDist(bsts.fit3$one.step.prediction.errors)
+checks3 <- bstsPostPredChecks(bsts.fit3, save.plot = F, return.val = T)
+cat(checks3$summary)
+```
+
+
+
+
+
+
+
+Semilocal Linear trend 
+Useful for longer-term forecasts (linear trend persists longer, 
+tighter prediction bounds over longer post-intervention window)
+```{r}
+## Initiate empty state space configuration list
+st.sp4 <- list()
+## Add local level to trend component of state space
+st.sp4 <- AddSemilocalLinearTrend(st.sp4, y.pre.treat.NAs.post, 
+  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
+  slope.mean.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0), 
+  slope.ar1.prior=Ar1CoefficientPrior(mu = 0, 
+                                      sigma = .01, 
+                                      force.stationary = FALSE, 
+                                      force.positive = FALSE, 
+                                      initial.value = 0
+                                      ),
+  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
+  initial.level.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0),
+  initial.slope.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0)
+)
+## Add trigonometric seasonality to state space
+st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post, 
+  nseasons = 12, 
+  season.duration = 1, 
+  sigma.prior = SdPrior(
+    sigma.guess = 0.01,    ## guess
+    sample.size = 2,    ## default
+    initial.value= 0.01,    ## defaults to sigma.guess
+    upper.limit= 1.5 * sd(y, na.rm = T)
+  ), 
+  initial.state.prior = NormalPrior(
+    mu= 0,   ##guess
+    sigma=0.01,  ## guess
+    initial.value=0  ## default to mu
+  )
+)
+
+
+## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+## component (all covariates in df1[,-1] dataframe)
+bsts.fit4 <- bsts(y.pre.treat.NAs.post ~ . ,
+                 state.specification = st.sp4,
+                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 niter = bsts.niter)
+
+summary(bsts.fit4)
+plot(bsts.fit4)
+plot(bsts.fit4, 'components')
+plot(bsts.fit4, 'coefficients')
+qqdist(bsts.fit4$one.step.prediction.errors)
+AcfDist(bsts.fit4$one.step.prediction.errors)
+checks4 <- bstsPostPredChecks(bsts.fit4, save.plot = F, return.val = T)
+cat(checks4$summary)
+```
+
+
+
+
+```{r}
+CompareBstsModels(list(level=bsts.fit, 
+                       seasonal=bsts.fit2, 
+                       localLinearTrend=bsts.fit3,
+                       SemilocalLinearTrend=bsts.fit4
+                       ))
+```
+
+
+
+
 ```{r 2_season, message=FALSE, include=FALSE}
 key <- '2_season'
 simlist[[key]] <- simcopy ## add another sim scenario and replace the state space
