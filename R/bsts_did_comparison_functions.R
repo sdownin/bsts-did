@@ -1351,7 +1351,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
             ppcheck.filename <- file.path(save.img.dir,
                                           sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_covCats%s_msize%s_%s_%s_%s.png',
                                                   prefix,n,npds,h,bsts.niter,bsts.ctrl.cats,bsts.expect.mod.size,key.strip,effect.type,sim.id))
-            convcheck <- postPredChecks(impact_amount, filename=ppcheck.filename, return.val = T)
+            convcheck <- bstsPostPredChecks(bsts.model, filename=ppcheck.filename, return.val = T)
             ##
             # print(convcheck)
             ##

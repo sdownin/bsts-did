@@ -141,10 +141,10 @@ dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 
 ##**DEBUG**
 st.sp.lists <- list(
-  `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
+  # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression'),
   # `8b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression'),
   # `8b`=c('AddLocalLevel','AddSeasonal', 'AddRegression','AddAr')#,
-  `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
+  # `11b`=c('AddLocalLinearTrend','AddSeasonal', 'AddRegression'),
   `15b`=c('AddSemilocalLinearTrend','AddSeasonal', 'AddRegression')#,
   # `16`=c('AddAr','AddSeasonal', 'AddRegression')
 )
@@ -220,7 +220,7 @@ for (d in 1:length(ns)) {
                   # cov.scenario.key = cov.scenario.key,
                   ## Dynamic treatment effect  (quadratic polynomial)
                   w0 = 1.0,  ## constant
-                  w1 = 0.027, ## linear
+                  w1 = 0.03, ## linear
                   w2 =  -0.0032 /sqrt(npds), ## ## quadratic
                   # w2.shift = -round( sqrt(npds)*.85 ), ## quadratic shift rightward (make all of U-shape after intervention)
                   ##

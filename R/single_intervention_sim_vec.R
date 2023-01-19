@@ -363,9 +363,8 @@ runSimSingleIntervention <- function(
     localLevel.tm1 <- if(t==1) {rep(0, n)} else { mean(df$localLevel[idx.tm1], na.rm=T) } 
     
     ## DYNAMIC REGRESSION BETAS --------------
-    ##   (same for all n; using mean( cov[t-1] ) should be same as selection first item [1])
-    ## FULL SEASONALITY COMPONENT IS INCLUDED IN OUTCOME ( b5 := 1 )
-    ## cov_season (seasonality = sinusoid with 52 pds, 1 frequency)
+    ##   (same for all n; using mean( cov[t-1] ) should be same as selecting any item [i])
+    ## SEASONALITY COMPONENT 
     b4.tm1 <- if (t==1) { 1 } else { mean(df$b4[idx.tm1], na.rm=T) }
     ## LOCAL LEVEL ---------------------------
     b5.tm1 <- if (t==1) { 1 } else { mean(df$b5[idx.tm1], na.rm=T) }
@@ -537,14 +536,14 @@ runSimSingleIntervention <- function(
     # # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
     ##**MULTIVARIATE NORMAL CORRELATED RANDOM NOISE COVARIATES**
-    c1 <- rnorm(n, .5, noise.level * 1)
-    c2 <- rnorm(n, .02 * t, noise.level * 1.5)
+    c1 <- rnorm(n,  .5, noise.level * 1)
+    c2 <- rnorm(n,  .015 * t, noise.level * 1.5)
     c3 <- rnorm(n, -.01 * t, noise.level * .5)
     ## 
-    sig.mat <- matrix( c( 1,.15,.1,
-                         .15, 1,.2,
-                         .1,.2, 1), ncol=3, byrow = T)
-    mu.vec <- c(.1, .15, .05)
+    sig.mat <- matrix( c( 1,.01,.08,
+                         .01, 1,.05,
+                         .08,.05, 1), ncol=3, byrow = T)
+    mu.vec <- c(.1, .12, .08)
     rmv.mat <- mvtnorm::rmvnorm(n, 
                                 mean = mu.vec, 
                                 sigma = sig.mat) 

@@ -66,7 +66,7 @@ sim.config <- list(
   rand.seed = 13579,
   ## Dynamic treatment effect  (quadratic polynomial)
   w0 = 1.0,  ## constant
-  w1 = 0.027, ## linear
+  w1 = 0.03, ## linear
   w2 = -.0032 / sqrt(npds), ## quadratic
   w2.shift = -round( sqrt(npds)*.7 ), ## quadratic shift rightward (make all of U-shape after intervention)
   ##
@@ -77,7 +77,7 @@ sim.config <- list(
 simlist <- list()
 
 ## state space configuration used as label
-key <- '1_level'
+key <- 'base'
 ## SImulations list (for comparisons, gridsearches; use list length==1 for single model run)
 simlist[[ key ]] <- sim.config
 ## Simulation ID
@@ -587,15 +587,15 @@ getBstsDiagnosticSummary(bsts.fit4)
 ```{r}
 reslist <- list()
 ## SD LOW SCENARIO KEY
-scenario_key1 <- 'sdlow'
-reslist[[scenario_key1]] <- list(
+scenario_key <- '1_noCtrl_lowSd'
+reslist[[scenario_key]] <- list(
   level=bsts.fit, 
   seasonal=bsts.fit2, 
   localLinearTrend=bsts.fit3,
   SemilocalLinearTrend=bsts.fit4
 )
 ## Compare BSTS models' cumulative one-step ahead prediciton error
-CompareBstsModels(reslist.sdlow)
+CompareBstsModels(reslist[[scenario_key]])
 ```
 
 
@@ -825,8 +825,14 @@ runSimulationScenarioBstsModelComparison <- function(df)
 }
 
 
+## SD LOW SCENARIO KEY
+scenario_key <- '2_noCtrl_highSd'
+
 ## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
-res.sdhigh <- runSimulationScenarioBstsModelComparison(df2)
+reslist[[scenario_key]] <- runSimulationScenarioBstsModelComparison(df2)
+
+## Compare BSTS models' cumulative one-step ahead prediciton error
+CompareBstsModels(reslist[[scenario_key]])
 
 ```
 
@@ -848,9 +854,13 @@ df22 <- read.csv(dat2$bsts.df2.filepath, stringsAsFactors = F)
 ## df12
 
 ```{r res.ctrl.sdlow}
+## SD LOW SCENARIO KEY
+scenario_key <- '3_hasCtrl_lowSd'
+# CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
+reslist[[scenario_key]] <- runSimulationScenarioBstsModelComparison(df12)
+## Compare BSTS models' cumulative one-step ahead prediciton error
+CompareBstsModels(reslist[[scenario_key]])
 
-## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
-res.ctrl.sdlow <- runSimulationScenarioBstsModelComparison(df12)
 ```
 
 
@@ -861,13 +871,24 @@ res.ctrl.sdlow <- runSimulationScenarioBstsModelComparison(df12)
 
 
 ```{r res.ctrl.sdhigh}
-
-## CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
-res.ctrl.sdhigh <- runSimulationScenarioBstsModelComparison(df22)
+## SD LOW SCENARIO KEY
+scenario_key <- '4_hasCtrl_highSd'
+# CALL THE FUNCTION TO RUN ON THE DF WITH CONTROL GROUP SERIES
+reslist[[scenario_key]] <- runSimulationScenarioBstsModelComparison(df22)
+## Compare BSTS models' cumulative one-step ahead prediciton error
+CompareBstsModels(reslist[[scenario_key]])
 ```
 
 
 
+Save simulation list to serialized data file
+
+```{r}
+reslist.filepath <- file.path(dir_proj,
+                              sprintf('__bsts_vignette_1_sim_RESLIST_%s.rds',
+                                   sim.id))
+saveRDS(reslist, file = reslist.filepath)
+```
 
 
 
@@ -920,7 +941,7 @@ be addressed (e.g., by increasing MCMC iterations, or respecifying the state spa
 
 ```{r mcmc_diag_fail, fig.dim = c(14, 10), out.width="100%", include=FALSE}
 causimp <- getCausalImpactFromSimlist(simlist, key)
-convcheck <- postPredChecks(causimp, save.plot=F, return.val = T)
+convcheck <- bstsPostPredChecks(causimp, save.plot=F, return.val = T)
 ```
 The MCMC convergence checks (left column) indicate that the BSTS function 
 needs to be re-run with more MCMC iterations. Here we use a function we 
