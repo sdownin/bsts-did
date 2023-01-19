@@ -221,7 +221,7 @@ for (d in 1:length(ns)) {
                   ## Dynamic treatment effect  (quadratic polynomial)
                   w0 = 1.0,  ## constant
                   w1 = 0.03, ## linear
-                  w2 =  -0.0032 /sqrt(npds), ## ## quadratic
+                  w2 =  -0.00333 /sqrt(npds), ## ## quadratic
                   # w2.shift = -round( sqrt(npds)*.85 ), ## quadratic shift rightward (make all of U-shape after intervention)
                   ##
                   # b4 = b4,   ## seasonal component weight  (default 1)
