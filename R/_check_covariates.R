@@ -273,7 +273,7 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
 ##          num.groups = Cartesian product of all binned covariates, 
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
-bsts.ctrl.cats.list <- list(NA, 1)  #list(1, NA) ## NA=no control;
+bsts.ctrl.cats.list <- list(1, NA)  #list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
 bsts.expect.mod.sizes <- list(3)  #list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations

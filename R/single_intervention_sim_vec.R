@@ -535,10 +535,36 @@ runSimSingleIntervention <- function(
     # c3 <- rnorm(n, c3.tm1, sd = noise.level )
     # # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
-    ##**MULTIVARIATE NORMAL CORRELATED RANDOM NOISE COVARIATES**
-    c1 <- rnorm(n,  .5, noise.level * 1)
-    c2 <- rnorm(n,  .015 * t, noise.level * 1.5)
-    c3 <- rnorm(n, -.01 * t, noise.level * .5)
+    # ## IDs of treatment and control
+    # ## Treatment
+    # .idx.t <- which( x1*x2 == 1 )
+    # n.t <- length(.idx.t)
+    ## Control
+    .idx.c <- which( x1*x2 != 1 )
+    n.c <- length(.idx.c)
+    
+    ###**COV CASE 1: CONTROL**
+    ###*
+    y.ctrl.mean <- mean(y.tm1[.idx.c], na.rm=T)
+    y.ctrl.sd  <- sd(y.tm1[.idx.c], na.rm=T)
+    # print('y.ctrl.mean')
+    # print(y.ctrl.mean)
+    # print('y.ctrl.sd')
+    # print(y.ctrl.sd)
+    c1 <- rnorm(rep(y.ctrl.mean^.5, n),  max(y.ctrl.sd * 1, .01) ) 
+    c2 <- rnorm(rep(y.ctrl.mean * -.5, n), max(y.ctrl.sd * 1.5 , .01) )
+    c3 <- rnorm(rep(y.ctrl.mean * 1.5, n), max(y.ctrl.sd * 2, .01) )
+    # c1 <- rnorm(n,  .5, noise.level * 1)
+    # c2 <- rnorm(n,  .015 * t, noise.level * 1.5)
+    # c3 <- rnorm(n, -.01 * t, noise.level * .5)
+    # ## **COV CASE 1: CONTROL**
+    # c1[.idx.c] <- rnorm(n.c,  .5, noise.level * 1)
+    # c2[.idx.c] <- rnorm(n.c,  .015 * t, noise.level * 1.5)
+    # c3[.idx.c] <- rnorm(n.c, -.01 * t, noise.level * .5)
+    # ## **COV CASE 2: TREATMENT**
+    # c1[.idx.t] <- rnorm(n.t,  1, noise.level * .5)
+    # c2[.idx.t] <- rnorm(n.t,  .02 * t, noise.level * 1)
+    # c3[.idx.t] <- rnorm(n.t, -.005 * t, noise.level * .1)
     ## 
     sig.mat <- matrix( c( 1,.01,.03,
                          .01, 1,.05,
