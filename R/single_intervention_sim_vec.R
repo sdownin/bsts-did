@@ -551,9 +551,10 @@ runSimSingleIntervention <- function(
     # print(y.ctrl.mean)
     # print('y.ctrl.sd')
     # print(y.ctrl.sd)
-    c1 <- rnorm(rep(y.ctrl.mean^.5, n),  max(y.ctrl.sd * 1, .01) ) 
-    c2 <- rnorm(rep(y.ctrl.mean * -.5, n), max(y.ctrl.sd * 1.5 , .01) )
-    c3 <- rnorm(rep(y.ctrl.mean * 1.5, n), max(y.ctrl.sd * 2, .01) )
+    # c1 <- rnorm( .2 * rep(y.ctrl.mean^.5 + .5, n),  max(y.ctrl.sd * .5, .01) ) 
+    c1 <- rnorm(n,  .01 * t, noise.level * .01)
+    c2 <- rnorm( .005 * rep( -t * y.ctrl.mean , n), max(y.ctrl.sd * .15 , .01) )
+    c3 <- rnorm( .05 * rep( y.ctrl.mean - 1, n), max(y.ctrl.sd * .02, .01) )
     # c1 <- rnorm(n,  .5, noise.level * 1)
     # c2 <- rnorm(n,  .015 * t, noise.level * 1.5)
     # c3 <- rnorm(n, -.01 * t, noise.level * .5)
@@ -569,10 +570,10 @@ runSimSingleIntervention <- function(
     sig.mat <- matrix( c( 1,.01,.03,
                          .01, 1,.05,
                          .03,.05, 1), ncol=3, byrow = T)
-    mu.vec <- c(.1, .12, .08)
-    rmv.mat <- mvtnorm::rmvnorm(n, 
-                                mean = mu.vec, 
-                                sigma = sig.mat) 
+    # mu.vec <- c(.1, .12, .08)
+    # rmv.mat <- mvtnorm::rmvnorm(n,
+    #                             mean = mu.vec,
+    #                             sigma = sig.mat)
     # correlated random variables
     Cmvt <- cbind(c1, c2, c3) %*% sig.mat
     

@@ -709,7 +709,7 @@ ggdid.agg.es <- function(attgt,
   rng.y <- range(results$att, na.rm = T)
   rng.x <- range(results$year, na.rm=T)
   an.y <- max( (results$att + results$c * results$att.se), na.rm = T) + 0.3*diff(rng.y)
-  an.x <- min(as.numeric(results$year), na.rm=T) + ifelse(npds >= 7, 0.3*diff(rng.x), 0.4*diff(rng.x))
+  an.x <- mean(as.numeric(results$year), na.rm=T) - 0.1*diff(rng.x)
   
   p <- ggplot(results,
               aes(x=as.numeric(year), y=att, ymin=(att-c*att.se),
