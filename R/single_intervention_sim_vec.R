@@ -563,9 +563,9 @@ runSimSingleIntervention <- function(
       # print(y.ctrl.sd)
       # c1 <- rnorm( .2 * rep(y.ctrl.mean^.5 + .5, n),  max(y.ctrl.sd * .5, .01) ) 
       ##
-      c1 <- rnorm(n,  .01 * t, noise.level * .2)
-      c2 <- rnorm(n, -.0001 * t * y.ctrl.mean , noise.level * .1 )
-      c3 <- rnorm(n, 0.1 *  y.ctrl.mean , noise.level * .05 )
+      c1 <- rnorm(n,  .01 * t, noise.level * .05)
+      c2 <- rnorm(n, -.0001 * t * y.ctrl.mean , noise.level * .05 )
+      c3 <- rnorm(n, 0.2 *  y.ctrl.mean , noise.level * .01 )
       ## 
       # c1 <- rnorm(n,  .01 * t, noise.level * .5)
       # c2 <- rnorm(n, -.005 * t * y.ctrl.mean,   noise.level * .2 )
@@ -585,8 +585,8 @@ runSimSingleIntervention <- function(
     } else if (covariates.type == 'random') {
       
       c1 <- rnorm(n,  .5, noise.level * .01)
-      c2 <- rnorm(n,  .1 * log( 1 + t) , noise.level * .01)
-      c3 <- rnorm(n, -.001 * t, noise.level * .01)
+      c2 <- rnorm(n,  .015 * t , noise.level * .01)
+      c3 <- rnorm(n, -.005 * t, noise.level * .01)
       
     } else {
       stop(sprintf('covariates.type `%s` is not in options set: (random, control)',
