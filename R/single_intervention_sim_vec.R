@@ -584,9 +584,9 @@ runSimSingleIntervention <- function(
       
     } else if (covariates.type == 'random') {
       
-      c1 <- rnorm(n,  .5, noise.level * .5)
-      c2 <- rnorm(n,  .01 * log( 1 + t) , noise.level * .1)
-      c3 <- rnorm(n, -.001 * t, noise.level * .05)
+      c1 <- rnorm(n,  .5, noise.level * .01)
+      c2 <- rnorm(n,  .1 * log( 1 + t) , noise.level * .01)
+      c3 <- rnorm(n, -.001 * t, noise.level * .01)
       
     } else {
       stop(sprintf('covariates.type `%s` is not in options set: (random, control)',
