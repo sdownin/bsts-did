@@ -97,7 +97,7 @@ prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
 # cov.scenarios <- list(high=list(c1=.5, c2=.6, c3=.7), 
 #                       mid=list(c1=.2, c2=.3, c3=.4),
 #                       low=list(c1=.05, c2=.1, c3=.15))
-covariates.types <- list('control','random')  ## random, control
+covariates.types <- list('random')  ## random, control
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
@@ -279,8 +279,8 @@ bsts.ctrl.cats.list <- list(NA,1)  #list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
 bsts.expect.mod.sizes <- list(3)  #list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
-bsts.niter.start <- 5000 ## 5000
-bsts.niter.max   <- 5000 ## 8e4
+bsts.niter.start <- 1500 ## 5000
+bsts.niter.max   <- 1500 ## 8e4
 ## LOOP OVER BSTS MODEL COMPARISONS ON SAME SIMULATED DATA (SAME DGP SCENARIO)
 for (m in 1:length(bsts.ctrl.cats.list)) {
   for (r in 1:length(bsts.expect.mod.sizes)) {
