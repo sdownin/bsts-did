@@ -450,7 +450,7 @@ st.sp2 <- AddLocalLevel(st.sp2, y.pre.treat.NAs.post,
                        initial.state.prior = NormalPrior(mu=0, sigma = .01))
 ## Add trigonometric seasonality to state space
 st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post, 
-                     nseasons = 12, season.duration = 1)
+                     nseasons = 52, season.duration = 1)
 
 
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
@@ -498,7 +498,7 @@ st.sp3 <- AddLocalLinearTrend(st.sp3, y.pre.treat.NAs.post,
 )
 ## Add trigonometric seasonality to state space
 st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
-  nseasons = 12, 
+  nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
     sigma.guess = 0.01,    ## guess
@@ -554,7 +554,7 @@ st.sp4 <- AddSemilocalLinearTrend(st.sp4, y.pre.treat.NAs.post,
 )
 ## Add trigonometric seasonality to state space
 st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post, 
-  nseasons = 12, 
+  nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
     sigma.guess = 0.01,    ## guess
@@ -597,6 +597,11 @@ reslist[[scenario_key]] <- list(
 ## Compare BSTS models' cumulative one-step ahead prediciton error
 CompareBstsModels(reslist[[scenario_key]])
 ```
+
+```{r}
+plotBstsStateComps(bsts.fit4, intpd=intpd, filename = NA)
+```
+
 
 
 ## Scenario 2: High prior SD
@@ -682,7 +687,7 @@ runSimulationScenarioBstsModelComparison <- function(df)
                            initial.state.prior = NormalPrior(mu=0, sigma = .01))
     ## Add trigonometric seasonality to state space
     st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post, 
-                         nseasons = 12, season.duration = 1)
+                         nseasons = 52, season.duration = 1)
     
     
     ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
@@ -733,7 +738,7 @@ runSimulationScenarioBstsModelComparison <- function(df)
     )
     ## Add trigonometric seasonality to state space
     st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
-      nseasons = 12, 
+      nseasons = 52, 
       season.duration = 1, 
       sigma.prior = SdPrior(
         sigma.guess = 0.01,    ## guess
@@ -784,7 +789,7 @@ runSimulationScenarioBstsModelComparison <- function(df)
     )
     ## Add trigonometric seasonality to state space
     st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post, 
-      nseasons = 12, 
+      nseasons = 52, 
       season.duration = 1, 
       sigma.prior = SdPrior(
         sigma.guess = 0.01,    ## guess

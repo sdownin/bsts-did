@@ -451,19 +451,24 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   ## prior SD initial value
   sig.init.val.hi <- .05
   sig.init.val.lo <- .01
+  ##
+  init.state.prior.sig.hi <- 1
+  init.state.prior.sig.lo <- 1
   ## Mean of prior distributions
-  mu.hi <- .1
-  mu.lo <- .01
+  mu.hi <- .01
+  mu.lo <- 0
   ## Autoregressive component
   ar.mu.hi <- .05
   ar.mu.lo <- .01
   ar.forc.sta <- FALSE
   ar.forc.pos <- FALSE
   ## Weight given to sigma.guess (interpretable as a prior observation count)
-  samp.size.prop.hi <- .05
-  samp.size.prop.lo <- .01
+  samp.size.prop.hi <- 64
+  samp.size.prop.lo <- 32
   ##
-  upper.limit <- Inf
+  # upper.limit.hi <- Inf
+  upper.limit.hi <- Inf
+  upper.limit.lo <- 1.2
   ## Spike and Slab priors on the AddAutoAr (Automatically selected Autoregressive lags)
   spikslab.init.val.hi <- .05
   spikslab.init.val.lo <- .01
@@ -474,8 +479,8 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   # spikslab.exp.mod.size.hi <- 3
   # spikslab.exp.mod.size.lo <- 2
   ##
-  expected.r2.hi <- .5
-  expected.r2.lo <- .2
+  expected.r2.hi <- .8
+  expected.r2.lo <- .5
   ## Latent factors (e.g., AddSharedLocalLevel() )
   n.latent.factors.hi <- 2
   n.latent.factors.lo <- 1
@@ -569,17 +574,17 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name='AddLocalLevel',
-           sigma.prior = SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, initial.value=sig.init.val.hi, upper.limit=upper.limit),
+           sigma.prior = SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, upper.limit=upper.limit.hi, fixed = FALSE),
            # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.hi, mu.guess.weight = 1, sigma.guess = sig.hi, sigma.guess.weight = 1),
-           initial.state.prior = NormalPrior(mu=mu.hi, sigma=sig.hi, initial.value=sig.init.val.hi)#,
+           initial.state.prior = NormalPrior(mu=mu.hi, sigma=init.state.prior.sig.hi, fixed = FALSE)#,
            # sdy = args$sdy,
            # initial.y = args$initial.y
       )
     } else if (grepl('sd.lo', scenario, perl = F)) {
       list(name='AddLocalLevel',
-           sigma.prior = SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, initial.value=sig.init.val.lo, upper.limit=upper.limit),
+           sigma.prior = SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, upper.limit=upper.limit.lo, fixed = FALSE),
            # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.lo, mu.guess.weight = 1, sigma.guess = sig.lo, sigma.guess.weight = 1),
-           initial.state.prior = NormalPrior(mu=mu.lo, sigma=sig.lo, initial.value=sig.init.val.lo)#,
+           initial.state.prior = NormalPrior(mu=mu.lo, sigma=init.state.prior.sig.lo, fixed = FALSE)#,
            # sdy = args$sdy,
            # initial.y = args$initial.y
       )
@@ -686,7 +691,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
         name = 'AddSeasonal',
         nseasons = bsts.nseasons,
         season.duration = bsts.freq,
-        sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size =samp.size.prop.hi, initial.value =sig.init.val.hi, upper.limit = upper.limit)#,
+        sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size =samp.size.prop.hi, upper.limit = upper.limit.hi)#,
         # initial.state.prior = args$initial.state.prior#,
         # sdy = args$sdy
       )
@@ -695,7 +700,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
         name = 'AddSeasonal',
         nseasons = bsts.nseasons,
         season.duration = bsts.freq,
-        sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size =samp.size.prop.lo, initial.value =sig.init.val.lo, upper.limit = upper.limit)#,
+        sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size =samp.size.prop.lo, upper.limit = upper.limit.lo)#,
         # initial.state.prior = args$initial.state.prior#,
         # sdy = args$sdy
       )
@@ -709,21 +714,21 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name = 'AddSemilocalLinearTrend',
-           level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
-           slope.mean.prior = NormalPrior(mu=mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi),
-           slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.hi, sigma = sig.hi, force.stationary = ar.forc.sta, force.positive = ar.forc.pos, initial.value = ar.mu.hi),
-           slope.sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
-           initial.level.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi),
-           initial.slope.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi)
+           level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, upper.limit = upper.limit.hi, fixed = FALSE),
+           slope.mean.prior = NormalPrior(mu=mu.hi, sigma = sig.hi, fixed = FALSE),
+           slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.hi, sigma = sig.hi, force.stationary = ar.forc.sta, force.positive = ar.forc.pos),
+           slope.sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size = samp.size.prop.hi, upper.limit = upper.limit.hi, fixed = FALSE),
+           initial.level.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, fixed = FALSE),
+           initial.slope.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, fixed = FALSE)
         )
     } else if (grepl('sd.lo', scenario, perl = F)) {
       list(name = 'AddSemilocalLinearTrend',
-           level.sigma.prior= SdPrior(sigma.guess=sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
-           slope.mean.prior = NormalPrior(mu=mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo),
-           slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.lo, sigma = sig.lo, force.stationary = ar.forc.sta, force.positive = ar.forc.pos, initial.value = ar.mu.lo),
-           slope.sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
-           initial.level.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo),
-           initial.slope.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo)
+           level.sigma.prior= SdPrior(sigma.guess=sig.lo, sample.size = samp.size.prop.lo, upper.limit = upper.limit.lo, fixed = FALSE),
+           slope.mean.prior = NormalPrior(mu=mu.lo, sigma = sig.lo, fixed = FALSE),
+           slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.lo, sigma = sig.lo, force.stationary = ar.forc.sta, force.positive = ar.forc.pos),
+           slope.sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size = samp.size.prop.lo, upper.limit = upper.limit.lo, fixed = FALSE),
+           initial.level.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, fixed = FALSE),
+           initial.slope.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, fixed = FALSE)
       )
     } else {
       list()
@@ -866,458 +871,458 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
 
 
 
-#############################################
-##   BSTS computation on list of simulated time series
-#############################################
-fitBstsUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
-                                 effect.types=c('constant','quadratic','geometric'), 
-                                 sim.id=NA,
-                                 save.items.dir=NA, ## save updated simlist items to seprate RDS files
-                                 bsts.niter=1e3,
-                                 bsts.max.iter=1e5, ## 80000
-                                 plot.show=TRUE, plot.save=TRUE,
-                                 verbose=TRUE, 
-                                 save.sim.rds=TRUE
-) {
-  ## cache original bsts.niter for dynamic niter updating if MCMC convergence failed
-  bsts.niter.orig <- bsts.niter
-  
-  # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
-  # print(simlist)
-  if (length(simlist) > 0 & length(names(simlist))==0) {
-    names(simlist) <- 1:length(simlist)
-  }
-  
-  ## Simulation ID
-  if (is.na(sim.id)) {
-    sim.id <- simlist[[1]]$sim$id
-    if (is.null(sim.id) | is.na(sim.id)) {
-      sim.id <- round(10*as.numeric(Sys.time()))
-    } 
-  } 
-  
-  ## IF save simlist items is NA, then save images to work_dir
-  ## else save images to save.items.fir
-  save.img.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
-  
-  ##===============================
-  ##  BSTS State Specification Comparison 
-  ##------------------------------
-  for (i in 1:length(simlist))
-  {
-    key <- names(simlist)[i]
-    key.strip <- gsub('[|]','',key,ignore.case = F, perl = T)
-    if(verbose) cat(sprintf('\n%s, %s\n',i, key))
-    
-    simlist[[key]]$cordf <- data.frame()
-    simlist[[key]]$compare <- list(bsts=list())
-    
-    ## simulation output from simulation scenario = simlist[[key]]
-    npds <- simlist[[key]]$npds
-    intpd <- simlist[[key]]$intpd
-    n <- simlist[[key]]$n
-    noise.level <- simlist[[key]]$noise.level
-    
-    ## Simulation object (containing the simulated timeseries)
-    sim <- simlist[[key]]$sim
-    # sim.id <- simlist[[key]]$sim$id
-    
-    
-    ## list of BSTS State component lists
-    bsts.state.specs <- simlist[[key]]$bsts.state.specs
-    if (length(names(bsts.state.specs))==0) {
-      names(bsts.state.specs) <- 1:length(bsts.state.specs)
-    }
-    
-    # ## BSTS expected model size for spike-and-slab priors
-    expect.mod.size <- ifelse(is.null(simlist[[key]]$expect.mod.size), NA, simlist[[key]]$expect.mod.size)
-    
-    
-    ## Dynamic Treatment Effect Type shapes
-    for (k in 1:length(effect.types)) 
-    {
-      
-      effect.type <- effect.types[k]
-      simdf <- sim$df[sim$df$effect.type == effect.type, ]
-      
-      ## Set group name 'gname' field, where 0 = control, # = period of treatment
-      simdf$match_pd <- as.numeric(simdf$match_pd)
-      simdf$gname <- 0
-      simdf$gname[simdf$group=='treatment'] <- simdf$match_pd[simdf$group=='treatment']
-      ## Remove NAs
-      simdf <- simdf[!is.na(simdf$match_id), ]
-      
-                     
-      ## Init output list wihtin simulations list
-      simlist[[key]]$compare$bsts[[effect.type]] <- list()
-      
-      
-      ##====================
-      ## BSTS Timseries Setup
-      ##--------------------
-      ## Aggregate into timeseries dataframe
-      tsdf <- simdf %>%
-        dplyr::filter( ! is.na(match_id)) %>%
-        group_by(t, t.post.intpd, effect.type, match_pd, gname, group, group.color) %>%
-        dplyr::summarize(
-          n_in_pd = n(),
-          actors = paste(unique(actor), collapse = '|'),
-          y_outcome = mean(y, na.rm=T),
-          y_sum = sum(y, na.rm=T),
-          y_sd = sd(y, na.rm=T),
-          y_min = min(y, na.rm=T),
-          y_max = max(y, na.rm=T),
-          y_skew = skewness(y, na.rm = T, type = 2), ## moment-based distribution
-          y_kurt = kurtosis(y, na.rm = T, type = 2), ## moment-based distribution
-          ##
-          x1_mean = mean(x1, na.rm=T),
-          x2_mean = mean(x2, na.rm=T),
-          x3_mean = mean(x3, na.rm=T),
-          ##
-          c1_mean = mean(c1, na.rm=T),
-          c2_mean = mean(c2, na.rm=T),
-          c3_mean = mean(c3, na.rm=T),
-          #
-          c1_sd = sd(c1, na.rm=T),
-          c2_sd = sd(c2, na.rm=T),
-          c3_sd = sd(c3, na.rm=T),
-          ##
-          c1_skew = skewness(c1, na.rm=T, type = 2),
-          c2_skew = skewness(c2, na.rm=T, type = 2),
-          c3_skew = skewness(c3, na.rm=T, type = 2),
-          #
-          c1_kurt = skewness(c1, na.rm=T, type = 2),
-          c2_kurt = skewness(c2, na.rm=T, type = 2),
-          c3_kurt = skewness(c3, na.rm=T, type = 2),
-          #
-          b1_mean = mean(b1, na.rm=T),
-          b2_mean = mean(b2, na.rm=T),
-          b3_mean = mean(b3, na.rm=T),
-          #
-          u_mean = mean(u, na.rm=T),
-          v_mean = mean(v, na.rm=T)
-        )
-      tsdf$.id <- 1:nrow(tsdf)
-      
-      ## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
-      val.cols <- c('y_outcome','y_sum','y_min','y_max','y_sd',
-                    'y_skew','y_kurt',
-                    'x1_mean','x2_mean','x3_mean',
-                    'c1_mean','c2_mean','c3_mean',
-                    'c1_sd','c2_sd','c3_sd',
-                    'c1_skew','c2_skew','c3_skew',
-                    'c1_kurt','c2_kurt','c3_kurt',
-                    'b1_mean','b2_mean','b3_mean',
-                    'u_mean','v_mean')
-      ts <- unique(tsdf$t)
-      groups <- unique(tsdf$group)
-      ## init timeseries dataframe - wide
-      tsdfw <- data.frame(t=ts,  stringsAsFactors = F)
-      for (jj in 1:length(groups)) {
-        id.j <- which( tsdf$group == groups[ jj ] ) 
-        for (kk in 1:length(val.cols)) {
-          df.col <- data.frame( tsdf[ id.j , val.cols[ kk ] ] )
-          names(df.col) <- sprintf('%s_%s',groups[ jj ],val.cols[ kk ])
-          tsdfw <- cbind(tsdfw,  df.col)
-        }
-      }
-      
-      
-      # Set up pre- and post-treatment period
-      # pre.period <- as.Date(c("2013-01-01","2016-01-25"))
-      pre.period <- c(1, intpd-1)  
-      # post.period <- as.Date(c("2016-01-26","2018-01-01"))
-      post.period <- c(intpd, npds) 
-      
-      # # BSTS causal effect analysis using CausalImpact package
-      # # CausalImpact option: 
-      # # niter: Number of MCMC samples to draw. More samples lead to more accurate inferences. Defaults to 1000.
-      # # standardize.data: Whether to standardize all columns of the data before fitting the model (i.e., setting Bayes priors), Defaults to TRUE.
-      # # prior.level.sd: Prior standard deviation of the Gaussian random walk of the local level. Defaults to 0.01.
-      # # nseasons: Period of the seasonal components. Default to 1.
-      # # dynamic.regression: Whether to include time-varying regression coefficients. Defaults to FALSE.
-      # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
-      # summary(impact_amount)
-      # plot(impact_amount)
-      dat <- tsdfw[,c('treatment_y_outcome',
-                      'control_y_outcome',
-                      # 'control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
-                      # 'control_y_max','control_y_skew', 'control_y_kurt',
-                      'control_c1_mean','control_c2_mean',  'control_c3_mean',
-                      'control_c1_sd','control_c2_sd','control_c3_sd',
-                      'control_c1_skew','control_c2_skew','control_c3_skew'#,
-                      # 'control_c1_kurt','control_c2_kurt',
-                      # 'control_c3_kurt'#,
-                      # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
-                      # 'control_u_mean','control_v_mean'
-      )]
-      ## Train on y pre-treatment but NA's post-treatment
-      y.pre.treat.NAs.post.treat <- c(dat$treatment_y_outcome[1:(intpd-1)], rep(NA,npds-intpd+1))
-      ## Then use the post-treatment response for causal impact estimation
-      post.period.response <- dat$treatment_y_outcome[intpd:npds]
-      ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
-      predictors <- dat[, ! names(dat) %in% 'treatment_y_outcome'] ## remove response; convert to matrix
-      # ## Covariates (predictors) - Dataframe for "data" argument
-      # predictors <- as.matrix(predictors) 
-      
-      ## ADD temporal trend to covariates
-      predictors$covar_temp_trend <- (1:npds) + rnorm(npds, 0, noise.level)   ## * simlist$`0.rand.base`$b5
-      
-      ## ***DEBUG***
-      # print("bsts.state.specs:")
-      # print(bsts.state.specs)
-      ##
-      
-      ##----------------------------
-      ## State Space Configuration
-      ##----------------------------
-      ## LOOP OVER BSTS STATE SPECIFICATIONS FOR THE SAME SIMULATION RUN
-      for (h in 1:length(bsts.state.specs)) 
-      {
-        simlist[[key]]$compare$bsts[[effect.type]][[ h ]] <- list()
-        
-        ## h'th BSTS state space configuration (state component list)
-        state.conf <- bsts.state.specs[[ h ]]
-        
-        ## names of 
-        state.comps <- unname(sapply(state.conf, function(x){
-          ifelse(class(x)=='list' & 'name' %in% names(x), x$name, 'ERROR x$name not set in state.conf[x]')
-        }, simplify = T))
-      
-        ## Loop over state space components
-        nss <- length(state.conf)
-        ## State Space Config list
-        st.sp <- list()
-        if (nss > 0) {
-          for (jj in 1:nss) {
-            state.conf.item <- state.conf[[ jj ]]
-            if (class(state.conf.item)=='list') {
-              
-              if(state.conf.item$name=='AddSharedLocalLevel') {
-                state.conf$coefficient.prior <- SpikeSlabPrior(
-                  x = predictors,
-                  y = dat$treatment_y_mean, ##**NOTE** USING ALL Y VALS (not just y.pre.treat.NAs.post.treat)
-                  expected.r2 = .5, ## [.5]
-                  prior.df = .01, ##[.01]
-                  expected.model.size = 2, ## [1]
-                  prior.information.weight = .01, ## [.01]
-                  diagonal.shrinkage = 0.5,  ## [.5] setting=0 --> Zellner's G-prior
-                  # optional.coefficient.estimate = NULL,
-                  max.flips = -1,  ## <= 0 means all indicators will be sampled
-                  # prior.inclusion.probabilities = NULL,
-                  sigma.upper.limit = Inf
-                )
-
-              }
-              ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
-              st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
-                                                                y.pre.treat.NAs.post.treat,  
-                                                                state.conf.item)
-              if(verbose) cat(sprintf('add to state.space: %s\n',state.conf.item$name))
-            }
-          }
-        } else {
-          ## Default in CausalImpact package
-          st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post.treat)
-        }
-        # print(st.sp)
-        
-        if(verbose) cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
-        
-        ##-------------------------------
-        ## Regression component of model
-        if ('AddRegression' %in% state.comps) {
-          bsts.input.form <- y.pre.treat.NAs.post.treat ~ . ## with regression
-        } else {
-          bsts.input.form <- y.pre.treat.NAs.post.treat  ## without regression
-        }
-        
-        ##---------------------------------------------------------
-        ## RUN BSTS WITH DYNAMIC niter BASED ON CONVERGENCE 
-        isConverged <- FALSE
-        isMaxIter <- FALSE
-        hasBstsError <- FALSE
-        bsts.niter <- bsts.niter.orig  ## reset to original bsts.niter input value
-        while ( !isConverged  &  !isMaxIter & !hasBstsError  ) {
-          
-          # ##**DEBUG**
-          # print('st.sp')
-          # print(st.sp)
-          # ##
-          
-          ## BSTS model
-          bsts.model <- tryCatch(expr = {
-            bsts(formula = bsts.input.form,
-                 state.specification = st.sp,
-                 data = predictors,
-                 expected.model.size = expect.mod.size,
-                 niter = bsts.niter,
-                 ping = ifelse(verbose, round(bsts.niter/10), 0))
-          },
-          error=function(e) {
-            message(sprintf('bsts() error: %s', as.character(e)))
-          },
-          warning=function(w) {
-            message(sprintf('bsts() warning: %s', as.character(w)))
-          },
-          finally={
-            ##PASS
-          })
-          
-          
-          ## skip if bsts() function threw an error (not return 'bsts' object)
-          if ( class(bsts.model) == 'bsts' ) {
-            ## Use BSTS prediction of counterfactual to estimate CausalImpact
-            impact_amount <- CausalImpact(bsts.model=bsts.model,
-                                          post.period.response = post.period.response,
-                                          alpha=0.05, model.args = list(niter = bsts.niter))
-            ## POSTERIOR PREDICTIVE CHECKS
-            ppcheck.filename <- file.path(save.img.dir,
-                                          sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                                  prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
-            convcheck <- bstsPostPredChecks(bsts.model, filename=ppcheck.filename, return.val = T)
-            ##
-            # print(convcheck)
-            ##
-            if(verbose) cat(sprintf('\nBSTS niter = %s',bsts.niter))
-            if(verbose) cat(convcheck$summary)
-            ## UPDATE CONVERGENCE CHECK FLAG - ELSE RERUN WITH INCREASED bsts.niter
-            # isConverged <- convcheck$converged.all
-            conv.tol <- 0.8
-            conv.min.iter.thresh <- 4e4 ## 40k
-            # isConverged <- convcheck$converged.prop >= conv.tol
-            isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter >= conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
-            if(verbose) print(convcheck$converged)
-            if(verbose) cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
-                        convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
-          } else {
-            hasBstsError <- TRUE
-          }
-          
-          
-          ## UPDATE niter --> increase by factor of 2
-          if ( !isConverged ) {
-            # .niter <- round( bsts.niter * (2 - convcheck$converged.prop) ) ## scale niter increment by proportion of failed checks
-            bsts.niter.new <- round( (bsts.niter * 2) / 10) * 10  ## double niter and make divisible by 10 (for bsts ping=10 to divide evenly into niter)
-            if ( bsts.niter.new <= bsts.max.iter ) {
-              bsts.niter <- bsts.niter.new  
-            } else {
-              isMaxIter <- TRUE
-            }
-          }
-          
-          
-        }
-        
-        if (hasBstsError) {
-          next
-        }
-        ##-------------------------------------------------------------
-        
-        if (plot.show) {
-          ##
-          plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-          PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
-          if (bsts.model$has.regression) {
-            PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
-          }
-          ##
-        }
-        if (plot.save) {
-          #                         key,effect.type,sim.id))
-          p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
-          ggsave(filename = file.path(save.img.dir,
-                                      sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
-                                              prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
-          )
-        }
-
-        
-        ##-------------------
-        ## OVERALL CONFIDENCE INTERVALS AND PVALUES
-        ## OVERALL CAUSAL P-VALUE
-        pval.bsts.general <- impact_amount$summary$p[2]
-        # pval.did.general <- ccattgt
-        ci.bsts.general <- c(impact_amount$summary$AbsEffect.lower[1], impact_amount$summary$AbsEffect.upper[1]) 
-        ## MUST USE GROUP AGGREGATION TO GET critical.val.egt
-        ## (we only have one group [i.e., one treatment time])
-        # ci.did.general <- c(agg.group$overall.att - (agg.group$overall.se * agg.group$crit.val.egt),
-        #                     agg.group$overall.att + (agg.group$overall.se * agg.group$crit.val.egt))
-        ##-------------------
-        
-        # ## DID
-        # did.res <- tidy(agg.es)
-        ## BSTS
-        bsts.res <- impact_amount$series
-        # .nidx <- which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper'))
-        bsts.res <- bsts.res[ , which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper')) ]
-        names(bsts.res) <- c('bsts.point.effect','bsts.point.effect.lower','bsts.point.effect.upper')
-        
-        # plot(did.res)
-        
-        # ## AVERAGE TREATMENT EFFECT USED IN SIMULATION
-        # simdf
-        
-        tr.actors <- unique(simdf$actor[which(simdf$group=='treatment')])  
-        co.actors <- unique(simdf$actor[which(simdf$group=='control')])
-      
-        ##
-        # att.b3 <- mean(b3diff$diff[intpd:npds])
-        # att.did <- agg.es$overall.att
-        att.bsts <- impact_amount$summary$AbsEffect[1]
-        # 
-        
-        ##===============================================================
-
-        ##
-        simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
-        simlist[[key]]$compare$att.bsts <- att.bsts
-
-      } ## // end h loop over bsts.state components
-      
-      
-    } ## // end k loop over effect types
-    
-    
-    if ( save.sim.rds ) {
-      save.items.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
-      maxGb <- 6
-      # maxGb <- .001  ## **DEBUG**
-      if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
-        ## IF SMALL ENOUGH, Save simulation list as serialized data file
-        simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
-        save.file.path <-  file.path(save.items.dir, simlist.file)
-        saveRDS(simlist[[key]], file = save.file.path)
-        ##
-        # ## FREE UP MEMORY
-        # simlist[[key]] <- list(file = save.file.path)
-      } else { 
-        ## IF TOO LARGE, then save BSTS object (with MCMC samples) separately from rest of simulation
-        save.file.paths <- c()
-        ## Save simulation list as serialized data file
-        ## 1.  BSTS
-        simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s_simlist-compare-bsts.rds', n, npds, bsts.niter, sim.id, key.strip)
-        save.file.path <-  file.path(save.items.dir, simlist.file)
-        saveRDS(simlist[[key]]$compare$bsts, file = save.file.path)
-        simlist[[key]]$compare$bsts <- NULL ## save space
-        save.file.paths[1] <- save.file.path
-        ## 2. rest of simulation object
-        simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s_simlist-MAIN.rds', n, npds, bsts.niter, sim.id, key.strip)
-        save.file.path <-  file.path(save.items.dir, simlist.file)
-        saveRDS(simlist[[key]], file = save.file.path)
-        save.file.paths[2] <- save.file.path
-        ##
-        # ## FREE UP MEMORY
-        # simlist[[key]] <- list(file = save.file.paths)
-      }
-    } 
-    
-    
-  } ## // end simlist loop i   ##  #; dev.off()
-  
-  return(simlist)
-  
-}
+# #############################################
+# ##   BSTS computation on list of simulated time series
+# #############################################
+# fitBstsUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlist elements
+#                                  effect.types=c('constant','quadratic','geometric'), 
+#                                  sim.id=NA,
+#                                  save.items.dir=NA, ## save updated simlist items to seprate RDS files
+#                                  bsts.niter=1e3,
+#                                  bsts.max.iter=1e5, ## 80000
+#                                  plot.show=TRUE, plot.save=TRUE,
+#                                  verbose=TRUE, 
+#                                  save.sim.rds=TRUE
+# ) {
+#   ## cache original bsts.niter for dynamic niter updating if MCMC convergence failed
+#   bsts.niter.orig <- bsts.niter
+#   
+#   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
+#   # print(simlist)
+#   if (length(simlist) > 0 & length(names(simlist))==0) {
+#     names(simlist) <- 1:length(simlist)
+#   }
+#   
+#   ## Simulation ID
+#   if (is.na(sim.id)) {
+#     sim.id <- simlist[[1]]$sim$id
+#     if (is.null(sim.id) | is.na(sim.id)) {
+#       sim.id <- round(10*as.numeric(Sys.time()))
+#     } 
+#   } 
+#   
+#   ## IF save simlist items is NA, then save images to work_dir
+#   ## else save images to save.items.fir
+#   save.img.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
+#   
+#   ##===============================
+#   ##  BSTS State Specification Comparison 
+#   ##------------------------------
+#   for (i in 1:length(simlist))
+#   {
+#     key <- names(simlist)[i]
+#     key.strip <- gsub('[|]','',key,ignore.case = F, perl = T)
+#     if(verbose) cat(sprintf('\n%s, %s\n',i, key))
+#     
+#     simlist[[key]]$cordf <- data.frame()
+#     simlist[[key]]$compare <- list(bsts=list())
+#     
+#     ## simulation output from simulation scenario = simlist[[key]]
+#     npds <- simlist[[key]]$npds
+#     intpd <- simlist[[key]]$intpd
+#     n <- simlist[[key]]$n
+#     noise.level <- simlist[[key]]$noise.level
+#     
+#     ## Simulation object (containing the simulated timeseries)
+#     sim <- simlist[[key]]$sim
+#     # sim.id <- simlist[[key]]$sim$id
+#     
+#     
+#     ## list of BSTS State component lists
+#     bsts.state.specs <- simlist[[key]]$bsts.state.specs
+#     if (length(names(bsts.state.specs))==0) {
+#       names(bsts.state.specs) <- 1:length(bsts.state.specs)
+#     }
+#     
+#     # ## BSTS expected model size for spike-and-slab priors
+#     expect.mod.size <- ifelse(is.null(simlist[[key]]$expect.mod.size), NA, simlist[[key]]$expect.mod.size)
+#     
+#     
+#     ## Dynamic Treatment Effect Type shapes
+#     for (k in 1:length(effect.types)) 
+#     {
+#       
+#       effect.type <- effect.types[k]
+#       simdf <- sim$df[sim$df$effect.type == effect.type, ]
+#       
+#       ## Set group name 'gname' field, where 0 = control, # = period of treatment
+#       simdf$match_pd <- as.numeric(simdf$match_pd)
+#       simdf$gname <- 0
+#       simdf$gname[simdf$group=='treatment'] <- simdf$match_pd[simdf$group=='treatment']
+#       ## Remove NAs
+#       simdf <- simdf[!is.na(simdf$match_id), ]
+#       
+#                      
+#       ## Init output list wihtin simulations list
+#       simlist[[key]]$compare$bsts[[effect.type]] <- list()
+#       
+#       
+#       ##====================
+#       ## BSTS Timseries Setup
+#       ##--------------------
+#       ## Aggregate into timeseries dataframe
+#       tsdf <- simdf %>%
+#         dplyr::filter( ! is.na(match_id)) %>%
+#         group_by(t, t.post.intpd, effect.type, match_pd, gname, group, group.color) %>%
+#         dplyr::summarize(
+#           n_in_pd = n(),
+#           actors = paste(unique(actor), collapse = '|'),
+#           y_outcome = mean(y, na.rm=T),
+#           y_sum = sum(y, na.rm=T),
+#           y_sd = sd(y, na.rm=T),
+#           y_min = min(y, na.rm=T),
+#           y_max = max(y, na.rm=T),
+#           y_skew = skewness(y, na.rm = T, type = 2), ## moment-based distribution
+#           y_kurt = kurtosis(y, na.rm = T, type = 2), ## moment-based distribution
+#           ##
+#           x1_mean = mean(x1, na.rm=T),
+#           x2_mean = mean(x2, na.rm=T),
+#           x3_mean = mean(x3, na.rm=T),
+#           ##
+#           c1_mean = mean(c1, na.rm=T),
+#           c2_mean = mean(c2, na.rm=T),
+#           c3_mean = mean(c3, na.rm=T),
+#           #
+#           c1_sd = sd(c1, na.rm=T),
+#           c2_sd = sd(c2, na.rm=T),
+#           c3_sd = sd(c3, na.rm=T),
+#           ##
+#           c1_skew = skewness(c1, na.rm=T, type = 2),
+#           c2_skew = skewness(c2, na.rm=T, type = 2),
+#           c3_skew = skewness(c3, na.rm=T, type = 2),
+#           #
+#           c1_kurt = skewness(c1, na.rm=T, type = 2),
+#           c2_kurt = skewness(c2, na.rm=T, type = 2),
+#           c3_kurt = skewness(c3, na.rm=T, type = 2),
+#           #
+#           b1_mean = mean(b1, na.rm=T),
+#           b2_mean = mean(b2, na.rm=T),
+#           b3_mean = mean(b3, na.rm=T),
+#           #
+#           u_mean = mean(u, na.rm=T),
+#           v_mean = mean(v, na.rm=T)
+#         )
+#       tsdf$.id <- 1:nrow(tsdf)
+#       
+#       ## MAKE WIDE TIMESERIES FOR treatment,control groups in n periods
+#       val.cols <- c('y_outcome','y_sum','y_min','y_max','y_sd',
+#                     'y_skew','y_kurt',
+#                     'x1_mean','x2_mean','x3_mean',
+#                     'c1_mean','c2_mean','c3_mean',
+#                     'c1_sd','c2_sd','c3_sd',
+#                     'c1_skew','c2_skew','c3_skew',
+#                     'c1_kurt','c2_kurt','c3_kurt',
+#                     'b1_mean','b2_mean','b3_mean',
+#                     'u_mean','v_mean')
+#       ts <- unique(tsdf$t)
+#       groups <- unique(tsdf$group)
+#       ## init timeseries dataframe - wide
+#       tsdfw <- data.frame(t=ts,  stringsAsFactors = F)
+#       for (jj in 1:length(groups)) {
+#         id.j <- which( tsdf$group == groups[ jj ] ) 
+#         for (kk in 1:length(val.cols)) {
+#           df.col <- data.frame( tsdf[ id.j , val.cols[ kk ] ] )
+#           names(df.col) <- sprintf('%s_%s',groups[ jj ],val.cols[ kk ])
+#           tsdfw <- cbind(tsdfw,  df.col)
+#         }
+#       }
+#       
+#       
+#       # Set up pre- and post-treatment period
+#       # pre.period <- as.Date(c("2013-01-01","2016-01-25"))
+#       pre.period <- c(1, intpd-1)  
+#       # post.period <- as.Date(c("2016-01-26","2018-01-01"))
+#       post.period <- c(intpd, npds) 
+#       
+#       # # BSTS causal effect analysis using CausalImpact package
+#       # # CausalImpact option: 
+#       # # niter: Number of MCMC samples to draw. More samples lead to more accurate inferences. Defaults to 1000.
+#       # # standardize.data: Whether to standardize all columns of the data before fitting the model (i.e., setting Bayes priors), Defaults to TRUE.
+#       # # prior.level.sd: Prior standard deviation of the Gaussian random walk of the local level. Defaults to 0.01.
+#       # # nseasons: Period of the seasonal components. Default to 1.
+#       # # dynamic.regression: Whether to include time-varying regression coefficients. Defaults to FALSE.
+#       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
+#       # summary(impact_amount)
+#       # plot(impact_amount)
+#       dat <- tsdfw[,c('treatment_y_outcome',
+#                       'control_y_outcome',
+#                       # 'control_y_sd',#'control_y_sum', 'control_y_min','control_y_max',
+#                       # 'control_y_max','control_y_skew', 'control_y_kurt',
+#                       'control_c1_mean','control_c2_mean',  'control_c3_mean',
+#                       'control_c1_sd','control_c2_sd','control_c3_sd',
+#                       'control_c1_skew','control_c2_skew','control_c3_skew'#,
+#                       # 'control_c1_kurt','control_c2_kurt',
+#                       # 'control_c3_kurt'#,
+#                       # 'treatment_c1_mean','treatment_c2_mean','treatment_c3_mean',
+#                       # 'control_u_mean','control_v_mean'
+#       )]
+#       ## Train on y pre-treatment but NA's post-treatment
+#       y.pre.treat.NAs.post.treat <- c(dat$treatment_y_outcome[1:(intpd-1)], rep(NA,npds-intpd+1))
+#       ## Then use the post-treatment response for causal impact estimation
+#       post.period.response <- dat$treatment_y_outcome[intpd:npds]
+#       ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
+#       predictors <- dat[, ! names(dat) %in% 'treatment_y_outcome'] ## remove response; convert to matrix
+#       # ## Covariates (predictors) - Dataframe for "data" argument
+#       # predictors <- as.matrix(predictors) 
+#       
+#       ## ADD temporal trend to covariates
+#       predictors$covar_temp_trend <- (1:npds) + rnorm(npds, 0, noise.level)   ## * simlist$`0.rand.base`$b5
+#       
+#       ## ***DEBUG***
+#       # print("bsts.state.specs:")
+#       # print(bsts.state.specs)
+#       ##
+#       
+#       ##----------------------------
+#       ## State Space Configuration
+#       ##----------------------------
+#       ## LOOP OVER BSTS STATE SPECIFICATIONS FOR THE SAME SIMULATION RUN
+#       for (h in 1:length(bsts.state.specs)) 
+#       {
+#         simlist[[key]]$compare$bsts[[effect.type]][[ h ]] <- list()
+#         
+#         ## h'th BSTS state space configuration (state component list)
+#         state.conf <- bsts.state.specs[[ h ]]
+#         
+#         ## names of 
+#         state.comps <- unname(sapply(state.conf, function(x){
+#           ifelse(class(x)=='list' & 'name' %in% names(x), x$name, 'ERROR x$name not set in state.conf[x]')
+#         }, simplify = T))
+#       
+#         ## Loop over state space components
+#         nss <- length(state.conf)
+#         ## State Space Config list
+#         st.sp <- list()
+#         if (nss > 0) {
+#           for (jj in 1:nss) {
+#             state.conf.item <- state.conf[[ jj ]]
+#             if (class(state.conf.item)=='list') {
+#               
+#               if(state.conf.item$name=='AddSharedLocalLevel') {
+#                 state.conf$coefficient.prior <- SpikeSlabPrior(
+#                   x = predictors,
+#                   y = dat$treatment_y_mean, ##**NOTE** USING ALL Y VALS (not just y.pre.treat.NAs.post.treat)
+#                   expected.r2 = .5, ## [.5]
+#                   prior.df = .01, ##[.01]
+#                   expected.model.size = 2, ## [1]
+#                   prior.information.weight = .01, ## [.01]
+#                   diagonal.shrinkage = 0.5,  ## [.5] setting=0 --> Zellner's G-prior
+#                   # optional.coefficient.estimate = NULL,
+#                   max.flips = -1,  ## <= 0 means all indicators will be sampled
+#                   # prior.inclusion.probabilities = NULL,
+#                   sigma.upper.limit = Inf
+#                 )
+# 
+#               }
+#               ## [[ IF NOT AddSharedLocalLevel(), NOT INCLUDING SPIKESLABPRIOR ]]
+#               st.sp <- updateStateSpaceAddComponentFromConfList(st.sp,  
+#                                                                 y.pre.treat.NAs.post.treat,  
+#                                                                 state.conf.item)
+#               if(verbose) cat(sprintf('add to state.space: %s\n',state.conf.item$name))
+#             }
+#           }
+#         } else {
+#           ## Default in CausalImpact package
+#           st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post.treat)
+#         }
+#         # print(st.sp)
+#         
+#         if(verbose) cat(sprintf('\nRunning BSTS model estimation for state.conf h=%s\n',h))
+#         
+#         ##-------------------------------
+#         ## Regression component of model
+#         if ('AddRegression' %in% state.comps) {
+#           bsts.input.form <- y.pre.treat.NAs.post.treat ~ . ## with regression
+#         } else {
+#           bsts.input.form <- y.pre.treat.NAs.post.treat  ## without regression
+#         }
+#         
+#         ##---------------------------------------------------------
+#         ## RUN BSTS WITH DYNAMIC niter BASED ON CONVERGENCE 
+#         isConverged <- FALSE
+#         isMaxIter <- FALSE
+#         hasBstsError <- FALSE
+#         bsts.niter <- bsts.niter.orig  ## reset to original bsts.niter input value
+#         while ( !isConverged  &  !isMaxIter & !hasBstsError  ) {
+#           
+#           # ##**DEBUG**
+#           # print('st.sp')
+#           # print(st.sp)
+#           # ##
+#           
+#           ## BSTS model
+#           bsts.model <- tryCatch(expr = {
+#             bsts(formula = bsts.input.form,
+#                  state.specification = st.sp,
+#                  data = predictors,
+#                  expected.model.size = expect.mod.size,
+#                  niter = bsts.niter,
+#                  ping = ifelse(verbose, round(bsts.niter/10), 0))
+#           },
+#           error=function(e) {
+#             message(sprintf('bsts() error: %s', as.character(e)))
+#           },
+#           warning=function(w) {
+#             message(sprintf('bsts() warning: %s', as.character(w)))
+#           },
+#           finally={
+#             ##PASS
+#           })
+#           
+#           
+#           ## skip if bsts() function threw an error (not return 'bsts' object)
+#           if ( class(bsts.model) == 'bsts' ) {
+#             ## Use BSTS prediction of counterfactual to estimate CausalImpact
+#             impact_amount <- CausalImpact(bsts.model=bsts.model,
+#                                           post.period.response = post.period.response,
+#                                           alpha=0.05, model.args = list(niter = bsts.niter))
+#             ## POSTERIOR PREDICTIVE CHECKS
+#             ppcheck.filename <- file.path(save.img.dir,
+#                                           sprintf('%s_bsts_post_pred_checks_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+#                                                   prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+#             convcheck <- bstsPostPredChecks(bsts.model, filename=ppcheck.filename, return.val = T)
+#             ##
+#             # print(convcheck)
+#             ##
+#             if(verbose) cat(sprintf('\nBSTS niter = %s',bsts.niter))
+#             if(verbose) cat(convcheck$summary)
+#             ## UPDATE CONVERGENCE CHECK FLAG - ELSE RERUN WITH INCREASED bsts.niter
+#             # isConverged <- convcheck$converged.all
+#             conv.tol <- 0.8
+#             conv.min.iter.thresh <- 4e4 ## 40k
+#             # isConverged <- convcheck$converged.prop >= conv.tol
+#             isConverged <- convcheck$converged.all | (convcheck$converged.prop >= conv.tol & bsts.niter >= conv.min.iter.thresh) ## don't allow incomplete check below minimum threshold of bsts.niter = 10k 
+#             if(verbose) print(convcheck$converged)
+#             if(verbose) cat(sprintf('Converged proportion = %.3f (tol = %.3f) (min.iter.converg.thresh=%s)\nConverged status = %s\n\n',
+#                         convcheck$converged.prop, conv.tol, conv.min.iter.thresh,  isConverged))
+#           } else {
+#             hasBstsError <- TRUE
+#           }
+#           
+#           
+#           ## UPDATE niter --> increase by factor of 2
+#           if ( !isConverged ) {
+#             # .niter <- round( bsts.niter * (2 - convcheck$converged.prop) ) ## scale niter increment by proportion of failed checks
+#             bsts.niter.new <- round( (bsts.niter * 2) / 10) * 10  ## double niter and make divisible by 10 (for bsts ping=10 to divide evenly into niter)
+#             if ( bsts.niter.new <= bsts.max.iter ) {
+#               bsts.niter <- bsts.niter.new  
+#             } else {
+#               isMaxIter <- TRUE
+#             }
+#           }
+#           
+#           
+#         }
+#         
+#         if (hasBstsError) {
+#           next
+#         }
+#         ##-------------------------------------------------------------
+#         
+#         if (plot.show) {
+#           ##
+#           plot(bsts.model, main=sprintf('BSTS Plot: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+#           PlotBstsComponents(bsts.model) ## , main=sprintf('BSTS Components: %s: %s',effect.type,paste(state.comps,collapse = ' + '))
+#           if (bsts.model$has.regression) {
+#             PlotBstsSize(bsts.model, main=sprintf('BSTS Size: %s: %s',effect.type,paste(state.comps,collapse = ' + ')))
+#           }
+#           ##
+#         }
+#         if (plot.save) {
+#           #                         key,effect.type,sim.id))
+#           p.bsts.impact.all <- plot(impact_amount, c('original','pointwise','cumulative')) # pointwise','cumulative
+#           ggsave(filename = file.path(save.img.dir,
+#                                       sprintf('%s_bsts_CausalImpact_plot_n%s_pd%s_ss%s_niter%s_%s_%s_%s.png',
+#                                               prefix,n,npds,h,bsts.niter,key.strip,effect.type,sim.id))
+#           )
+#         }
+# 
+#         
+#         ##-------------------
+#         ## OVERALL CONFIDENCE INTERVALS AND PVALUES
+#         ## OVERALL CAUSAL P-VALUE
+#         pval.bsts.general <- impact_amount$summary$p[2]
+#         # pval.did.general <- ccattgt
+#         ci.bsts.general <- c(impact_amount$summary$AbsEffect.lower[1], impact_amount$summary$AbsEffect.upper[1]) 
+#         ## MUST USE GROUP AGGREGATION TO GET critical.val.egt
+#         ## (we only have one group [i.e., one treatment time])
+#         # ci.did.general <- c(agg.group$overall.att - (agg.group$overall.se * agg.group$crit.val.egt),
+#         #                     agg.group$overall.att + (agg.group$overall.se * agg.group$crit.val.egt))
+#         ##-------------------
+#         
+#         # ## DID
+#         # did.res <- tidy(agg.es)
+#         ## BSTS
+#         bsts.res <- impact_amount$series
+#         # .nidx <- which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper'))
+#         bsts.res <- bsts.res[ , which(names(bsts.res) %in% c('point.effect','point.effect.lower','point.effect.upper')) ]
+#         names(bsts.res) <- c('bsts.point.effect','bsts.point.effect.lower','bsts.point.effect.upper')
+#         
+#         # plot(did.res)
+#         
+#         # ## AVERAGE TREATMENT EFFECT USED IN SIMULATION
+#         # simdf
+#         
+#         tr.actors <- unique(simdf$actor[which(simdf$group=='treatment')])  
+#         co.actors <- unique(simdf$actor[which(simdf$group=='control')])
+#       
+#         ##
+#         # att.b3 <- mean(b3diff$diff[intpd:npds])
+#         # att.did <- agg.es$overall.att
+#         att.bsts <- impact_amount$summary$AbsEffect[1]
+#         # 
+#         
+#         ##===============================================================
+# 
+#         ##
+#         simlist[[key]]$compare$bsts[[effect.type]][[ h ]]$CausalImpact <- impact_amount
+#         simlist[[key]]$compare$att.bsts <- att.bsts
+# 
+#       } ## // end h loop over bsts.state components
+#       
+#       
+#     } ## // end k loop over effect types
+#     
+#     
+#     if ( save.sim.rds ) {
+#       save.items.dir <- ifelse(is.na(save.items.dir), getwd(), save.items.dir)
+#       maxGb <- 6
+#       # maxGb <- .001  ## **DEBUG**
+#       if ( (object.size(simlist[[key]])/1e9) <= maxGb) {
+#         ## IF SMALL ENOUGH, Save simulation list as serialized data file
+#         simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s.rds', n, npds, bsts.niter, sim.id, key.strip)
+#         save.file.path <-  file.path(save.items.dir, simlist.file)
+#         saveRDS(simlist[[key]], file = save.file.path)
+#         ##
+#         # ## FREE UP MEMORY
+#         # simlist[[key]] <- list(file = save.file.path)
+#       } else { 
+#         ## IF TOO LARGE, then save BSTS object (with MCMC samples) separately from rest of simulation
+#         save.file.paths <- c()
+#         ## Save simulation list as serialized data file
+#         ## 1.  BSTS
+#         simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s_simlist-compare-bsts.rds', n, npds, bsts.niter, sim.id, key.strip)
+#         save.file.path <-  file.path(save.items.dir, simlist.file)
+#         saveRDS(simlist[[key]]$compare$bsts, file = save.file.path)
+#         simlist[[key]]$compare$bsts <- NULL ## save space
+#         save.file.paths[1] <- save.file.path
+#         ## 2. rest of simulation object
+#         simlist.file <- sprintf('__fitBstsUpdateSimlist__n%s_pd%s_niter%s_%s_%s_simlist-MAIN.rds', n, npds, bsts.niter, sim.id, key.strip)
+#         save.file.path <-  file.path(save.items.dir, simlist.file)
+#         saveRDS(simlist[[key]], file = save.file.path)
+#         save.file.paths[2] <- save.file.path
+#         ##
+#         # ## FREE UP MEMORY
+#         # simlist[[key]] <- list(file = save.file.paths)
+#       }
+#     } 
+#     
+#     
+#   } ## // end simlist loop i   ##  #; dev.off()
+#   
+#   return(simlist)
+#   
+# }
 
 
 

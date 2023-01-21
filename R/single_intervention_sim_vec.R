@@ -264,6 +264,8 @@ runSimSingleIntervention <- function(
     ## SEASONALITY 
     nseasons, ##  NA omits seasonality; integer values incluce seasonality with nseasons
     season.frequency, ##1, ## number of completed sin waves within 1 cycle of nseasons
+    ## COVARIATES
+    covariates.type,
     ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
     g0 = .1,
     g1 = .1,
@@ -504,6 +506,11 @@ runSimSingleIntervention <- function(
     ## 
     c3.tm1 <- if (t==1) { rep(0, n) } else { df$c3[idx.tm1] }
     
+    ## initiate current-period covariate empty vectors
+    c1 <- rep(NA, n)
+    c2 <- rep(NA, n)
+    c3 <- rep(NA, n)
+    
     # ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # # c1 <- rpois(n, lambda = noise.level*0.8) + 1
     # # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
@@ -535,26 +542,57 @@ runSimSingleIntervention <- function(
     # c3 <- rnorm(n, c3.tm1, sd = noise.level )
     # # c3 <- rpois(n, lambda = max(.1, c3.tm1)  )
     
-    # ## IDs of treatment and control
-    # ## Treatment
-    # .idx.t <- which( x1*x2 == 1 )
-    # n.t <- length(.idx.t)
+    ##**COVARIATES** 
+    ## IDs of treatment and control
+    ## Treatment
+    .idx.t <- which( x1*x2 == 1 )
+    n.t <- length(.idx.t)
     ## Control
     .idx.c <- which( x1*x2 != 1 )
     n.c <- length(.idx.c)
     
-    ###**COV CASE 1: CONTROL**
-    ###*
-    y.ctrl.mean <- mean(y.tm1[.idx.c], na.rm=T)
-    y.ctrl.sd  <- sd(y.tm1[.idx.c], na.rm=T)
-    # print('y.ctrl.mean')
-    # print(y.ctrl.mean)
-    # print('y.ctrl.sd')
-    # print(y.ctrl.sd)
-    # c1 <- rnorm( .2 * rep(y.ctrl.mean^.5 + .5, n),  max(y.ctrl.sd * .5, .01) ) 
-    c1 <- rnorm(n,  .01 * t, noise.level * .01)
-    c2 <- rnorm( .005 * rep( -t * y.ctrl.mean , n), max(y.ctrl.sd * .15 , .01) )
-    c3 <- rnorm( .05 * rep( y.ctrl.mean - 1, n), max(y.ctrl.sd * .02, .01) )
+    if (covariates.type == 'control') {
+      
+      ### **COV CASE 1: CONTROL**
+      ###
+      y.ctrl.mean <- mean(y.tm1[.idx.c], na.rm=T)
+      y.ctrl.sd  <- sd(y.tm1[.idx.c], na.rm=T)
+      # print('y.ctrl.mean')
+      # print(y.ctrl.mean)
+      # print('y.ctrl.sd')
+      # print(y.ctrl.sd)
+      # c1 <- rnorm( .2 * rep(y.ctrl.mean^.5 + .5, n),  max(y.ctrl.sd * .5, .01) ) 
+      ##
+      c1 <- rnorm(n,  .01 * t, noise.level * .2)
+      c2 <- rnorm(n, -.0001 * t * y.ctrl.mean , noise.level * .1 )
+      c3 <- rnorm(n, 0.1 *  y.ctrl.mean , noise.level * .1 )
+      ## 
+      # c1 <- rnorm(n,  .01 * t, noise.level * .5)
+      # c2 <- rnorm(n, -.005 * t * y.ctrl.mean,   noise.level * .2 )
+      # c3 <- rnorm(n,  .1 * y.ctrl.mean ,  noise.level * .3 )
+      
+    # } else if (covariates.type == 'conditional') {
+    # 
+    #   ## **COV CASE 1: CONTROL**
+    #   c1[.idx.c] <- rnorm(n.c,  .5, noise.level * 1)
+    #   c2[.idx.c] <- rnorm(n.c,  .015 * t, noise.level * 1.5)
+    #   c3[.idx.c] <- rnorm(n.c, -.01 * t, noise.level * .5)
+    #   ## **COV CASE 2: TREATMENT**
+    #   c1[.idx.t] <- rnorm(n.t,  1, noise.level * .5)
+    #   c2[.idx.t] <- rnorm(n.t,  .02 * t, noise.level * 1)
+    #   c3[.idx.t] <- rnorm(n.t, -.005 * t, noise.level * .1)
+      
+    } else if (covariates.type == 'random') {
+      
+      c1 <- rnorm(n,  .5, noise.level * .5)
+      c2 <- rnorm(n,  .002 * t, noise.level * .1)
+      c3 <- rnorm(n, -.001 * t, noise.level * .05)
+      
+    } else {
+      stop(sprintf('covariates.type `%s` is not in options set: (random, control)',
+                   covariates.type))
+    }
+
     # c1 <- rnorm(n,  .5, noise.level * 1)
     # c2 <- rnorm(n,  .015 * t, noise.level * 1.5)
     # c3 <- rnorm(n, -.01 * t, noise.level * .5)
@@ -619,9 +657,11 @@ runSimSingleIntervention <- function(
                        b6=rep(b6, n),
                        b7=rep(b7, n),
                        b8=rep(b8, n),
+                       # b9=rep(b9, n),
                        localLevel=localLevel,
                        c1=c1, c2=c2, c3=c3,
                        u=u, v=v,
+                       covariates.type=covariates.type,
                        stringsAsFactors = F)
     
     if (nrow(df.t) != n) {
@@ -914,6 +954,8 @@ runSimSingleInterventionEffectComparison <- function(
     ## SEASONALITY 
     nseasons = NA, ##  NA omits seasonality; integer values incluce seasonality with nseasons
     season.frequency = 1, ## number of completed sin waves within 1 cycle of nseasons
+    ## COVARIATES
+    covariates.type='random',
     ## # ENDOGENOUS TREATMENT SELECTION [x1[t](y[t-1])] FUNCTION PARAMETERS
     g0 = .1,   ## TODO CHECK SENSITIVITY TO THESE PARAMS
     g1 = .1,
@@ -975,6 +1017,7 @@ runSimSingleInterventionEffectComparison <- function(
       # w2.shift=w2.shift, 
       nseasons=nseasons, 
       season.frequency=season.frequency,
+      covariates.type=covariates.type,
       g0=g0, 
       g1=g1, 
       logit.shift=logit.shift, 
@@ -1212,6 +1255,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
                                 effect.types=c('constant','quadratic','geometric'), 
                                 sim.id=round(10*as.numeric(Sys.time())),
                                 dgp.prior.sd.weight=.01,
+                                covariates.type='random', ## c('random','conditional','control')
                                 plot.show=F, plot.save=F, verbose=TRUE) {
   
   # print("runSimBstsDiDComparison()::SIMLIST INPUT:")
@@ -1262,6 +1306,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       ##
       nseasons  = ifelse(is.null(sim$dgp.nseasons), NA, sim$dgp.nseasons), 
       season.frequency = ifelse(is.null(sim$dgp.freq), NA, sim$dgp.freq),
+      ##
+      covariates.type = ifelse(is.null(sim$covariates.type), NA, sim$covariates.type), 
       ##
       dgp.prior.sd.weight=dgp.prior.sd.weight,
       ## Plotting

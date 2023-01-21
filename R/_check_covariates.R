@@ -97,6 +97,7 @@ prior.sd.scenarios <- list('sd.low') ## list('sd.low','sd.high')  ## sd.low
 # cov.scenarios <- list(high=list(c1=.5, c2=.6, c3=.7), 
 #                       mid=list(c1=.2, c2=.3, c3=.4),
 #                       low=list(c1=.05, c2=.1, c3=.15))
+covariates.types <- list('random')  ## random, control
 ## FOCAL CONSTRUCT
 dgp.ars <- list(0)  ## 0.6  ## .1,.2,.4
 ## STATE SPACE CONFIGURATIONS
@@ -194,17 +195,17 @@ for (d in 1:length(ns)) {
               bsts.state.specs[[ paste(st.sp.vec, collapse='|') ]] <- bsts.state.config
             }
             
-            # ## COVARIATE SCENARIOS
-            # for (l in 1:length(cov.scenarios)) {
-            #   cov.scenario <- cov.scenarios[[ l ]]
-            #   cov.scenario.key <- names(cov.scenarios)[[ l ]]
-            #   # for (m in 1:length(bsts.n.cov.cats.list)) {
-            #   #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
+            ## COVARIATE SCENARIOS
+            for (l in 1:length(covariates.types)) {
+              cov.type <- covariates.types[[ l ]]
+  
+              # for (m in 1:length(bsts.n.cov.cats.list)) {
+              #   bsts.n.cov.cats <- bsts.n.cov.cats.list[[ m ]]
                 
                 ##--------------------------------------------
                 ## Append simulation configuration to simlist
                 ##--------------------------------------------
-                key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s', d,f,g,h,i,j)
+                key <- sprintf('d%s|f%s|g%s|h%s|i%s|j%s|l%s', d,f,g,h,i,j,l)
                 cat(sprintf('\n%s\n',key))
                 # .idx <- sprintf('ar%s',dgp.ar)
                 simlist[[ key ]] <- list(
@@ -231,13 +232,14 @@ for (d in 1:length(ns)) {
                   dgp.nseasons= ifelse(seasonality, dgp.nseasons, NA), 
                   dgp.freq= ifelse(seasonality, dgp.freq, NA),
                   bsts.state.specs=bsts.state.specs,
+                  covariates.type = cov.type,
                   # bsts.state.specs=list(list(AddSemilocalLinearTrend),list(AddSemilocalLinearTrend,AddStudentLocalLinearTrend)),
                   rand.seed = 321
                 )
                 
               # }  // end m list n.cov.cats (?)
               
-            # } ## // end l loop over cov.scenarios 
+            } ## // end l loop over cov.scenarios
             
           } ## // end prior.sd.scenarios loop
           
@@ -264,7 +266,7 @@ sim.id <- round(10*as.numeric(Sys.time()))
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
                                plot.show = F, plot.save = F,
-                               dgp.prior.sd.weight=.01)
+                               dgp.prior.sd.weight=.01 ) ## c('random','conditional','control')
 
 ##------------------- RUN BSTS; COMPARE vs. DID ---------------------
 ## `bsts.ctrl.cats` control group category definitions:
@@ -273,7 +275,7 @@ simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
 ##  [1+ ] = Synthetic control series created by binning each covariate to make control group (N categories per covariates; 
 ##          num.groups = Cartesian product of all binned covariates, 
 ##          (e.g., bsts.ctrl.cats=3 for 3 covs (c1,c2,c3) --> 3*3*3=27 series to choose from for synthetic controls)
-bsts.ctrl.cats.list <- list(1, NA)  #list(1, NA) ## NA=no control;
+bsts.ctrl.cats.list <- list(NA)  #list(1, NA) ## NA=no control;
 ## BSTS expected model size (for spike-and-slab priors)
 bsts.expect.mod.sizes <- list(3)  #list(1, 3, 5, 7) # 1  ## list(7, 4, 1)
 ## MCMC Iterations
@@ -297,6 +299,8 @@ for (m in 1:length(bsts.ctrl.cats.list)) {
     # break   ##**DEBUG**
   }
 }
+
+ 
 
 
 ##----------------------- END ---------------------------------------
