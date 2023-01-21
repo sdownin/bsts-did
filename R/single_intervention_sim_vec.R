@@ -565,7 +565,7 @@ runSimSingleIntervention <- function(
       ##
       c1 <- rnorm(n,  .01 * t, noise.level * .2)
       c2 <- rnorm(n, -.0001 * t * y.ctrl.mean , noise.level * .1 )
-      c3 <- rnorm(n, 0.1 *  y.ctrl.mean , noise.level * .1 )
+      c3 <- rnorm(n, 0.1 *  y.ctrl.mean , noise.level * .05 )
       ## 
       # c1 <- rnorm(n,  .01 * t, noise.level * .5)
       # c2 <- rnorm(n, -.005 * t * y.ctrl.mean,   noise.level * .2 )
