@@ -1348,7 +1348,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
   pred <- if (bsts.model$has.regression) {
     newdata <- bsts.model$predictors[1:(intpd-1), ]
     newdata <- cbind(response=response[1:(intpd-1)], newdata)
-    predict.bsts(bsts.model, newdata = newdata , burn = burn) ## already knows horizon from 
+    predict.bsts(bsts.model, newdata = newdata , burn = burn, timestamps = -((intpd-1):1)) ## already knows horizon from 
   } else {
     predict.bsts(bsts.model, burn = burn, 
                  horizon = intpd-1,
@@ -1529,7 +1529,13 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
     burn <- round( niter * .2 )
   }
   
-  ## Newdata (post-intervention data) to predict via BSTS
+  idx.noburn <- (burn+1):niter
+  
+  ## before intervention period bool dummy
+  .ind <- (1:npds) %in% idx.pre
+  # .ind <- (1:npds) < intpd
+  
+  ## observed data to predict via BSTS
   hasRegression <- bsts.model$has.regression
   if (hasRegression) {
     newdata <- bsts.model$predictors[idx.pre, ]
@@ -1542,29 +1548,44 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   # print('newdata[1:10,]')
   # print(newdata[1:10,])
   # ##**
-  
-  # predict.mbsts()
-  post.pred <- if (hasRegression) {
-    predict.bsts(bsts.model, newdata = newdata , burn = burn) ## already knows horizon from 
-  } else {
-    predict.bsts(bsts.model, burn = burn, 
-                 horizon = intpd-1,
-                 olddata = response[idx.pre])
-  }
-  
   # ##**DEBUG**
   # plot(post.pred$mean, col='red',type='l',ylim=c(-2,6)); points(response[1:(intpd-1)], col='black', pch=16, main='DEBUG')
   # print('post.pred:')
   # print(post.pred)
   # ##
   
-  post.pred.dist <- post.pred$distribution
-  post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
+  ##-- Prediction distribution ----------------------------------------
+  ##  in sample forecasts for plotting predicted-observed distributions
+  pred.in.samp <- if (hasRegression) {
+    predict.bsts(bsts.model, newdata = newdata , burn = burn) ## already knows horizon from
+  } else {
+    predict.bsts(bsts.model, burn = burn,
+                 horizon = intpd-1,
+                 olddata = response[idx.pre])
+  }
+  pred.in.samp.dist <- pred.in.samp$distribution  ## [niter - burn,  1:(intpd-1) ]
+  pred.in.samp.mean <- colMeans(pred.in.samp.dist, na.rm = T)
+  ##--------------------------------------------------------------------
   
-  ## before intervention period bool dummy
-  .ind <- (1:npds) %in% idx.pre
-  # .ind <- (1:npds) < intpd
+  ##-- Error distributions ------------------------------------
+  ##   1-step ahead prediction error 
+  # ## matrix [niter - burn,  1:(intpd-1) ]
+  # post.pred.dist <- post.pred$distribution
+  # ## vector of length(1:(intpd-1))
+  # post.pred.mean <- post.pred$mean ##apply(post.pred$distribution, c(1), mean)
+  #####
+  # standardized errors of 1-step ahead prediction (pre-intervention window)
+  err.1step.dist <- bsts.model$one.step.prediction.errors[idx.noburn, idx.pre]
+  ##### ^ this is SAME as:
+  # # err.1step.std.all <- bsts.prediction.errors(bsts.model, burn = burn, standardize = T)
+  # # err.1step.dist <- err.1step.std.all$in.sample[ , idx.pre]
+  #####
+  ## Periodwise means of 1-step ahead errors from MCMC iterations 
+  err.1step.mean <- colMeans(err.1step.dist, na.rm=T)
+  ##----------------------------------------------------------
   
+  
+  ##========================= PLOTTING =========================================
   if (save.plot) {
     png(filename = ppcheck.filename, width = 15, height = 10, units = 'in', res = 400)
   }
@@ -1573,11 +1594,15 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   
   ##===================
   ## Posterior Predictive (Y) plots 
+  ##
+  ##   - use predictions from in-sample window  
+  ##      `pred.in.samp.dist`, `pred.in.samp.mean`
+  ##
   ##-------------------
   
   ##-----------
   ## Trace plot of Posterior Predictive distribution Markov Chain 
-  post.pred.tr <- rowMeans(post.pred.dist)
+  post.pred.tr <- rowMeans(pred.in.samp.dist)
   ##
   gd <- geweke.diag(post.pred.tr, .1, .5)
   gd.z <- abs(gd$z) ## z statistic
@@ -1615,14 +1640,14 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   ##-----------
   ## DENSITIES
   plot(density(y[.ind]),  main = "B. Density comparison, Y")
-  lines(density(post.pred.mean), lwd=2, lty=2, col='red')
+  lines(density(pred.in.samp.mean), lwd=2, lty=2, col='red')
   legend('topleft', legend=c('observed','predicted'), lty=c(1,2), col=c('black','red'))
   ##-----------
   
   ##-----------
   ## HISTOGRAMS & BAYESIAN P-VALUES
   # max.distrib <- apply(post.pred, c(2, 3), max)
-  max.distrib <- apply(post.pred$distribution, 1, max)
+  max.distrib <- apply(pred.in.samp.dist, 1, max)
   pvalue <- sum(max.distrib >= max(y[.ind]))/length(max.distrib)
   hist(max.distrib, 30, col = "lightblue", border = "grey", 
        main = paste0("C. Bayesian p-val (Max Y) = ", round(pvalue, 2)),
@@ -1632,16 +1657,23 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   
   ##===================
   ## Std. Residual plots
+  ##
+  ##   - use errors from 1-step ahead predictions (pre-intervention window)
+  ##      `err.1step.dist`, `err.1step.mean`
+  ##
   ##-------------------
-  y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
-  # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
-  res <-  y.rep - t(post.pred.dist)
-  std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
-  # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+  # y.rep <- matrix(y[.ind], length(y[.ind]), (niter - burn),  byrow = FALSE)
+  # # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+  # res <-  y.rep - t(post.pred.dist)
+  # std.res <- res / apply(res,1,sd)   ## [residual i] / [ stdev of residual i]
+  # # std.res <- t(apply(res, 1, FUN = "/", sqrt(CausalMBSTS$mcmc$Sigma.eps[i, i, ])))
+  err.1step.dist <- err.1step.dist
+  
   
   ##-----------
   ## Trace plot of Posterior Predictive distribution Markov Chain 
-  res.tr <- colMeans(std.res)
+  # res.tr <- colMeans(std.res)
+  res.tr <- rowMeans(err.1step.dist)
   ##
   gd <- geweke.diag(res.tr, .1, .5)
   gd.z <- abs(gd$z) ## z statistic
@@ -1677,13 +1709,13 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   
   ##-----------
   # Std. Residual Normality plot
-  qqnorm(rowMeans(std.res), main = "E. Std.Residual QQ-plot, Y")
-  qqline(rowMeans(std.res))
+  qqnorm(rowMeans(err.1step.dist), main = "E. Std.Residual QQ-plot, Y")
+  qqline(rowMeans(err.1step.dist))
   ##-----------
   
   ##-----------
   ## Std Residual ACF
-  Acf(rowMeans(std.res), main = "");title(main='F. Std.Residual ACF, Y')
+  Acf(rowMeans(err.1step.dist), main = "");title(main='F. Std.Residual ACF, Y')
   ##-----------
   
   ##----------- end PNG PLOT --------------------------------------
@@ -1693,8 +1725,8 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   
   ##
   if(return.val) {
-    checklist$std.residual <- std.res
-    checklist$postpred.dist <- post.pred.dist
+    checklist$err.1step.dist <- err.1step.dist
+    checklist$pred.in.samp.dist <- pred.in.samp.dist
     checklist$summary <- sprintf('\nPosterior Predictive:-----\n%s\nStd. Residuals:-----\n%s\n\n', mtext.postpred, mtext.residual)
     
     ## ALL CONVERGENCE CHECKS

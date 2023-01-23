@@ -613,7 +613,9 @@ runSimSingleIntervention <- function(
     #                             mean = mu.vec,
     #                             sigma = sig.mat)
     # correlated random variables
-    Cmvt <- cbind(c1, c2, c3) %*% sig.mat
+    # Cmvt <- cbind(c1, c2, c3) %*% sig.mat
+    
+    Cmvt <- cbind(c1, c2, c3) 
     
     ##-------------------------------------
     ## PERFORMANCE
@@ -1272,7 +1274,7 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
     sim <- simlist[[key]]
     if(verbose) cat(sprintf('\nScenario label: %s\n\n', key))
     ##  
-    set.seed( ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed) )
+    rand.seed <- ifelse(is.null(sim$rand.seed), 54321, sim$rand.seed)
     noise.level <- ifelse(is.null(sim$noise.level), 0, sim$noise.level)
     ##
     # cov.scenario <- if(is.null(sim$cov.scenario)){list(c1=.1, c2=.2, c3=.3)} else{ sim$cov.scenario }
@@ -1310,6 +1312,8 @@ runSimUpdateSimlist <- function(simlist,     ## n, npds, intpd moved into simlis
       covariates.type = ifelse(is.null(sim$covariates.type), NA, sim$covariates.type), 
       ##
       dgp.prior.sd.weight=dgp.prior.sd.weight,
+      ##
+      rand.seed = rand.seed,
       ## Plotting
       plot.show = plot.show, ## TRUE
       plot.save = plot.save, ## TRUE

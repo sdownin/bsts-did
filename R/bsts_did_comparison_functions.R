@@ -281,6 +281,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
     n <- simlist[[key]]$n
     noise.level <- simlist[[key]]$noise.level
     covariates.type <- simlist[[key]]$covariates.type
+    rand.seed <- simlist[[key]]$rand.seed
     
     ## Simulation object (containing the simulated timeseries)
     sim <- simlist[[key]]$sim
@@ -324,6 +325,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       nrow.sdf <- nrow(simdf)
       
       ## Compute Multiperiod DiD for Avg Treatment Effect on Treated
+      set.seed( rand.seed )
       ccattgt <- att_gt(yname = "y", ## "Y",
                         tname = "t",
                         idname = "actor",
@@ -728,7 +730,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         hasBstsError <- FALSE
         bsts.niter <- bsts.niter.orig  ## reset to original bsts.niter input value
         while ( !isConverged  &  !isMaxIter & !hasBstsError  ) {
-          
+          set.seed( rand.seed )
           ## BSTS model
           bsts.model <- tryCatch(expr = {
             bsts(formula = bsts.input.form,

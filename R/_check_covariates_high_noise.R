@@ -282,7 +282,7 @@ for (d in 1:length(ns)) {
 ##---------------- RUN SIM GENERATE DATA SET -----------------------
 
 ##
-effect.types = c('geometric','constant') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
+effect.types = c('quadratic') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 
@@ -291,7 +291,7 @@ sim.id <- round(10*as.numeric(Sys.time()))
 simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
                                sim.id = sim.id,
                                plot.show = F, plot.save = F,
-                               dgp.prior.sd.weight=.01 ) ## c('random','conditional','control')
+                               dgp.prior.sd.weight= 0.1 ) ## 
 
 ##------------------- RUN BSTS; COMPARE vs. DID ---------------------
 ## `bsts.ctrl.cats` control group category definitions:
