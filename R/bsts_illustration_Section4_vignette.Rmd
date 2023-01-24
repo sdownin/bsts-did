@@ -1,10 +1,16 @@
 ---
-title: "Bayesian Structural Time Series (BSTS) Illustration & Tutorial"
+title: "Bayesian Structural Time Series (BSTS) for Dynamic Causal Inference"
 output: pdf_document
 ---
 
-This is a tutorial and illustration for running Bayesian structural time series 
-(BSTS) models, including configuring the state space and checking model diagnostics. 
+This is a tutorial and illustration for (1) running Bayesian structural time series 
+(BSTS) models, including configuring the state space and checking model diagnostics.
+The fitted BSTS model is then used for (2) counterfactual causal inference. 
+Additionally, the last three sections present simulation results for examining 
+(3) the effect of better vs. worse quality covirate series in BSTS models with 
+regression, (4) BSTS causal inference on different causal cycle curve shapes,
+and (5) sensitivity to Bayesian priors and regression spike-and-slab priors
+(model size, expected R^2^). 
 ```{r initExclude, setup, message=FALSE, include=FALSE}
 rm(list=ls())
 library(plyr)
@@ -371,7 +377,7 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post)
 ## Set BSTS MCMC iterations
-bsts.niter <- 1000
+bsts.niter <- 2000
 ```
 For the baseline case, scenario 1, we use `df1` for the `predictors` argument
 in the `bsts()` function. This `predictors` data table uses `df1`, 
@@ -440,7 +446,7 @@ counterfactual for causal inference with the `CasualImpact()` function in
 [Section 2](#2. Causal Inference). 
 
 
-## 1.3. Add Seasonality
+## 1.3. Seasonality
 
 To account for seasonality in the time series data generating process, 
 we add a seasonal component to the state space ("seasonal.52.1" = one cycle of 
@@ -482,7 +488,7 @@ the state space. Meanwhile the trend component still captures the seasonality
 pre-intervention and makes only a naive local level forecast post-intervention
 That is, the expectation at `t` is the trend at `t-1` plus Gaussian noise.
 Since this does not allow us to incorporate the seasonal structure into the 
-state space, it would therefore would make a subpar counterfactual for inferring
+state space, it would therefore would make a subpar counterfactual for 
 causal inference as this data set exhibits seasonality. To address this, 
 we adjust the Bayesian prior settings for the state space components (which is
 a step in machine learning analyses that is commonly referred to as 
@@ -575,11 +581,9 @@ plotBstsStateComps(bsts.fit4)
 
 Variable selection is a crucial step in building a counterfactual time series
 that sufficiently approximates (i.e., correlates to a sufficient degree with) 
-the outcomes series in the pre-intervention window. 
-
-In Bayesian structural time series models, variable selection is 
-incorporated into the model within a Bayesian framework via 
-spike-and-slab priors. 
+the outcomes series in the pre-intervention window. In Bayesian structural time 
+series models, variable selection is incorporated into the model within a 
+Bayesian framework via spike-and-slab priors. 
 
 There are three ways to modify the the number of covariate series included
 in the BSTS model, which is also referred to as the "model size," or 
@@ -587,8 +591,8 @@ size of the regression component of the model.
 
 1. Pass `expected.model.size` argument into `bsts()` directly
 2. Create a `SpikeSlabPrior` object to pass into `bsts()` by:
- - 2a. Using `expected.model.size` argument of `SpikeSlabPrior()`
- - 2b. Specifying inclusion probability for each covariate in `SpikeSlabPrior()`
+ 2a. Using `expected.model.size` argument of `SpikeSlabPrior()`
+ 2b. Specifying inclusion probability for each covariate in `SpikeSlabPrior()`
 
 First, the simplest method is to set the `expected.model.size` attribute 
 (of the `SpikeSlabPrior()`) by passing the `expected.model.size` argument 
@@ -682,19 +686,19 @@ st.sp7 <- st.sp6
 ```
 
 
-## 1.6. Compare State Space Configurations 
+## 1.6. Compare State Space Trends 
 
 Besides the default state space containing only a local level component, 
 we can evaluate different state space configurations, such as those
 including a local linear trend and semi-local linear trend.
 
-### 1.6.0. Local Level
+### 1.6.0. Local Level (Trend without Slope)
 
 This was the simple model already introduced above. As a state space without
 a linear trend, this model will serve as a baseline for comparison 
 with other state space configurations that contain a type of linear trend. 
 
-### 1.6.1. Local linear trend 
+### 1.6.1. Local linear trend (Trend with Level and Slope)
 
 The local linear trend is useful for short term predictions of relatively 
 well-behaved time series. 
@@ -737,13 +741,13 @@ getBstsSummaryPlots(bsts.fit8)
 plotBstsStateComps(bsts.fit8)
 ```
 
-### 1.6.2. Semilocal linear trend 
+### 1.6.2. Semilocal linear trend (Trend with Level and slope with AR(1) drift)
 
 The semilocal linear trend component in the BSTS model state space is 
 useful for longer-term forecasts wherein the linear trend persists longer, 
 so tighter prediction bounds are reasonable over longer post-intervention 
 window. 
-```{r, fig.width="100%", }
+```{r}
 ## Initiate empty state space configuration list
 st.sp9 <- list()
 ## Add local level to trend component of state space
@@ -786,6 +790,7 @@ bsts.fit9 <- bsts(y.pre.treat.NAs.post ~ . ,
 
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsSummaryPlots(bsts.fit9)
+plotBstsStateComps(bsts.fit9)
 ```
 
 ```{r}
@@ -807,9 +812,9 @@ getBstsSummaryPlots(bsts.fit9)
 ```
 
 ## 1.7. Check MCMC Convergence and Model Diagnostics
-
+fig.dim = c(14, 10), out.width="100%",
 To inspect the model's state space component contributions and check 
-```{r}
+```{r, out.width="95%", fig.align="center", fig.dim=c(12, 8)}  
 ###
 ## Define a funciton to call all of our plotting, 
 ##    diagnostics and converngence checks functions
@@ -838,7 +843,7 @@ For this purpose we plot MCMC convergence and model fit checks for the outcome
 (Y, top row panels) and the standardized residuals (bottom row panels). 
 
 We Begin with the simple model containing only a local level `bsts.fit`.
-```{r mcmc_diag_fit, fig.dim = c(14, 10), out.width="100%", include=FALSE}
+```{r mcmc_diag_fit,  out.width="95%", fig.align="center", fig.dim=c(12, 8)}
 getBstsSummaryPlots(bsts.fit)
 getBstsDiagnosticPlots(bsts.fit)
 ```
@@ -864,7 +869,7 @@ ppcheck2 <- bstsPostPredChecks(bsts.fit2, save.plot=F, return.val = T)
 With all checks ow we have a BSTS model to serve as the counterfactual for causal inference.
 
 
-# 2. Causal Inference
+# 2. Causal Inference: BSTS as Counterfactual
 
 The preferred fitted bsts model `bsts.fit4` (i.e., the model with the least 
 pre-intervention, one-step-ahead cumulative absolute prediction error) 
@@ -967,10 +972,10 @@ then DiD uses this as control group (counterfactual)
 Save simulation list to serialized data file
 
 ```{r}
-reslist.filepath <- file.path(dir_proj,
-                              sprintf('__bsts_vignette_1_sim_RESLIST_%s_%s.rds',
-                                   effect.type, sim.id))
-saveRDS(reslist, file = reslist.filepath)
+# reslist.filepath <- file.path(dir_proj,
+#                               sprintf('__bsts_vignette_1_sim_RESLIST_%s_%s.rds',
+#                                    effect.type, sim.id))
+# saveRDS(reslist, file = reslist.filepath)
 ```
 
 
