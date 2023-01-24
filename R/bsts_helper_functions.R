@@ -1430,7 +1430,9 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   ncomps <- length(components)
   y.orig <- as.numeric( bsts.model$original.series[1:(intpd-1)] )
   sc.means.all <-  c(sapply(1:ncomps,function(i)colMeans(sc[,i,])))
-  .vals <- c(y.orig, sc.means.all, pred.mean)
+  # sc.mins <-  c(sapply(1:ncomps,function(i)min(c(sc[,i,]),na.rm = T)))
+  # sc.maxs <-  c(sapply(1:ncomps,function(i)max(c(sc[,i,]),na.rm = T)))
+  .vals <- c(y.orig, sc.means.all, pred.mean)  #sc.mins, sc.maxs
   .ylim <- range(.vals)
   # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
@@ -1451,19 +1453,17 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   par(mar=c(2.5,2.5,2.5,1))  ##mfrow=c(nrow,ncol), 
   title <- sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
   plot(x=1:(intpd-1), y.orig, pch=16,
-       ylab='Y', xlab='t', main=title)  ## ylim=.ylim
-  lines(pred.mean, col='blue', lwd=1.9) ## ylim=.ylim
-  lines(pred$interval[1,])
-  lines(pred$interval[2,])
+       ylab='Y', xlab='t', ylim=.ylim, main=title)  ## ylim=.ylim
+  lines(pred.mean, col='blue', lwd=2, ylim=.ylim) ## ylim=.ylim
   for (i in 1:dim(sc)[2]) {
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
-    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5) ## ylim=.ylim
+    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim)
   }
   legend('topleft', legend=c('observed', 'predicted', components), 
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
-         lwd=c(NA, 1.9, rep(1.5,ncomps)))
+         lwd=c(NA, 2, rep(1.5,ncomps)))
   ##-------------- END PNG PLOT ----------------------------------
   if (save.plot) {
     dev.off()

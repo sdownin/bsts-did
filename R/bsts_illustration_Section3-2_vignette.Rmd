@@ -333,7 +333,7 @@ abline(v=intpd, lty=2)
 legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
 ```
 
-## 1.1. Specify a Simple State Space 
+## 1.1. State Space Specification - A Simple Baseline
 
 Fit a simple BSTS model with only the local level in the state space. 
 To visualize the results, we plot the state space components against the 
@@ -378,7 +378,7 @@ For the baseline case, scenario 1, we use `df1` for the `predictors` argument
 in the `bsts()` function. This `predictors` data table uses `df1`, 
 excluding the first column that contains the outcome (`y_treatment`).
 
-## 1.2. Fit BSTS Model - MCMC Estimation
+## 1.2. BSTS Model Estimation via MCMC
 
 Fit the BSTS model by calling the `bsts()` function to run MCMC estimation 
 for `bsts.niter` draws from the stationary distribution of the Markov chain that 
@@ -388,7 +388,6 @@ which will be addressed below.)
 ## Fit BSTS model
 bsts.fit <- bsts(y.pre.treat.NAs.post,
                  state.specification = st.sp,
-                 # data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 ```
 ```{r}
@@ -437,14 +436,13 @@ st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post,
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = .01,    ## guess
-    sample.size = 1,    ## default
-    upper.limit= 1.5 * sd(y, na.rm = T)
+    sigma.guess = .01,    ## default guess
+    sample.size = .01,    ## default
+    upper.limit= Inf ## default
   ), 
   initial.state.prior = NormalPrior(
-    mu= 0,   ##guess
-    sigma=0.01,  ## guess
-    initial.value=0  ## default to mu
+    mu= 0,   ##default guess
+    sigma=0.01  ## default guess
   )
 )
 
@@ -452,8 +450,7 @@ st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post,
 
 ## Fit BSTS model: 
 bsts.fit2 <- bsts(y.pre.treat.NAs.post ,
-                 state.specification = st.sp2,
-                 # data = predictors,  ## -1 excludes the outcome in 1st column 
+                 state.specification = st.sp2, 
                  niter = bsts.niter)
 
 
@@ -464,20 +461,56 @@ getBstsDiagnosticSummary(bsts.fit2)
 plotBstsStateComps(bsts.fit2, intpd=intpd, filename=NA) ##NA file does not save
 ```
 
-
-## 1.4 Regression
-
-### 1.4.1.  Add Regression `formula` to BSTS function
-
-This uses predictors as `data`.
-
+## 1.4. Tune Hyperparameters: Adjust Bayesian Priors
 
 ```{r}
 ## Initiate empty state space configuration list
 st.sp3 <- list()
 ## Add local level to trend component of state space
 st.sp3 <- AddLocalLevel(st.sp3, y.pre.treat.NAs.post, 
-  initial.state.prior = NormalPrior(mu=0, sigma = .01, fixed = FALSE)
+  initial.state.prior = NormalPrior(mu=0, sigma = .1, fixed = FALSE)
+)
+## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
+y.sd <- sd(y.pre.treat.NAs.post, na.rm = T)
+st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
+  nseasons = 52, 
+  season.duration = 1, 
+  sigma.prior = SdPrior(
+    sigma.guess = y.sd,    
+    sample.size = intpd-1,    
+    upper.limit= 1.5 * y.sd
+  ),
+  initial.state.prior = NormalPrior(
+    mu= 1.5,   
+    sigma=.5
+  )
+)
+## Fit BSTS model:
+bsts.fit3 <- bsts(y.pre.treat.NAs.post,
+                 state.specification = st.sp3,
+                 niter = bsts.niter, ping=0)
+## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+getBstsDiagnosticSummary(bsts.fit3)
+```
+```{r}
+source(file.path(dir_r,'bsts_helper_functions.R'))
+plotBstsStateComps(bsts.fit3, intpd=intpd, filename=NA) ##NA file does not save
+```
+
+## 1.5 Regression
+
+### 1.5.1.  Add Regression `formula` to BSTS function
+
+This uses predictors as `data`.
+
+
+```{r}
+bsts.niter <- 2000
+## Initiate empty state space configuration list
+st.sp3 <- list()
+## Add local level to trend component of state space
+st.sp3 <- AddLocalLevel(st.sp3, y.pre.treat.NAs.post, 
+  initial.state.prior = NormalPrior(mu=0, sigma = .1, fixed = FALSE)
 )
 ## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
 st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
@@ -489,7 +522,7 @@ st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post,
     upper.limit= 1.5 * sd(y.pre.treat.NAs.post, na.rm = T)
   ),
   initial.state.prior = NormalPrior(
-    mu= 1,   ##guess
+    mu= 2,   ##guess
     sigma=1  ## guess
   )
 )
@@ -505,19 +538,24 @@ bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
 getBstsDiagnosticSummary(bsts.fit3)
 ```
 
-## 1.5. Compare State Space Configurations 
+```{r}
+plotBstsStateComps(bsts.fit3)
+```
+
+
+## 1.6. Compare State Space Configurations 
 
 Besides the default state space containing only a local level component, 
 we can evaluate different state space configurations, such as those
 include a local linear trend, or semi-local linear trend.
 
-### 1.5.0. Local Level
+### 1.6.0. Local Level
 
 This was the simple model already introduced above. As a state space without
 a linear trend, this model will serve as a baseline for comparison 
 with other state space configurations that contain a type of linear trend. 
 
-### 1.5.1. Local linear trend 
+### 1.6.1. Local linear trend 
 
 The local linear trend is useful for short term predictions of relatively 
 well-behaved time series. 
@@ -559,7 +597,7 @@ bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
 getBstsDiagnosticSummary(bsts.fit3)
 ```
 
-### 1.5.2. Semilocal linear trend 
+### 1.6.2. Semilocal linear trend 
 
 The semilocal linear trend component in the BSTS model state space is 
 useful for longer-term forecasts wherein the linear trend persists longer, 
@@ -629,7 +667,7 @@ sum(abs(bsts.fit3$one.step.prediction.errors[200:1000]))
 sum(abs(bsts.fit4$one.step.prediction.errors[200:1000]))
 ```
 
-## 1.6. Check MCMC Convergence and Model Diagnostics
+## 1.7. Check MCMC Convergence and Model Diagnostics
 
 Draws from the posterior distribution of the stationary Markov chain(s)
 are used to estimate the model prediction at each time period though 
