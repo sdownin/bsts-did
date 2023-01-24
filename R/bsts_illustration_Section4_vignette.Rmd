@@ -48,7 +48,7 @@ knitr::opts_knit$set(root.dir = dir_proj)
 n <- 100  ## number of actors (i.e., number of time series)
 npds <- 520
 intpd <- round( npds * .6 )
-effect.types <- c('quadratic') ##  c('constant','geometric','quadratic') ## c('quadratic')  
+effect.type <- c('constant') ##  c('constant','geometric','quadratic') ## c('quadratic')  
 bsts.niters <- list(sm.start = 50, sm.max = 100, lg.start = 500, lg.max = 1000)  ## lg=10k for full run
 bsts.ctrl.cats <- NA
 
@@ -94,18 +94,18 @@ sim.id <- round(10*as.numeric(Sys.time()))
 ###
 ## Function to simulate time series data or load saved simulation data
 ###
-processSimData <- function(simlist, key, effect.types, 
+processSimData <- function(simlist, key, effect.type, 
                            dgp.prior.sd.weight, sim.id=NA)
 {
   
       ##-------------------------------------------------------
     ### CREATING ILLUSTRATION SIMULATION IF NONE EXISTS
-    data.filepath <- file.path(dir_proj, sprintf('__bsts_vignette_1_sim-priorSd%s_df.csv',
-                                                 dgp.prior.sd.weight))
+    data.filepath <- file.path(dir_proj, sprintf('__bsts_vignette_1_sim-priorSd%s_%s_df.csv',
+                                                 dgp.prior.sd.weight, effect.type))
     if ( ! file.exists(data.filepath) ) {
       cat(sprintf('\nIllustration data file 1 not found in project dir:\n %s.\n Simulating new illustration data set.\n',dir_proj))
       ## RUN SIMULATION -  GENERATE TIME SERIES
-      simlist <- runSimUpdateSimlist(simlist, effect.types = effect.types,
+      simlist <- runSimUpdateSimlist(simlist, effect.types = effect.type,
                                      sim.id = sim.id, plot.show = F, plot.save = F,     
                                      dgp.prior.sd.weight=dgp.prior.sd.weight)
       # ## Save simulation for reuse with multiple BSTS models
@@ -131,11 +131,11 @@ processSimData <- function(simlist, key, effect.types,
     ##--------------------------------------------------------
     ### SUMMARIZE BSTS (single-observation) SERIES - WITH DIFFERENT COVARIATE PREDICTORS
     bsts.df1.filepath <- file.path(dir_proj,
-                                   sprintf('__bsts_vignette_1_sim-priorSd%s_agg_bsts_df1-NOctrl.csv',
-                                   dgp.prior.sd.weight))
+                                   sprintf('__bsts_vignette_1_sim-priorSd%s_%s_agg_bsts_df1-NOctrl.csv',
+                                   dgp.prior.sd.weight, effect.type))
     bsts.df2.filepath <- file.path(dir_proj,
-                                   sprintf('__bsts_vignette_1_sim-priorSd%s_agg_bsts_df2-ONEctrl.csv',
-                                   dgp.prior.sd.weight))
+                                   sprintf('__bsts_vignette_1_sim-priorSd%s_%s_agg_bsts_df2-ONEctrl.csv',
+                                   dgp.prior.sd.weight, effect.type))
     # bsts.df3.filepath <- file.path(dir_proj, 'bsts_vignette_illustration_bsts-3-SYNTHctrl_df.csv')
     f1exists <- file.exists(bsts.df1.filepath) 
     f2exists <- file.exists(bsts.df2.filepath) 
@@ -291,11 +291,11 @@ dgp.prior.sd.weight.high <- .1
 ## the prior SD is 0.01. 
 ##
 ## SIMULATE DATA AND RETURN DATA LIST OBJECT - LOW PRIOR SD
-dat1 <- processSimData(simlist, key, effect.types, 
+dat1 <- processSimData(simlist, key, effect.type, 
                        dgp.prior.sd.weight.low, 
                        sim.id)
 ## SIMULATE DATA AND RETURN DATA LIST OBJECT - HIGH PRIOR SD
-dat2 <- processSimData(simlist, key, effect.types, 
+dat2 <- processSimData(simlist, key, effect.type, 
                        dgp.prior.sd.weight.high, 
                        sim.id)
 ```
@@ -387,7 +387,7 @@ which will be addressed below.)
 ## Fit BSTS model
 bsts.fit <- bsts(y.pre.treat.NAs.post,
                  state.specification = st.sp,
-                 niter = bsts.niter, ping=5)
+                 niter = bsts.niter)
 ```
 Visualizing the model's behavior can help build  intuition about 
 what the model is doing and, ideally, about how to improve its fit to the 
@@ -405,7 +405,8 @@ getBstsSummaryPlots <- function(bsts.fit) {
   plot(bsts.fit, 'components')
   if (bsts.fit$has.regression) {
     plot(bsts.fit, 'coefficients')
-    plot(bsts.fit, 'sizes')
+    plot(bsts.fit, 'size')
+    plot(bsts.fit, 'state')
   }
 }
 ## Call our newly defined function
@@ -492,7 +493,7 @@ hyperparameter tuning).
 We bound outside the scope of this tutorial vignette most of the particulars of
 prior elicitation. Beginning at the assumption that the researcher
 has theoretical and/or contextual knowledge that can inform  
-of prior settings, we focus on illustrating how to adjust the prior 
+prior distributions, we focus on illustrating how to adjust the prior 
 distribution settings for the `bsts()` function.
 
 ```{r}
@@ -508,12 +509,12 @@ st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post,
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = y.sd,      ## use empirical y SD
-    sample.size = intpd-1,   ## use empirical sample size (pre-intervention)
-    upper.limit= 1.5 * y.sd  ## use empirical y SD to set upper limit
+    sigma.guess = y.sd,      ## try empirical y SD
+    sample.size = intpd-1,   ## try empirical sample size (pre-intervention)
+    upper.limit= 1.5 * y.sd  ## try empirical y SD to set upper limit
   ),
   initial.state.prior = NormalPrior(
-    mu= 3,   ## incrase initial state prior mu
+    mu= 3,   ## increase initial state prior mu
     sigma=1  ## increase initial state prior sigma
   )
 )
@@ -595,16 +596,16 @@ into the `bsts()` function directly.
 ```{r}
 ##TODO
 st.sp5 <- st.sp4
-#=================
-# Option 1. Specify expected model size (internally creates SpikeSlabPrior)
-#----------------
-#   This uniformly sets prior (spike) probabilities = (1 / expected.model.size)
-bsts.fit5 <- bsts(y.pre ~ .,
-               state.specification = st.sp5,
-               niter = bsts.niter,
-               data = initial.claims,
-               expected.model.size = 5,  ## argument passed to SpikeSlabPrior
-               seed = 7531, ping=0)  
+# #=================
+# # Option 1. Specify expected model size (internally creates SpikeSlabPrior)
+# #----------------
+# #   This uniformly sets prior (spike) probabilities = (1 / expected.model.size)
+# bsts.fit5 <- bsts(y.pre ~ .,
+#                state.specification = st.sp5,
+#                niter = bsts.niter,
+#                data = initial.claims,
+#                expected.model.size = 5,  ## argument passed to SpikeSlabPrior
+#                seed = 7531, ping=0)  
 
 ```
 
@@ -784,25 +785,25 @@ bsts.fit9 <- bsts(y.pre.treat.NAs.post ~ . ,
                  niter = bsts.niter)
 
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
-getBstsDiagnosticSummary(bsts.fit9)
+getBstsSummaryPlots(bsts.fit9)
 ```
 
 ```{r}
-reslist <- list()
-## SD LOW SCENARIO KEY
-scenario_key <- '1_noCtrl_lowSd'
-reslist[[scenario_key]] <- list(
-  level=bsts.fit, 
-  seasonal=bsts.fit2, 
-  localLinearTrend=bsts.fit3,
-  SemilocalLinearTrend=bsts.fit4
-)
-CompareBstsModels(reslist[[scenario_key]])
-
-sum(abs(bsts.fit$one.step.prediction.errors[200:1000]))
-sum(abs(bsts.fit2$one.step.prediction.errors[200:1000]))
-sum(abs(bsts.fit3$one.step.prediction.errors[200:1000]))
-sum(abs(bsts.fit4$one.step.prediction.errors[200:1000]))
+# reslist <- list()
+# ## SD LOW SCENARIO KEY
+# scenario_key <- '1_noCtrl_lowSd'
+# reslist[[scenario_key]] <- list(
+#   level=bsts.fit, 
+#   seasonal=bsts.fit2, 
+#   localLinearTrend=bsts.fit3,
+#   SemilocalLinearTrend=bsts.fit4
+# )
+# CompareBstsModels(reslist[[scenario_key]])
+# 
+# sum(abs(bsts.fit$one.step.prediction.errors[200:1000]))
+# sum(abs(bsts.fit2$one.step.prediction.errors[200:1000]))
+# sum(abs(bsts.fit3$one.step.prediction.errors[200:1000]))
+# sum(abs(bsts.fit4$one.step.prediction.errors[200:1000]))
 ```
 
 ## 1.7. Check MCMC Convergence and Model Diagnostics
@@ -820,8 +821,7 @@ getBstsDiagnosticPlots <- function(bsts.fit) {
   cat(checks$summary)
 }
 
-getBstsSummaryPlots(bsts.fit)
-getBstsDiagnosticPlots(bsts.fit)
+getBstsDiagnosticPlots(bsts.fit9)
 ```
 
 Draws from the posterior distribution of the stationary Markov chain(s)
@@ -839,7 +839,8 @@ For this purpose we plot MCMC convergence and model fit checks for the outcome
 
 We Begin with the simple model containing only a local level `bsts.fit`.
 ```{r mcmc_diag_fit, fig.dim = c(14, 10), out.width="100%", include=FALSE}
-ppcheck <- bstsPostPredChecks(bsts.fit, save.plot=F, return.val = T)
+getBstsSummaryPlots(bsts.fit)
+getBstsDiagnosticPlots(bsts.fit)
 ```
 In the first column, the trace of the Markov chain (mean of draws per period) 
 is shown for the posterior predictive distribution of the outcome (Y). 
@@ -904,7 +905,7 @@ plot(impact.amount)
 
 
 
-# 4 Dynamic Causal Inference: MCC Curve Shapes
+# 4. Dynamic Causal Inference: MCC Curve Shapes
 
 ```{r}
 
@@ -967,8 +968,8 @@ Save simulation list to serialized data file
 
 ```{r}
 reslist.filepath <- file.path(dir_proj,
-                              sprintf('__bsts_vignette_1_sim_RESLIST_%s.rds',
-                                   sim.id))
+                              sprintf('__bsts_vignette_1_sim_RESLIST_%s_%s.rds',
+                                   effect.type, sim.id))
 saveRDS(reslist, file = reslist.filepath)
 ```
 
