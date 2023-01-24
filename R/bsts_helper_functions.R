@@ -1433,6 +1433,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   # sc.mins <-  c(sapply(1:ncomps,function(i)min(c(sc[,i,]),na.rm = T)))
   # sc.maxs <-  c(sapply(1:ncomps,function(i)max(c(sc[,i,]),na.rm = T)))
   .vals <- c(y.orig, sc.means.all, pred.mean)  #sc.mins, sc.maxs
+  .vals <- .vals[which(!is.null(.vals) & !is.nan(.vals) & !is.na(.vals))]
   .ylim <- range(.vals)
   # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
@@ -1454,7 +1455,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   title <- sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
   plot(x=1:(intpd-1), y.orig, pch=16,
        ylab='Y', xlab='t', ylim=.ylim, main=title)  ## ylim=.ylim
-  lines(pred.mean, col='blue', lwd=2, ylim=.ylim) ## ylim=.ylim
+  lines(pred.mean, col='blue', lwd=1.9, ylim=.ylim) ## ylim=.ylim
   for (i in 1:dim(sc)[2]) {
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
     lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim)
@@ -1463,7 +1464,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
-         lwd=c(NA, 2, rep(1.5,ncomps)))
+         lwd=c(NA, 1.9, rep(1.5,ncomps)))
   ##-------------- END PNG PLOT ----------------------------------
   if (save.plot) {
     dev.off()
