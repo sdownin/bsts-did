@@ -119,6 +119,7 @@ processSimData <- function(simlist, key, effect.types,
       cat(sprintf('Saved simulated data to file:\n %s',data.filepath))
     } else {
       cat(sprintf('Loading data file:\n %s',data.filepath))
+      simdf <- read.csv(data.filepath, stringsAsFactors = F)
     }
     
     ##--------------------------- INITS ----------------------
@@ -279,12 +280,13 @@ processSimData <- function(simlist, key, effect.types,
 #   write.csv(bsts.df3, file=bsts.df3.filepath, row.names = F, na = '')
 # }
 
-## SCENARIOS------------------
-## PRIOR SD WEIGHT
+##=====================================================================
+## ---------SCENARIOS---------------
+## LOW DGP SD WEIGHT
 dgp.prior.sd.weight.low <- .01
-## PRIOR SD WEIGHT
+## HIGH DGP SD WEIGHT
 dgp.prior.sd.weight.high <- .1
-##----------------------------
+##-----------------------------------
 ## First we simulate the data for the simulation scenario 1, in which 
 ## the prior SD is 0.01. 
 ##
@@ -325,8 +327,8 @@ outcome series `y_treatment`.
 ```{r outcome_plot, fig.dim = c(6,4), out.width="100%"}
 npds <- nrow(df1)
 intpd <- round(npds * 0.6)  # time period to split series (60% pre-, 40% post-)
-##
-plot(df1$y_treatment, main='Simulated Time Series (Y)',ylab='Y',xlab='Time')
+## PLOT
+plot(df1$y_treatment, main='Simulated Outcome Time Series (Y)',ylab='Y',xlab='Time')
 abline(v=intpd, lty=2)
 legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
 ```
@@ -383,29 +385,42 @@ for `bsts.niter` draws from the stationary distribution of the Markov chain that
 specifies the posterior distribution (assuming convergence was reached,
 which will be addressed below.)
 ```{r}
-## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
-## component (all covariates in df1[,-1] dataframe)
-bsts.fit <- bsts(y.pre.treat.NAs.post ~ . ,
+## Fit BSTS model
+bsts.fit <- bsts(y.pre.treat.NAs.post,
                  state.specification = st.sp,
-                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 # data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 ```
 ```{r}
-summary(bsts.fit)
-plot(bsts.fit)
-plot(bsts.fit, 'components')
-plot(bsts.fit, 'coefficients')
+###
+## Define a funciton to call all of our plotting, 
+##    diagnostics and converngence checks functions
+###
+getBstsDiagnosticSummary <- function(bsts.fit) {
+  print(summary(bsts.fit))
+  plot(bsts.fit, 'components')
+  if (bsts.fit$has.regression) {
+    plot(bsts.fit, 'coefficients')
+  }
+  par(mfrow=c(1,1))
+  checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+  cat(checks$summary)
+  # plot(bsts.fit, 'predictors') ## qqdist(checks$err.1step.dist) ## AcfDist(checks$err.1step.dist)
+}
+getBstsDiagnosticSummary(bsts.fit)
 ```
 Then we can plot the contributions to the model's state space to help with 
 visual understanding of this model and comparison with other models below.
 ```{r}
+source(file.path(dir_r,'bsts_helper_functions.R'))
 plotBstsStateComps(bsts.fit, intpd=intpd, filename=NA) ##NA file does not save
 ```
 
 ## 1.3. Add Seasonality
 
 To account for seasonality in the time series data generating process, 
-we add a seasonal component to the state space ("seasonal.52.1" = one cycle of 52 periods per year). 
+we add a seasonal component to the state space ("seasonal.52.1" = one cycle of 
+52 periods per year). 
 This produces a state contribution of seasonal cycles (e.g., weekly periods each year) 
 added to the other state components. The augmented state space then improves 
 model performance in terms of the mean absolute error (MAE) of 
@@ -415,43 +430,79 @@ one-step ahead predictions during the pre-intervention window.
 st.sp2 <- list()
 ## Add local level to trend component of state space
 st.sp2 <- AddLocalLevel(st.sp2, y.pre.treat.NAs.post, 
-                       initial.state.prior = NormalPrior(mu=0, sigma = .01))
-## Add trigonometric seasonality to state space
+  initial.state.prior = NormalPrior(mu=0, sigma = .01, fixed = FALSE)
+)
+## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
 st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post, 
-                     nseasons = 52, season.duration = 1)
+  nseasons = 52, 
+  season.duration = 1, 
+  sigma.prior = SdPrior(
+    sigma.guess = .01,    ## guess
+    sample.size = 1,    ## default
+    upper.limit= 1.5 * sd(y, na.rm = T)
+  ), 
+  initial.state.prior = NormalPrior(
+    mu= 0,   ##guess
+    sigma=0.01,  ## guess
+    initial.value=0  ## default to mu
+  )
+)
 
 
-## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
-## component (all covariates in df1[,-1] dataframe)
-bsts.fit2 <- bsts(y.pre.treat.NAs.post ~ . ,
+
+## Fit BSTS model: 
+bsts.fit2 <- bsts(y.pre.treat.NAs.post ,
                  state.specification = st.sp2,
-                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 # data = predictors,  ## -1 excludes the outcome in 1st column 
                  niter = bsts.niter)
 
-
-###
-## Define a funciton to call all of our plotting, 
-##    diagnostics and converngence checks functions
-###
-getBstsDiagnosticSummary <- function(bsts.fit) {
-  # print(bsts.fit)
-  checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
-  cat(checks$summary)
-  # plot(bsts.fit)
-  plot(bsts.fit, 'components')
-  plot(bsts.fit, 'coefficients')
-  qqdist(bsts.fit$one.step.prediction.errors)
-  AcfDist(bsts.fit$one.step.prediction.errors)
-}
 
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsDiagnosticSummary(bsts.fit2)
 ```
-## 1.4 Regression: Spike-and-Slab Priors
+```{r}
+plotBstsStateComps(bsts.fit2, intpd=intpd, filename=NA) ##NA file does not save
+```
+
+
+## 1.4 Regression
+
+### 1.4.1.  Add Regression `formula` to BSTS function
+
+This uses predictors as `data`.
 
 
 ```{r}
+## Initiate empty state space configuration list
+st.sp3 <- list()
+## Add local level to trend component of state space
+st.sp3 <- AddLocalLevel(st.sp3, y.pre.treat.NAs.post, 
+  initial.state.prior = NormalPrior(mu=0, sigma = .01, fixed = FALSE)
+)
+## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
+st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
+  nseasons = 52, 
+  season.duration = 1, 
+  sigma.prior = SdPrior(
+    sigma.guess = 1,    ## guess
+    sample.size = 1,    ## default
+    upper.limit= 1.5 * sd(y.pre.treat.NAs.post, na.rm = T)
+  ),
+  initial.state.prior = NormalPrior(
+    mu= 1,   ##guess
+    sigma=1  ## guess
+  )
+)
 
+## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
+## component (all covariates in df1[,-1] dataframe)
+bsts.fit3 <- bsts(y.pre.treat.NAs.post ~ . ,
+                 state.specification = st.sp3,
+                 data = predictors,  ## -1 excludes the outcome in 1st column 
+                 niter = bsts.niter)
+
+## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
+getBstsDiagnosticSummary(bsts.fit3)
 ```
 
 ## 1.5. Compare State Space Configurations 
@@ -864,20 +915,20 @@ runSimulationScenarioBstsModelComparison <- function(df)
                      niter = bsts.niter)
     
     
-    ###
-    ## Define a funciton to call all of our plotting, 
-    ##    diagnostics and converngence checks functions
-    ###
-    getBstsDiagnosticSummary <- function(bsts.fit) {
-      # print(bsts.fit)
-      checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
-      cat(checks$summary)
-      plot(bsts.fit)
-      plot(bsts.fit, 'components')
-      plot(bsts.fit, 'coefficients')
-      qqdist(bsts.fit$one.step.prediction.errors)
-      AcfDist(bsts.fit$one.step.prediction.errors)
-    }
+    # ###
+    # ## Define a funciton to call all of our plotting, 
+    # ##    diagnostics and converngence checks functions
+    # ###
+    # getBstsDiagnosticSummary <- function(bsts.fit) {
+    #   # print(bsts.fit)
+    #   checks <- bstsPostPredChecks(bsts.fit, save.plot = F, return.val = T)
+    #   cat(checks$summary)
+    #   plot(bsts.fit)
+    #   plot(bsts.fit, 'components')
+    #   plot(bsts.fit, 'coefficients')
+    #   qqdist(bsts.fit$one.step.prediction.errors)
+    #   AcfDist(bsts.fit$one.step.prediction.errors)
+    # }
     
     ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
     getBstsDiagnosticSummary(bsts.fit2)

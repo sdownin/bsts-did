@@ -349,7 +349,7 @@ for (m in 1:length(bsts.ctrl.cats.list)) {
 sim.id <- 16743474366
 
 
-runfiles <- dir(dir_ext, pattern=sprintf('16743474366.+\\.rds$', sim.id))
+runfiles <- dir(dir_ext, pattern=sprintf('%s.+\\.rds$', sim.id))
 df <- data.frame(stringsAsFactors = F)
 for (i in 1:length(runfiles)) {
   cat(sprintf('\n%s',runfiles[i]))

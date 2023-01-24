@@ -1331,8 +1331,8 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
 ### 
 ## Plot BSTS State Components - all series compared against observed values
 ###
-plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
-  save.plot <- !is.na(filename)
+plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALSE) {
+  # save.plot <- !is.na(filename)
   
   npds <- length(bsts.model$original.series)
   
@@ -1340,22 +1340,88 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
     intpd <- npds
   }
   
+  
   niter <- bsts.model$niter
   burn <- round( niter * .2 )
   
-  response <- bsts.model$original.series
+  idx.noburn <- (burn+1):niter
+  idx.pre    <- 1:(intpd-1)
   
-  pred <- if (bsts.model$has.regression) {
-    newdata <- bsts.model$predictors[1:(intpd-1), ]
-    newdata <- cbind(response=response[1:(intpd-1)], newdata)
-    predict.bsts(bsts.model, newdata = newdata , burn = burn, timestamps = -((intpd-1):1)) ## already knows horizon from 
-  } else {
-    predict.bsts(bsts.model, burn = burn, 
-                 horizon = intpd-1,
-                 olddata = response[1:(intpd-1)])
-  }
+  err.pre.1step <- bsts.model$one.step.prediction.errors[idx.noburn, idx.pre]
+  y.pre <- bsts.model$original.series[idx.pre]
+  
+  ## MEAN ABSOLUTE ERROR (MAE)
+  mae <- mean(colMeans(abs(err.pre.1step), na.rm = T), na.rm=T)
+  
+  
+  ## Reverse Extract Prediction (per MCMC iteration) from observed and residual
+  ##  @see p.69 in  https://cran.r-project.org/web/packages/bsts/bsts.pdf
+  ##              err = y[t] - y_hat[t](y[t-1]) 
+  ## y_hat[t](y[t-1]) = y[t] - err
+  ## Create replicas of outcome series to subtract each MCMC iteration
+  y.pre.rep <- matrix(y.pre, length(y.pre), (niter - burn),  byrow = FALSE)
+  ## Get prediction for each MCMC iteration:
+  ## t([npds, niter-burn]) -   [niter-burn, npds]
+  ## colMeans() returns periodwise means (over MCMC iterations)
+  y.pred <-  colMeans( t(y.pre.rep) - err.pre.1step )
+  
+  # 
+  # y.pred.interval <- as.matrix( rbind(q) )
+  
+  # y.pred <- (cbind(y.pre) - t(err.pre.1step))
+  
+  
+  # ##---------- CHECK REFITTING ON TRUNCATED DATA BEFORE INTERVENTION -----------
+  # y.pre <- bsts.model$original.series[idx.pre]
+  # bsts.model0 <- bsts(y.pre ~ . , 
+  #                    state.specification = bsts.model$state.specification,
+  #                    data = as.data.frame(bsts.model$predictors[idx.pre, -1]), ## drop (Intercept) first column 
+  #                    timestamps = -1*rev(idx.pre),
+  #                    niter = niter
+  #                    )
+  # bsts.model <- bsts.model0
+  # ##
+  # response <- bsts.model$original.series
+  # ##
+  # pred <- if (bsts.model$has.regression) {
+  #   newdata <- bsts.model$predictors
+  #   newdata <- cbind(response=response, newdata)
+  #   predict.bsts(bsts.model, newdata = newdata , burn = burn,
+  #                timestamps = idx.pre
+  #   ) ## already knows horizon from 
+  # } else {
+  #   predict.bsts(bsts.model, burn = burn, 
+  #                horizon = intpd-1,
+  #                olddata = response[1:(intpd-1)] )
+  # }
+  # # ## DEBUG
+  # plot(pred, style='dynamic')
+  # # matplot(cbind(t(pred$interval),pred$mean))
+  # # ##
+  # ##------------------------------------------------------------------------
+  
+  # # response <- bsts.model$original.series
+  # 
+  # pred <- if (bsts.model$has.regression) {
+  #   newdata <- bsts.model$predictors[idx.pre, ]
+  #   newdata <- cbind(response=response[idx.pre], newdata)
+  #   predict.bsts(bsts.model, newdata = newdata , burn = burn,
+  #                timestamps = idx.pre
+  #                ) ## already knows horizon from 
+  # } else {
+  #   predict.bsts(bsts.model, burn = burn, 
+  #                horizon = intpd-1,
+  #                olddata = response[1:(intpd-1)] )
+  # }
+  # # ## DEBUG
+  # plot(pred, style='boxplot')
+  # # matplot(cbind(t(pred$interval),pred$mean))
+  # # ##
   
   sc <- bsts.model$state.contributions
+  
+  # pred.mean <- colMeans(pred$distribution)
+  pred.mean <- y.pred
   
   # bsts.model$final.state
   # dim(sc)
@@ -1364,16 +1430,17 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
   ncomps <- length(components)
   y.orig <- as.numeric( bsts.model$original.series[1:(intpd-1)] )
   sc.means.all <-  c(sapply(1:ncomps,function(i)colMeans(sc[,i,])))
-  .vals <- c(y.orig, sc.means.all, colMeans(pred$distribution))
-  .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
+  .vals <- c(y.orig, sc.means.all, pred.mean)
+  .ylim <- range(.vals)
+  # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
   ## Get Mean Absolute Error (MAE) for plot title
   ## y.rep dimensions:  rows [npds before intervention] x cols [draws (niter - burn)]
-  y.rep <- matrix(y.orig, length(y.orig), (niter - burn),  byrow = FALSE)
-  # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
-  res <-  y.rep - t(pred$distribution)
-  err.pds <- rowMeans(res)  ## mean over MCMC draws per period
-  mae <- mean( abs(err.pds), na.rm=T) ## mean of absolute per-period errors
+  # y.rep <- matrix(y.orig, length(y.orig), (niter - burn),  byrow = FALSE)
+  # # res <- y.rep - (post.pred.dist - CausalMBSTS$mcmc$eps.samples[, i, ])
+  # res <-  y.rep - t(pred$distribution)
+  # err.pds <- rowMeans(res)  ## mean over MCMC draws per period
+  # mae <- mean( abs(err.pds), na.rm=T) ## mean of absolute per-period errors
   
   if(save.plot) {
     png(filename = filename, width = 10, height = 8, units = 'in', res = 400)
@@ -1383,18 +1450,20 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA) {
   # ncol <- ceiling(ncomps / nrow)
   par(mar=c(2.5,2.5,2.5,1))  ##mfrow=c(nrow,ncol), 
   title <- sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
-  plot(x=1:(intpd-1), y.orig, ylim=.ylim, pch=16,
-       ylab='Y', xlab='t', main=title)
-  lines(colMeans(pred$distribution), col='blue', ylim=.ylim, lwd=1.8)
+  plot(x=1:(intpd-1), y.orig, pch=16,
+       ylab='Y', xlab='t', main=title)  ## ylim=.ylim
+  lines(pred.mean, col='blue', lwd=1.9) ## ylim=.ylim
+  lines(pred$interval[1,])
+  lines(pred$interval[2,])
   for (i in 1:dim(sc)[2]) {
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
-    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, ylim=.ylim, lwd=1.5)
+    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5) ## ylim=.ylim
   }
-  legend('bottomleft', legend=c('observed', 'predicted', components), 
+  legend('topleft', legend=c('observed', 'predicted', components), 
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
-         lwd=c(NA, 1.8, rep(1.5,ncomps)))
+         lwd=c(NA, 1.9, rep(1.5,ncomps)))
   ##-------------- END PNG PLOT ----------------------------------
   if (save.plot) {
     dev.off()

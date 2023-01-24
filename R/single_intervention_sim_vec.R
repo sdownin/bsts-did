@@ -605,9 +605,9 @@ runSimSingleIntervention <- function(
     # c2[.idx.t] <- rnorm(n.t,  .02 * t, noise.level * 1)
     # c3[.idx.t] <- rnorm(n.t, -.005 * t, noise.level * .1)
     ## 
-    sig.mat <- matrix( c( 1,.01,.03,
-                         .01, 1,.05,
-                         .03,.05, 1), ncol=3, byrow = T)
+    # sig.mat <- matrix( c( 1,.01,.03,
+    #                      .01, 1,.05,
+    #                      .03,.05, 1), ncol=3, byrow = T)
     # mu.vec <- c(.1, .12, .08)
     # rmv.mat <- mvtnorm::rmvnorm(n,
     #                             mean = mu.vec,
