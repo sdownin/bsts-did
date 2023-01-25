@@ -1,5 +1,5 @@
 ---
-title: "Towards Dynamic Causal Inference: Bayesian Counterfactual Approach"
+title: "Towards Dynamic Causal Inference: A Bayesian Counterfactual Approach"
 output: pdf_document
 ---
 
@@ -384,7 +384,7 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post)
 ## Set BSTS MCMC iterations
-bsts.niter <- 3000
+bsts.niter <- 5000
 ```
 For the baseline case, scenario 1, we use `df1` for the `predictors` argument
 in the `bsts()` function. This `predictors` data table uses `df1`, 
@@ -844,7 +844,7 @@ plotBstsStateComps(bsts.fit9)
 ## 1.7. Check MCMC Convergence and Model Diagnostics
 fig.dim = c(14, 10), out.width="100%",
 To inspect the model's state space component contributions and check 
-```{r, out.width="100%", fig.align="center", fig.dim=c(12, 8)}  
+```{r, out.width="100%", fig.align="center", fig.dim=c(14, 10)}  
 ###
 ## Define a funciton to call all of our plotting, 
 ##    diagnostics and converngence checks functions
@@ -875,7 +875,6 @@ For this purpose we plot MCMC convergence and model fit checks for the outcome
 
 We Begin with the simple model containing only a local level `bsts.fit`.
 ```{r mcmc_diag_fit,  out.width="100%", fig.align="center", fig.dim=c(12, 8)}
-getBstsSummaryPlots(bsts.fit)
 checks <- getBstsDiagnosticPlots(bsts.fit, return.val = T)
 print(checks$converged.all)
 ```
@@ -980,30 +979,30 @@ then DiD uses this as control group (counterfactual)
 - bsts does not need to be parallel trend; did requires parallel trend 
 (refer to paper)
 
-```{r}
+```{r,  out.width="100%", fig.align="center", fig.dim=c(7, 12), message=FALSE, warning=FALSE}
 ## Show predictor series and some measure, like correlation
 sim.reps.id <- 16745322384
 dfr <- read.csv( file=file.path(dir_rep, sprintf('bsts_runs_%s.csv',sim.reps.id)), 
                 stringsAsFactors = F)
 
-ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), 
-               colour=factor(cov.has.control))) +  
-  xlim(c(-.1,.1)) +
-  geom_density(alpha=.15) +
-  geom_vline(xintercept=0,lty=3) + theme_bw()
-ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-.1,.1)) +
-  geom_histogram(alpha=.15, binwidth = 0.01, position = 'identity') +
-  geom_vline(xintercept=0,lty=3) + theme_bw()
-###
-ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-1,1)) +
-  geom_density(alpha=.15) +
-  geom_vline(xintercept = 0, lty=3) + theme_bw()
-ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-1,1)) +
-  geom_histogram(alpha=.15, binwidth = 0.1, position = 'identity') +
-  geom_vline(xintercept = 0, lty=3) + theme_bw()
+# ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), 
+#                colour=factor(cov.has.control))) +  
+#   xlim(c(-.1,.1)) +
+#   geom_density(alpha=.15) +
+#   geom_vline(xintercept=0,lty=3) + theme_bw()
+# ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-.1,.1)) +
+#   geom_histogram(alpha=.15, binwidth = 0.01, position = 'identity') +
+#   geom_vline(xintercept=0,lty=3) + theme_bw()
+# ###
+# ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-1,1)) +
+#   geom_density(alpha=.15) +
+#   geom_vline(xintercept = 0, lty=3) + theme_bw()
+# ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-1,1)) +
+#   geom_histogram(alpha=.15, binwidth = 0.1, position = 'identity') +
+#   geom_vline(xintercept = 0, lty=3) + theme_bw()
 
 
 
@@ -1042,14 +1041,14 @@ df.bsts.did.s <- df.bsts.did %>%
 #        filename = file.path(dir_ext,'bsts_did_compare_post_err_with_control_facet_grid_plot.png'),
 #        units = 'in', height = 12, width=8, dpi=300)
 
-ck <- df.bsts.did %>% group_by(effect.type, cov.type, cov.has.ctrl) %>%
-  summarize(
-    n=n(),
-    err.post.me.mean=mean(err.post.me, na.rm=T),
-    err.post.me.sd = sd(err.post.me, na.rm=T),
-    err.post.me.skew = skewness(err.post.me, na.rm=T, type=2)
-  )
-View(ck)
+# ck <- df.bsts.did %>% group_by(effect.type, cov.type, cov.has.ctrl) %>%
+#   summarize(
+#     n=n(),
+#     err.post.me.mean=mean(err.post.me, na.rm=T),
+#     err.post.me.sd = sd(err.post.me, na.rm=T),
+#     err.post.me.skew = skewness(err.post.me, na.rm=T, type=2)
+#   )
+# View(ck)
 
 
 ```
