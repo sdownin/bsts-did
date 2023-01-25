@@ -35,6 +35,7 @@ set.seed(rand.seed)
 ## Directories
 dir_proj <- 'C:\\Users\\sdr8y\\OneDrive - University of Missouri\\Research\\BSTS'
 dir_ext <- 'D:\\BSTS_external'
+dir_rep <- file.path(dir_ext, 'bsts_did_replication_sensitivity')
 dir_plot <- file.path(dir_proj, 'plots')
 dir_r <- file.path(dir_proj,'R')
 ##  file prefix for saving images, writing outputs, etc.
@@ -382,7 +383,7 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post)
 ## Set BSTS MCMC iterations
-bsts.niter <- 2000
+bsts.niter <- 1500
 ```
 For the baseline case, scenario 1, we use `df1` for the `predictors` argument
 in the `bsts()` function. This `predictors` data table uses `df1`, 
@@ -418,6 +419,7 @@ getBstsSummaryPlots <- function(bsts.fit) {
   if (bsts.fit$has.regression) {
     plot(bsts.fit, 'coefficients')
     plot(bsts.fit, 'size')
+    plot(bsts.fit, 'predictors')
     plot(bsts.fit, 'state')
   }
 }
@@ -442,10 +444,13 @@ plotBstsStateComps(bsts.fit, intpd=intpd, filename=NA) ##NA file does not save
 ```
 This model appears to match the data with the trend only. However, this is only 
 accurate for short (e.g., one-step ahead) predictions within the training
-window. While the predicted values (blue line) are one-step ahead, in-sample
+window. In terms of capturing the structure of the time series, this model
+is underspecified and, essentially, overfitted to the training data.
+While the predicted values (blue line) are one-step ahead, in-sample
 predictions, the model would lose the seasonal information outside the
 training window (post intervention), leaving the counterfactual series
 devoid of seasonality when used for causal inference computations (see below).
+
 Therefore, it is crucial to capture seasonality in the outcome time series 
 and incorporate it into the BSTS model that will be used as the 
 counterfactual for causal inference with the `CasualImpact()` function in
@@ -491,7 +496,7 @@ getBstsSummaryPlots(bsts.fit2)
 ```
 Here we have a seasonal component, but it is making a negligible contribution to 
 the state space. Meanwhile the trend component still captures the seasonality
-pre-intervention and makes only a naive local level forecast post-intervention
+pre-intervention and makes only a naive local level forecast post-intervention.
 That is, the expectation at `t` is the trend at `t-1` plus Gaussian noise.
 Since this does not allow us to incorporate the seasonal structure into the 
 state space, it would therefore would make a subpar counterfactual for 
@@ -509,11 +514,13 @@ prior distributions, we focus on illustrating how to adjust the prior
 distribution settings for the `bsts()` function.
 
 ```{r, out.width="100%", fig.align="center", fig.dim=c(8, 5)}
+## Get outcome (Y) standard deviation to use for adjusting priors below
+y.sd <- sd(y.pre.treat.NAs.post, na.rm = T)
 ## Initiate empty state space configuration list
 st.sp3 <- list()
 ## Add local level to trend component of state space
 st.sp3 <- AddLocalLevel(st.sp3, y.pre.treat.NAs.post, 
-  initial.state.prior = NormalPrior(mu=1, sigma = 0.1 * y.sd, fixed = FALSE),
+  initial.state.prior = NormalPrior(mu=1, sigma = 0.25 * y.sd, fixed = FALSE),
   initial.y = y.pre.treat.NAs.post[1]
 )
 
@@ -523,13 +530,13 @@ st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post,
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = 0.1 * y.sd,      ## try empirical y SD
-    sample.size = round(0.1 * (intpd-1)),   ## try empirical sample size (pre-intervention)
-    upper.limit= 1.5 * y.sd  ## try empirical y SD to set upper limit
+    sigma.guess = 0.01 * y.sd,      ##try a low weight of empirical y SD
+    sample.size = round(0.1 * (intpd-1)), ##prop empirical sample size (pre-int.)
+    upper.limit= 1.5 * y.sd  ##try a factor of empirical y SD to set upper limit
   ),
   initial.state.prior = NormalPrior(
-    mu = 1,   ## increase initial state prior mu
-    sigma =  y.sd  ## increase initial state prior sigma
+    mu = 0,   ## increase initial state prior mu
+    sigma = 1.0 * y.sd  ## increase initial state prior sigma
   )
 )
 ## Fit BSTS model:
@@ -552,22 +559,20 @@ This uses covariate series in the `predictors` dataframe for the `data` input.
 st.sp4 <- list()
 ## Add local level to trend component of state space
 st.sp4 <- AddLocalLevel(st.sp4, y.pre.treat.NAs.post,
-  initial.state.prior = NormalPrior(mu=1, sigma = .001, fixed = FALSE),
+  initial.state.prior = NormalPrior(mu=1, sigma = .25 * y.sd, fixed = FALSE),
   initial.y = y.pre.treat.NAs.post[1]
 )
 ## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
-y.sd <- sd(y.pre.treat.NAs.post, na.rm = T)
 st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post, 
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = y.sd * 0.3,      ## use empirical y SD
+    sigma.guess = 0.01 * y.sd,      ## use empirical y SD
     sample.size = round(0.1 * (intpd-1)),  ## use half of pre-int window
-    upper.limit= 2 * y.sd, ## use empirical y SD to set upper limit
-    initial.value = y.sd * 0.3
+    upper.limit= 1.5 * y.sd ## use empirical y SD to set upper limit
   ),
   initial.state.prior = NormalPrior(
-    mu= 2,  
+    mu= 0,  
     sigma= 1.0 * y.sd  
   )
 )
@@ -627,6 +632,9 @@ par(mfrow=c(3,1))
 plot(bsts.fit5, 'coefficients', main='Expected Size = 5')
 plot(bsts.fit4, 'coefficients', main='Expected Szie = 3')
 plot(bsts.fit51, 'coefficients', main='Expected Szie = 1')
+CompareBstsModels(list(`Expect Size=5`=bsts.fit5,
+                       `Expect Size=3`=bsts.fit4,
+                       `Expect Size=1`=bsts.fit51))
 ```
 
 Second, you can create a `SpikeSlabPrior` object to pass into the `bsts()`
@@ -640,65 +648,69 @@ step of creating a `SpikeSlabPrior` object enables the researcher to adjust
 the expected model size and all other regression prior parameter settings 
 in the same step. 
 ```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
-##TODO
 st.sp6 <- st.sp5
-# #=================
-# # Option 2. Create SpikeSlabPrior object and pass it into BSTS function
-# #-----------------
-# ##----------------
-# #  2A. Set expected.model.size in SpikeSlabPrior (with other options)
-# priorObjA <- SpikeSlabPrior(x = model.matrix(y ~ ., data=data), 
-#                             y = y, 
-#                             expected.model.r2 = .5,
-#                             prior.df = 0.01,
-#                             expected.model.size = 5, ## argument set directly in SpikeSlabPrior
-#                             prior.information.weight = 10) ## in terms of observation count
-#          
-# # Run the bsts model with the SpikeSlabPrior object ‘priorObjA’
-# bsts.fit6 <- bsts(y ~ ., state.specification = st.sp, 
-#                 data = initial.claims, 
-#                 niter = bsts.niter, 
-#                 prior= priorObjA, 
-#                 seed = 7531)
+#=================
+# Option 2. Create SpikeSlabPrior object and pass it into BSTS function
+#-----------------
+##----------------
+#  2A. Set expected.model.size in SpikeSlabPrior (with other options)
+priorObjA <- SpikeSlabPrior(x = model.matrix(y.pre.treat.NAs.post ~ ., 
+                                             data=predictors),
+                            y = y.pre.treat.NAs.post,
+                            expected.model.size = 3, ## size in SpikeSlabPrior
+                            expected.r2 = .7,
+                            prior.df = .01,## obs. count
+                            prior.information.weight = .01) 
 
+# Run the bsts model with the SpikeSlabPrior object ‘priorObjA’
+bsts.fit6 <- bsts(y.pre.treat.NAs.post ~ ., 
+                  state.specification = st.sp6,
+                  data = predictors,
+                  niter = bsts.niter,
+                  prior= priorObjA,
+                  seed = rand.seed, ping = 0)
+getBstsSummaryPlots(bsts.fit6)
+plotBstsStateComps(bsts.fit6)
 ```
 
 Finally, the other way to create a `SpikeSlabPrior` object to pass
 into the `bsts()`function is by specifying prior inclusion probabilities
 (and estimates) for each covariates series in `predictors`. This is useful
 when the researcher has prior knowledge that certain covariates are 
-more likley to be important contributors to the counterfactual series
+more likely to be important contributors to the counterfactual series
 and should therefore be included in the model in more iterations 
 (i.e., more MCMC draws from the posterior predictive distribution). 
 
 ```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 st.sp7 <- st.sp6
-##TODO
-# ##----------------
-# # 2B. Specify prior.inclusion.probabilities for each covariate 
-# #   where length of prior spikes and means vectors should equal the number of 
-##    covariates
-# #   (i.e., this example with vector lengths = 11 implies 
-##      ‘data’ has 11 columns) 
-# prior.spikes <- c(0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,0.1,1,0.1)
-# prior.means <- c(0,0,0,0,0,0,0,0,0,0.6,0)
-# 
-# # Directly set prior spike probabilities for each covariate in the prior object
-# priorObjB <- SpikeSlabPrior(x = model.matrix(y ~ ., data=data), 
-#                             y = y, 
-#                             expected.model.r2 = .5,
-#                             prior.df = 0.01,
-#                             prior.information.weight = 10, ##  ~ obs. count
-#                             prior.inclusion.probabilities = prior.spikes, 
-#                             optional.coefficient.estimate = prior.means)
-#  
-# # Run the bsts model with the SpikeSlabPrior object ‘priorObjB’
-# bsts.fit7 <- bsts(y ~ ., state.specification = st.sp, 
-#                 data = initial.claims, 
-#                 niter = bsts.niter, 
-#                 prior= priorObjB, 
-#                 seed = 7531)
+##----------------
+# 2B. Specify prior.inclusion.probabilities for each covariate
+#   where length of prior spikes and means vectors should equal the number of
+#    covariates
+#   (i.e., this example with vector lengths = 11 implies
+#      ‘data’ has 11 columns) <-- this includes intercept in example below
+prior.spikes <- c(.7,.8,.9,.1,.1,.1,.1,.1,.1,.1) ## +1 column for intercept (?)
+prior.means <- c(.1,.2,.3,0,0,0,0,0,0,0) ## +1 column for intercept (?)
 
+# Directly set prior spike probabilities for each covariate in the prior object
+priorObjB <- SpikeSlabPrior(x = model.matrix(y.pre.treat.NAs.post ~ ., 
+                                             data=predictors),
+                            y = y.pre.treat.NAs.post,
+                            expected.r2 = .9,
+                            prior.df = .1,
+                            prior.information.weight = .1, ##  ~ obs. count
+                            prior.inclusion.probabilities = prior.spikes,
+                            optional.coefficient.estimate = prior.means)
+
+# Run the bsts model with the SpikeSlabPrior object ‘priorObjB’
+bsts.fit7 <- bsts(y.pre.treat.NAs.post ~ ., 
+                  state.specification = st.sp7,
+                  data = predictors,
+                  niter = bsts.niter,
+                  prior= priorObjB,
+                  seed = rand.seed, ping = 0)
+getBstsSummaryPlots(bsts.fit7)
+plotBstsStateComps(bsts.fit7)
 ```
 
 
@@ -723,34 +735,40 @@ well-behaved time series.
 st.sp8 <- list()
 ## Add local level to trend component of state space
 st.sp8 <- AddLocalLinearTrend(st.sp8, y.pre.treat.NAs.post, 
-  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=1, fixed = F, upper.limit = 1.2), 
-  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=1, fixed = F, upper.limit = 1.2), 
-  initial.level.prior=NormalPrior(mu=0, sigma=.01, fixed = F), 
-  initial.slope.prior=NormalPrior(mu=0, sigma=.01, fixed = F)
+  level.sigma.prior=SdPrior(sigma.guess=.01 * y.sd, 
+                            sample.size=round( 0.1 * (intpd-1)), 
+                            upper.limit = 1.5 * y.sd,
+                            fixed = F), 
+  slope.sigma.prior=SdPrior(sigma.guess=.0001 * y.sd, 
+                            sample.size=round( 0.1 * (intpd-1)), 
+                            upper.limit = 1.5 * y.sd,
+                            fixed = F), 
+  initial.level.prior=NormalPrior(mu=1, sigma=.001 * y.sd, fixed = F), 
+  initial.slope.prior=NormalPrior(mu=0, sigma=.001 * y.sd, fixed = F)
 )
 ## Add trigonometric seasonality to state space
 st.sp8 <- AddSeasonal(st.sp8, y.pre.treat.NAs.post, 
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = sd(y, na.rm = T),    ## guess
-    sample.size = round( 0.5 * (intpd-1)),    ## default
-    upper.limit= 1.5 * sd(y, na.rm = T)
+    sigma.guess = 0.01 * y.sd,    ## guess
+    sample.size = round( 0.1 * (intpd-1)),    ## default
+    upper.limit = 1.5 * y.sd
   ), 
   initial.state.prior = NormalPrior(
-    mu= 2,   ##guess
-    sigma=1,  ## guess
-    initial.value=0  ## default to mu
+    mu = 0,   ##guess
+    sigma = 1 * y.sd  ## guess
   )
 )
-
-
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
 ## component (all covariates in df1[,-1] dataframe)
 bsts.fit8 <- bsts(y.pre.treat.NAs.post ~ . ,
                  state.specification = st.sp8,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
-                 niter = bsts.niter)
+                 niter = bsts.niter, 
+                 prior = priorObjB,
+                 # expected.model.size=3,
+                 seed=rand.seed, ping = 0)
 
 ## CALL OUR CUSTOM BSTS SUMMARY
 getBstsSummaryPlots(bsts.fit8)
@@ -768,31 +786,44 @@ window.
 st.sp9 <- list()
 ## Add local level to trend component of state space
 st.sp9 <- AddSemilocalLinearTrend(st.sp9, y.pre.treat.NAs.post, 
-  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
-  slope.mean.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0), 
-  slope.ar1.prior=Ar1CoefficientPrior(mu = 0, 
-                                      sigma = .01, 
-                                      force.stationary = FALSE, 
-                                      force.positive = FALSE, 
-                                      initial.value = 0
-                                      ),
-  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, initial.value=.01),
-  initial.level.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0),
-  initial.slope.prior=NormalPrior(mu = 0, sigma = .01, initial.value = 0)
+  level.sigma.prior=SdPrior(
+    sigma.guess=.01 * y.sd, 
+    sample.size=round( 0.1 * (intpd-1)), 
+    upper.limit = 1.5 * y.sd, 
+    fixed = F),
+  slope.mean.prior=NormalPrior(
+    mu = 0, 
+    sigma = .001 * y.sd), 
+  slope.ar1.prior=Ar1CoefficientPrior(
+    mu = , 
+    sigma = .001 * y.sd, 
+    force.stationary = FALSE, 
+    force.positive = FALSE, 
+    initial.value = 0 ),
+  slope.sigma.prior=SdPrior(
+    sigma.guess=.0001 * y.sd, 
+    sample.size=round( 0.1 * (intpd-1))),
+  initial.level.prior=NormalPrior(
+    mu = 1,
+    sigma = .001 * y.sd, 
+    fixed = F),
+  initial.slope.prior=NormalPrior(
+    mu = 0, 
+    sigma = .001 * y.sd, 
+    fixed = F)
 )
 ## Add trigonometric seasonality to state space
 st.sp9 <- AddSeasonal(st.sp9, y.pre.treat.NAs.post, 
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = 0.01,    ## guess
-    sample.size = 2,    ## default
-    upper.limit= 1.5 * sd(y, na.rm = T)
+    sigma.guess = .01 * y.sd,    ## guess
+    sample.size = round( 0.1 * (intpd-1)),    ## default
+    upper.limit= 1.5 * y.sd
   ), 
   initial.state.prior = NormalPrior(
-    mu= 0,   ##guess
-    sigma=0.01,  ## guess
-    initial.value=0  ## default to mu
+    mu= 0,   
+    sigma = 1 * y.sd,  
   )
 )
 
@@ -802,7 +833,10 @@ st.sp9 <- AddSeasonal(st.sp9, y.pre.treat.NAs.post,
 bsts.fit9 <- bsts(y.pre.treat.NAs.post ~ . ,
                  state.specification = st.sp9,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
-                 niter = bsts.niter)
+                 niter = bsts.niter, 
+                 prior = priorObjB,
+                 # expected.model.size=3,
+                 seed=rand.seed, ping=0)
 
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsSummaryPlots(bsts.fit9)
@@ -973,6 +1007,76 @@ then DiD uses this as control group (counterfactual)
 
 ```{r}
 ## Show predictor series and some measure, like correlation
+sim.reps.id <- 16745322384
+dfr <- read.csv( file=file.path(dir_rep, sprintf('bsts_runs_%s.csv',sim.reps.id)), 
+                stringsAsFactors = F)
+
+ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), 
+               colour=factor(cov.has.control))) +  
+  xlim(c(-.1,.1)) +
+  geom_density(alpha=.15) +
+  geom_vline(xintercept=0,lty=3) + theme_bw()
+ggplot(dfr, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+  xlim(c(-.1,.1)) +
+  geom_histogram(alpha=.15, binwidth = 0.01, position = 'identity') +
+  geom_vline(xintercept=0,lty=3) + theme_bw()
+###
+ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+  xlim(c(-1,1)) +
+  geom_density(alpha=.15) +
+  geom_vline(xintercept = 0, lty=3) + theme_bw()
+ggplot(dfr, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+  xlim(c(-1,1)) +
+  geom_histogram(alpha=.15, binwidth = 0.1, position = 'identity') +
+  geom_vline(xintercept = 0, lty=3) + theme_bw()
+
+
+
+#####
+# df.bsts.did <- df %>% group_by(rand.seed, cov.has.control)
+cov.type.ctrl <- 'Has covariate with same DGP as Y (has a "control")'
+cov.type.no <- 'NO covariate with same DGP as Y (No "control")'
+df.bsts.did <- rbind(
+  data.frame(model='bsts',
+             err.post.me=dfr$bias.post.me[dfr$cov.has.control==1],
+             cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfr$effect.type),
+  data.frame(model='bsts',
+             err.post.me=dfr$bias.post.me[dfr$cov.has.control==0],
+             cov.has.ctrl=0, cov.type=cov.type.no, effect.type=dfr$effect.type),
+  data.frame(model='did',
+             err.post.me=dfr$did.post.me[dfr$cov.has.control==1],
+             cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfr$effect.type),
+  data.frame(model='did',
+             err.post.me=NA,
+             cov.has.ctrl=0, cov.type=cov.type.no, effect.type=dfr$effect.type)
+)
+df.bsts.did.s <- df.bsts.did %>%
+  group_by(cov.has.ctrl,model,effect.type) %>%
+  summarize(
+    mean=mean(err.post.me, na.rm=T),
+    sd=sd(err.post.me, na.rm=T)#,
+    # skew=skewness(err.post.me, na.rm=T, type=2)
+  )
+
+(p.bsts.did.err.shapes <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
+  xlim(c(-1,1)) +
+  geom_density(alpha=.15) +
+  geom_vline(xintercept=0,lty=3) +
+  facet_grid(effect.type ~ cov.type) + theme_bw())
+# ggsave(plot=p.bsts.did.err.shapes,
+#        filename = file.path(dir_ext,'bsts_did_compare_post_err_with_control_facet_grid_plot.png'),
+#        units = 'in', height = 12, width=8, dpi=300)
+
+ck <- df.bsts.did %>% group_by(effect.type, cov.type, cov.has.ctrl) %>%
+  summarize(
+    n=n(),
+    err.post.me.mean=mean(err.post.me, na.rm=T),
+    err.post.me.sd = sd(err.post.me, na.rm=T),
+    err.post.me.skew = skewness(err.post.me, na.rm=T, type=2)
+  )
+View(ck)
+
+
 ```
 
 
