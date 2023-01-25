@@ -1,5 +1,5 @@
 ---
-title: "Bayesian Structural Time Series (BSTS) for Dynamic Causal Inference"
+title: "Towards Dynamic Causal Inference: Bayesian Counterfactual Approach"
 output: pdf_document
 ---
 
@@ -9,8 +9,8 @@ The fitted BSTS model is then used for (2) counterfactual causal inference.
 Additionally, the last three sections present simulation results for examining 
 (3) the effect of better vs. worse quality covirate series in BSTS models with 
 regression, (4) BSTS causal inference on different causal cycle curve shapes,
-and (5) sensitivity to Bayesian priors and regression spike-and-slab priors
-(model size, expected R^2^). 
+and (5) sensitivity to Bayesian priors, such as regression spike-and-slab priors
+(parameters for expected model size and expected R^2^). 
 ```{r initExclude, setup, message=FALSE, include=FALSE}
 rm(list=ls())
 library(plyr)
@@ -307,7 +307,7 @@ dat2 <- processSimData(simlist, key, effect.type,
 ```
 
 
-# 1. Bayesian Structural Time Series (BSTS) Introduction
+# 1. Bayesian Structural Time Series (BSTS) Overview
 
 ## 1.0. Time Series Data
 
@@ -338,6 +338,11 @@ plot(df1$y_treatment, main='Simulated Outcome Time Series (Y)',ylab='Y',xlab='Ti
 abline(v=intpd, lty=2)
 legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
 ```
+The question of interest for reserach and practice is whether there
+is a significant effect caused by the intervention at time point
+`t=312`. We will apply BSTS for counterfactual causal inference to 
+answer this question in a manner robust to the shape of the causal cycle
+curve post-intervention. 
 
 ## 1.1. State Space Specification - A Simple Baseline Model
 
@@ -393,7 +398,8 @@ which will be addressed below.)
 ## Fit BSTS model
 bsts.fit <- bsts(y.pre.treat.NAs.post,
                  state.specification = st.sp,
-                 niter = bsts.niter)
+                 niter = bsts.niter,
+                 seed = rand.seed)
 ```
 Visualizing the model's behavior can help build  intuition about 
 what the model is doing and, ideally, about how to improve its fit to the 
@@ -401,7 +407,7 @@ characteristics of your data set. To inspect the contributions of the model
 components, we write a function that will report the model's summary, 
 plot the state space components, and if there is a regression in the model, 
 it will plot the coefficients and distrubtion of model sizes.
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ###
 ## Define a function to summarize and visualize the BSTS model components 
 ###
@@ -430,7 +436,7 @@ Then we can plot the contributions to the model's state space against
 the observed outcome (black dots) to help with visual understanding of 
 this model's prediction (blue line), and later for comparison with 
 other models below.
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 # source(file.path(dir_r,'bsts_helper_functions.R'))
 plotBstsStateComps(bsts.fit, intpd=intpd, filename=NA) ##NA file does not save
 ```
@@ -443,8 +449,7 @@ devoid of seasonality when used for causal inference computations (see below).
 Therefore, it is crucial to capture seasonality in the outcome time series 
 and incorporate it into the BSTS model that will be used as the 
 counterfactual for causal inference with the `CasualImpact()` function in
-[Section 2](#2. Causal Inference). 
-
+[Section 2](# 2. Causal Inference: BSTS as Counterfactual). 
 
 ## 1.3. Seasonality
 
@@ -455,7 +460,7 @@ This produces a state contribution of seasonal cycles (e.g., weekly periods each
 added to the other state components. The augmented state space then improves 
 model performance in terms of the mean absolute error (MAE) of 
 one-step ahead predictions during the pre-intervention window. 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ## Initiate empty state space configuration list
 st.sp2 <- list()
 ## Add local level to trend component of state space
@@ -479,7 +484,8 @@ st.sp2 <- AddSeasonal(st.sp2, y.pre.treat.NAs.post,
 ## Fit BSTS model: 
 bsts.fit2 <- bsts(y.pre.treat.NAs.post ,
                  state.specification = st.sp2, 
-                 niter = bsts.niter, ping=0)
+                 niter = bsts.niter,
+                 seed = rand.seed, ping=0)
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsSummaryPlots(bsts.fit2)
 ```
@@ -502,37 +508,37 @@ has theoretical and/or contextual knowledge that can inform
 prior distributions, we focus on illustrating how to adjust the prior 
 distribution settings for the `bsts()` function.
 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(8, 5)}
 ## Initiate empty state space configuration list
 st.sp3 <- list()
 ## Add local level to trend component of state space
 st.sp3 <- AddLocalLevel(st.sp3, y.pre.treat.NAs.post, 
-  initial.state.prior = NormalPrior(mu=1, sigma = .01, fixed = FALSE)
+  initial.state.prior = NormalPrior(mu=1, sigma = 0.1 * y.sd, fixed = FALSE),
+  initial.y = y.pre.treat.NAs.post[1]
 )
+
 ## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
 y.sd <- sd(y.pre.treat.NAs.post, na.rm = T)
 st.sp3 <- AddSeasonal(st.sp3, y.pre.treat.NAs.post, 
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = y.sd,      ## try empirical y SD
-    sample.size = intpd-1,   ## try empirical sample size (pre-intervention)
+    sigma.guess = 0.1 * y.sd,      ## try empirical y SD
+    sample.size = round(0.1 * (intpd-1)),   ## try empirical sample size (pre-intervention)
     upper.limit= 1.5 * y.sd  ## try empirical y SD to set upper limit
   ),
   initial.state.prior = NormalPrior(
-    mu= 3,   ## increase initial state prior mu
-    sigma=1  ## increase initial state prior sigma
+    mu = 1,   ## increase initial state prior mu
+    sigma =  y.sd  ## increase initial state prior sigma
   )
 )
 ## Fit BSTS model:
 bsts.fit3 <- bsts(y.pre.treat.NAs.post,
                  state.specification = st.sp3,
-                 niter = bsts.niter, ping=0)
+                 niter = bsts.niter,
+                 seed = rand.seed, ping=0)
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsSummaryPlots(bsts.fit3)
-```
-```{r}
-# source(file.path(dir_r,'bsts_helper_functions.R'))
 plotBstsStateComps(bsts.fit3, intpd=intpd, filename=NA) ##NA file does not save
 ```
 
@@ -541,12 +547,13 @@ plotBstsStateComps(bsts.fit3, intpd=intpd, filename=NA) ##NA file does not save
 ### 1.5.1.  Add Regression `formula` to BSTS function
 
 This uses covariate series in the `predictors` dataframe for the `data` input.
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ## Initiate empty state space configuration list
 st.sp4 <- list()
 ## Add local level to trend component of state space
-st.sp4 <- AddLocalLevel(st.sp4, y.pre.treat.NAs.post, 
-  initial.state.prior = NormalPrior(mu=0, sigma = .05, fixed = FALSE)
+st.sp4 <- AddLocalLevel(st.sp4, y.pre.treat.NAs.post,
+  initial.state.prior = NormalPrior(mu=1, sigma = .001, fixed = FALSE),
+  initial.y = y.pre.treat.NAs.post[1]
 )
 ## Add seasonality to state space (52 weekly periods = 1 yearly cycle) 
 y.sd <- sd(y.pre.treat.NAs.post, na.rm = T)
@@ -554,13 +561,14 @@ st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post,
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = y.sd,      ## use empirical y SD
-    sample.size = round(0.5 * (intpd-1)),  ## use half of pre-int window
-    upper.limit= 1.5 * y.sd  ## use empirical y SD to set upper limit
+    sigma.guess = y.sd * 0.3,      ## use empirical y SD
+    sample.size = round(0.1 * (intpd-1)),  ## use half of pre-int window
+    upper.limit= 2 * y.sd, ## use empirical y SD to set upper limit
+    initial.value = y.sd * 0.3
   ),
   initial.state.prior = NormalPrior(
-    mu= 2,   ## moderate initial state prior mu
-    sigma=0.5  ## moderate initial state prior sigma
+    mu= 2,  
+    sigma= 1.0 * y.sd  
   )
 )
 ## Fit BSTS model: formula “y.pre ~ .” indicates inclusion of regression  
@@ -568,12 +576,10 @@ st.sp4 <- AddSeasonal(st.sp4, y.pre.treat.NAs.post,
 bsts.fit4 <- bsts(y.pre.treat.NAs.post ~ . ,
                  state.specification = st.sp4,
                  data = predictors,  ## -1 excludes the outcome in 1st column 
-                 niter = bsts.niter)
+                 niter = bsts.niter, 
+                 seed = rand.seed, ping=0)
 ## CALL OUR CUSTOM BSTS DIAGNOSTICS SUMMARY
 getBstsSummaryPlots(bsts.fit4)
-```
-
-```{r}
 plotBstsStateComps(bsts.fit4)
 ```
 
@@ -597,20 +603,30 @@ size of the regression component of the model.
 First, the simplest method is to set the `expected.model.size` attribute 
 (of the `SpikeSlabPrior()`) by passing the `expected.model.size` argument 
 into the `bsts()` function directly.
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 10)}
 ##TODO
 st.sp5 <- st.sp4
-# #=================
-# # Option 1. Specify expected model size (internally creates SpikeSlabPrior)
-# #----------------
-# #   This uniformly sets prior (spike) probabilities = (1 / expected.model.size)
-# bsts.fit5 <- bsts(y.pre ~ .,
-#                state.specification = st.sp5,
-#                niter = bsts.niter,
-#                data = initial.claims,
-#                expected.model.size = 5,  ## argument passed to SpikeSlabPrior
-#                seed = 7531, ping=0)  
-
+#=================
+# Option 1. Specify expected model size (internally creates SpikeSlabPrior)
+#----------------
+#   This uniformly sets prior (spike) probabilities = (1 / expected.model.size)
+bsts.fit5 <- bsts(y.pre.treat.NAs.post ~ .,
+                 state.specification = st.sp5,
+                 data = predictors,
+                 expected.model.size = 5,  ## argument passed to SpikeSlabPrior
+                 niter = bsts.niter,
+                 seed = rand.seed, ping=0)
+bsts.fit51 <- bsts(y.pre.treat.NAs.post ~ .,
+                 state.specification = st.sp5,
+                 data = predictors,
+                 expected.model.size = 1,  ## argument passed to SpikeSlabPrior
+                 niter = bsts.niter,
+                 seed = rand.seed, ping=0)
+summary(bsts.fit5)
+par(mfrow=c(3,1))
+plot(bsts.fit5, 'coefficients', main='Expected Size = 5')
+plot(bsts.fit4, 'coefficients', main='Expected Szie = 3')
+plot(bsts.fit51, 'coefficients', main='Expected Szie = 1')
 ```
 
 Second, you can create a `SpikeSlabPrior` object to pass into the `bsts()`
@@ -623,7 +639,7 @@ probabilities. This is just like the first method above but the intermediate
 step of creating a `SpikeSlabPrior` object enables the researcher to adjust 
 the expected model size and all other regression prior parameter settings 
 in the same step. 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ##TODO
 st.sp6 <- st.sp5
 # #=================
@@ -655,7 +671,7 @@ more likley to be important contributors to the counterfactual series
 and should therefore be included in the model in more iterations 
 (i.e., more MCMC draws from the posterior predictive distribution). 
 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 st.sp7 <- st.sp6
 ##TODO
 # ##----------------
@@ -702,13 +718,13 @@ with other state space configurations that contain a type of linear trend.
 
 The local linear trend is useful for short term predictions of relatively 
 well-behaved time series. 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ## Initiate empty state space configuration list
 st.sp8 <- list()
 ## Add local level to trend component of state space
 st.sp8 <- AddLocalLinearTrend(st.sp8, y.pre.treat.NAs.post, 
-  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=32, fixed = F, upper.limit = 1.2), 
-  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=.01, fixed = F, upper.limit = 1.2), 
+  level.sigma.prior=SdPrior(sigma.guess=.01, sample.size=1, fixed = F, upper.limit = 1.2), 
+  slope.sigma.prior=SdPrior(sigma.guess=.01, sample.size=1, fixed = F, upper.limit = 1.2), 
   initial.level.prior=NormalPrior(mu=0, sigma=.01, fixed = F), 
   initial.slope.prior=NormalPrior(mu=0, sigma=.01, fixed = F)
 )
@@ -717,13 +733,13 @@ st.sp8 <- AddSeasonal(st.sp8, y.pre.treat.NAs.post,
   nseasons = 52, 
   season.duration = 1, 
   sigma.prior = SdPrior(
-    sigma.guess = 0.01,    ## guess
-    sample.size = 0.01,    ## default
-    upper.limit= 1.2 ##1.5 * sd(y, na.rm = T)
+    sigma.guess = sd(y, na.rm = T),    ## guess
+    sample.size = round( 0.5 * (intpd-1)),    ## default
+    upper.limit= 1.5 * sd(y, na.rm = T)
   ), 
   initial.state.prior = NormalPrior(
-    mu= 0,   ##guess
-    sigma=0.01,  ## guess
+    mu= 2,   ##guess
+    sigma=1,  ## guess
     initial.value=0  ## default to mu
   )
 )
@@ -747,7 +763,7 @@ The semilocal linear trend component in the BSTS model state space is
 useful for longer-term forecasts wherein the linear trend persists longer, 
 so tighter prediction bounds are reasonable over longer post-intervention 
 window. 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 ## Initiate empty state space configuration list
 st.sp9 <- list()
 ## Add local level to trend component of state space
@@ -793,7 +809,7 @@ getBstsSummaryPlots(bsts.fit9)
 plotBstsStateComps(bsts.fit9)
 ```
 
-```{r}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4)}
 # reslist <- list()
 # ## SD LOW SCENARIO KEY
 # scenario_key <- '1_noCtrl_lowSd'
@@ -814,7 +830,7 @@ plotBstsStateComps(bsts.fit9)
 ## 1.7. Check MCMC Convergence and Model Diagnostics
 fig.dim = c(14, 10), out.width="100%",
 To inspect the model's state space component contributions and check 
-```{r, out.width="95%", fig.align="center", fig.dim=c(12, 8)}  
+```{r, out.width="100%", fig.align="center", fig.dim=c(12, 8)}  
 ###
 ## Define a funciton to call all of our plotting, 
 ##    diagnostics and converngence checks functions
@@ -843,7 +859,7 @@ For this purpose we plot MCMC convergence and model fit checks for the outcome
 (Y, top row panels) and the standardized residuals (bottom row panels). 
 
 We Begin with the simple model containing only a local level `bsts.fit`.
-```{r mcmc_diag_fit,  out.width="95%", fig.align="center", fig.dim=c(12, 8)}
+```{r mcmc_diag_fit,  out.width="100%", fig.align="center", fig.dim=c(12, 8)}
 getBstsSummaryPlots(bsts.fit)
 getBstsDiagnosticPlots(bsts.fit)
 ```
@@ -891,17 +907,16 @@ cumulative sum of the pointwise impact estimates.
 impact.amount <- CausalImpact(bsts.model = bsts.fit4,
                               post.period.response = post.period.response,
                               alpha=0.05, model.args=list(niter = bsts.niter))
-
+summary(impact.amount)
 ```
 Echo the summary of causal inference results based on the model `bsts.fit`
 and plot the causal impact figures (original, pointwise, cumulative).
-```{r}
-summary(impact.amount)
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 10)}
 plot(impact.amount)
 ```
 
 
-# 3. Covariate Series and Regression Performance
+# 3. Covariate Quality and Regression Performance
 <!-- # 3. Control Group Series (Quasi-Experimental Design in Regression Component) -->
 
 ```{r}

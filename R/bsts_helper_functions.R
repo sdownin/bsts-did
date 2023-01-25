@@ -1435,6 +1435,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   .vals <- c(y.orig, sc.means.all, pred.mean)  #sc.mins, sc.maxs
   .vals <- .vals[which(!is.null(.vals) & !is.nan(.vals) & !is.na(.vals))]
   .ylim <- range(.vals)
+  .ylim[2] <- .ylim[2] + (.1 * .ylim[2])
   # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
   ## Get Mean Absolute Error (MAE) for plot title
