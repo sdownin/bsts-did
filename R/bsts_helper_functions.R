@@ -1331,13 +1331,19 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
 ### 
 ## Plot BSTS State Components - all series compared against observed values
 ###
-plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALSE) {
+plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, 
+                               save.plot=FALSE, pd.ids=NA) {
+  
   # save.plot <- !is.na(filename)
   
   npds <- length(bsts.model$original.series)
   
   if (is.na(intpd)) {
     intpd <- npds
+  }
+  
+  if(any(is.na(pd.ids))) {
+    pd.ids <- 1:npds
   }
   
   
@@ -1438,6 +1444,8 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   .ylim[2] <- .ylim[2] + (.1 * .ylim[2])
   # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
+  .xlim <- range(pd.ids)
+  
   ## Get Mean Absolute Error (MAE) for plot title
   ## y.rep dimensions:  rows [npds before intervention] x cols [draws (niter - burn)]
   # y.rep <- matrix(y.orig, length(y.orig), (niter - burn),  byrow = FALSE)
@@ -1455,11 +1463,11 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, save.plot=FALS
   par(mar=c(2.5,2.5,2.5,1))  ##mfrow=c(nrow,ncol), 
   title <- sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
   plot(x=1:(intpd-1), y.orig, pch=16,
-       ylab='Y', xlab='t', ylim=.ylim, main=title)  ## ylim=.ylim
+       ylab='Y', xlab='t', ylim=.ylim, xlim=.xlim, main=title)  ## ylim=.ylim
   lines(pred.mean, col='blue', lwd=1.9, ylim=.ylim) ## ylim=.ylim
   for (i in 1:dim(sc)[2]) {
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
-    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim)
+    lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim, xlim=.xlim)
   }
   legend('topleft', legend=c('observed', 'predicted', components), 
          lty=c(NA, 1, 1:ncomps), 
@@ -1565,9 +1573,11 @@ heidel.diag.mod <- function (x, eps = 0.1, pvalue=0.05)
 ###
 ## POSTERIOR PREDICTIVE CHECKS
 ###
-bstsPostPredChecks <- function(bsts.model, filename=NA, 
+bstsPostPredChecks <- function(bsts.model, #main.title=NA,
+                               filename=NA, 
                                save.plot=TRUE, return.val=FALSE,
-                               burn=NA, conv.alpha=0.05) {
+                               burn=NA, conv.alpha=0.05,
+                               ...) {
   
   ppcheck.filename <- if (is.na(filename)){
     sprintf('bsts_post_pred_checks_%s.png', round(10*as.numeric(Sys.time())) )
@@ -1789,6 +1799,18 @@ bstsPostPredChecks <- function(bsts.model, filename=NA,
   Acf(rowMeans(err.1step.dist), main = "");title(main='F. Std.Residual ACF, Y')
   ##-----------
   
+  # if(!is.na(main.title)) {
+  #   # args <- list(...)
+  #   args <- c(as.list(environment()), list(...))
+  #   print(names(args))
+  #   print(args[['bsts.model']])
+  #   stop()
+  #   # model.lab <- deparse(quote(bsts.model))
+  #   # mtext(sprintf('Model = %s',model.lab), side=1, line = -10, outer = TRUE)
+  #  
+  #}
+
+  # 
   ##----------- end PNG PLOT --------------------------------------
   if (save.plot) {
     dev.off()
