@@ -1907,7 +1907,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
     lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim, xlim=.xlim)
   }
-  legend('topleft', legend=c('observed', 'predicted', components), cex=0.75, 
+  legend('topleft', legend=c('observed', 'fitted', components), cex=0.9, 
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
@@ -2154,7 +2154,7 @@ bstsPostPredChecks <- function(bsts.model, #main.title=NA,
                             gd.result,gd.z,gd.p,
                             hd.st.result, hd.st.cmv, hd.st.p,
                             hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
-  mtext(text = mtext.postpred, side = 3, line=-4.5, outer = F)
+  mtext(text = mtext.postpred, side = 3, line=-4.5, outer = F, cex=0.8)
   ##
   checklist$ck.postpred <- list(
     geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
