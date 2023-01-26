@@ -427,7 +427,6 @@ getStateSpaceConf <- function(name, ...) {
 
 
 
-
 ##=======================================
 ## Get BSTS State Space Component Template By Simulation Scenario Settings
 ##---------------------------------------
@@ -436,10 +435,10 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
                                            y.spikslab.prior=NULL, ## Y  values for Boom::SpikeSlabPrior()
                                            ...) {
   scenario <- ifelse(is.na(scenario), 'sd.low', scenario)
-  
+
   ## Named arguments
   args <- list(...)
-  
+
   ## Default params
   # lags.hi <- 3
   # lags.lo <- 1
@@ -490,22 +489,22 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   ##
   bsts.nseasons <- 52  ## 12
   bsts.freq <- 1
-  
+
   ##-------------------------------------------------
   ### MAIN CONFIGUATION SELECTION BY COMPONENT NAME
   ##-------------------------------------------------
   if ( name == 'AddAr') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {  ## sd.hi, sd.high
-      list(name='AddAr', 
-           lags = lags.hi, 
+      list(name='AddAr',
+           lags = lags.hi,
            sigma.prior =  SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, initial.value=sig.init.val.hi, upper.limit=upper.limit),  ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
         initial.state.prior = MvnPrior(mean = rep(sig.init.val.hi, lags.hi), variance = matrix(rep(sig.hi,lags.hi^2),nrow=lags.hi))#, ## or use a Boom::MvnPrior(mean, variance)
         # sdy = args$sdy
       )
     } else if (grepl('sd.lo', scenario, perl = F)) { ## sd.lo, sd.low
-      list(name='AddAr', 
-           lags = lags.lo, 
+      list(name='AddAr',
+           lags = lags.lo,
            sigma.prior =  SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, initial.value=sig.init.val.lo, upper.limit=upper.limit),  ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
            initial.state.prior = MvnPrior(mean = rep(sig.init.val.lo, lags.lo), variance = matrix(rep(sig.lo,lags.lo^2),nrow=lags.lo))#, ## or use a Boom::MvnPrior(mean, variance)
            # sdy = args$sdy
@@ -514,12 +513,12 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   } else if (name == 'AddAutoAr') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name='AddAutoAr',
-            lags = lags.hi, 
+            lags = lags.hi,
             prior = SpikeSlabArPrior(
               lags = lags.hi,
               prior.inclusion.probabilities = GeometricSequence(length=lags.hi, initial.value=1, discount.factor=spikslab.disc.fac.hi),
@@ -534,7 +533,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       )
     } else if (grepl('sd.lo', scenario, perl = F)) {
       list(name='AddAutoAr',
-           lags = lags.lo, 
+           lags = lags.lo,
            prior = SpikeSlabArPrior(
              lags = lags.lo,
              prior.inclusion.probabilities = GeometricSequence(length=lags.lo, initial.value=1, discount.factor=spikslab.disc.fac.lo),
@@ -551,27 +550,27 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   # } else if (name == 'AddHierarchicalRegressionHoliday') {
-  #   
+  #
   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
   #     list(
   #       name='AddHierarchicalRegressionHoliday',
-  #       holiday.list = args$holiday.list, 
-  #       coefficient.mean.prior = args$coefficient.mean.prior, 
-  #       coefficient.variance.prior = args$coefficient.variance.prior, 
-  #       time0 = args$time0, 
+  #       holiday.list = args$holiday.list,
+  #       coefficient.mean.prior = args$coefficient.mean.prior,
+  #       coefficient.variance.prior = args$coefficient.variance.prior,
+  #       time0 = args$time0,
   #       sdy = args$sdy
   #     )
   #   } else if (grepl('sd.lo', scenario, perl = F)) {
-  #     
+  #
   #   } else {
   #     list()
   #   }
   #   return(conf)
-    
+
   } else if (name == 'AddLocalLevel') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name='AddLocalLevel',
            sigma.prior = SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, upper.limit=upper.limit.hi, fixed = FALSE),
@@ -592,9 +591,9 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   } else if (name == 'AddLocalLinearTrend') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(
         name='AddLocalLinearTrend',
@@ -620,20 +619,20 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     }
     return(conf)
 
-    
+
   # } else if (name == 'AddMonthlyAnnualCycle') {
-  #   
+  #
   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
-  #     
+  #
   #   } else if (grepl('sd.lo', scenario, perl = F)) {
   #     list(
   #       name ='AddMonthlyAnnualCycle',
-  #       # func =AddMonthlyAnnualCycle, 
-  #       # state.space = NULL, 
-  #       # y.pre.treat.NAs.post.treat = NULL, 
-  #       date.of.first.observation = args$date.of.first.observation, 
-  #       sigma.prior = args$sigma.prior, 
-  #       initial.state.prior = args$initial.state.prior, 
+  #       # func =AddMonthlyAnnualCycle,
+  #       # state.space = NULL,
+  #       # y.pre.treat.NAs.post.treat = NULL,
+  #       date.of.first.observation = args$date.of.first.observation,
+  #       sigma.prior = args$sigma.prior,
+  #       initial.state.prior = args$initial.state.prior,
   #       sdy = args$sdy
   #     )
   #   } else {
@@ -641,11 +640,11 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   #   }
   #   return(conf)
 
-    
+
   # } else if (name == 'AddRandomWalkHoliday') {
-  #   
+  #
   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
-  #     
+  #
   #   } else if (grepl('sd.lo', scenario, perl = F)) {
   #     list(
   #       name = 'AddRandomWalkHoliday',
@@ -662,15 +661,15 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   #     list()
   #   }
   #   return(conf)
-   
-    
+
+
   # } else if (name == 'AddRegressionHoliday') {
-  #   
+  #
   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
   #     list(
   #       name = 'AddRegressionHoliday',
   #       # func = AddRegressionHoliday,
-  #       # state.space = NULL, 
+  #       # state.space = NULL,
   #       # y.pre.treat.NAs.post.treat = NULL,
   #       holiday.list = args$holiday.list,
   #       time0 = args$time0,
@@ -678,7 +677,7 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
   #       sdy = args$sdy
   #     )
   #   } else if (grepl('sd.lo', scenario, perl = F)) {
-  #     
+  #
   #   } else {
   #     list()
   #   }
@@ -709,9 +708,9 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
     }
     return(conf)
 
-    
+
   } else if (name %in% c('AddSemilocalLinearTrend','AddGeneralizedLocalLinearTrend')) {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name = 'AddSemilocalLinearTrend',
            level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, upper.limit = upper.limit.hi, fixed = FALSE),
@@ -734,12 +733,12 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   } else if (name == 'AddSharedLocalLevel') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name = 'AddSharedLocalLevel',
-           nfactors = n.latent.factors.hi, 
+           nfactors = n.latent.factors.hi,
            # coefficient.prior=SpikeSlabPrior(x = x.spikslab.prior,
            #                                  y = y.spikslab.prior,
            #                                  expected.r2 = expected.r2.hi,
@@ -753,14 +752,14 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
            #                                  # sdy = sd(as.numeric(y), na.rm = TRUE),
            #                                  # prior.inclusion.probabilities = NULL,
            #                                  sigma.upper.limit = upper.limit),
-           initial.state.prior = MvnPrior(mean = rep(sig.init.val.hi, lags.hi), variance = matrix(rep(sig.hi, lags.hi^2),nrow=lags.hi))#, 
-           # timestamps = args$timestamps, 
-           # series.id = args$series.id, 
+           initial.state.prior = MvnPrior(mean = rep(sig.init.val.hi, lags.hi), variance = matrix(rep(sig.hi, lags.hi^2),nrow=lags.hi))#,
+           # timestamps = args$timestamps,
+           # series.id = args$series.id,
            # sdy = args$sdy
       )
     } else if (grepl('sd.lo', scenario, perl = F)) {
       list(name = 'AddSharedLocalLevel',
-           nfactors = n.latent.factors.lo, 
+           nfactors = n.latent.factors.lo,
            # coefficient.prior=SpikeSlabPrior(x = x.spikslab.prior,
            #                                  y = y.spikslab.prior,
            #                                  expected.r2 = expected.r2.lo,
@@ -774,32 +773,32 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
            #                                  # sdy = sd(as.numeric(y), na.rm = TRUE),
            #                                  # prior.inclusion.probabilities = NULL,
            #                                  sigma.upper.limit = upper.limit),
-           initial.state.prior = MvnPrior(mean = rep(sig.init.val.lo, lags.lo), variance = matrix(rep(sig.lo, lags.lo^2),nrow=lags.lo))#, 
-           # timestamps = args$timestamps, 
-           # series.id = args$series.id, 
+           initial.state.prior = MvnPrior(mean = rep(sig.init.val.lo, lags.lo), variance = matrix(rep(sig.lo, lags.lo^2),nrow=lags.lo))#,
+           # timestamps = args$timestamps,
+           # series.id = args$series.id,
            # sdy = args$sdy
       )
     } else {
       list()
     }
     return(conf)
-    
+
   # } else if (name == 'AddStaticIntercept') {
-  #   
+  #
   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
   #     list(name = 'AddStaticIntercept',
   #          initial.state.prior = args$initial.state.prior
   #     )
   #   } else if (grepl('sd.lo', scenario, perl = F)) {
-  #     
+  #
   #   } else {
   #     list()
   #   }
   #   return(conf)
 
-    
+
   } else if (name == 'AddStudentLocalLinearTrend') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name = 'AddStudentLocalLinearTrend',
           level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
@@ -824,9 +823,9 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   } else if (name == 'AddTrig') {
-    
+
     conf <- if (grepl('sd.hi', scenario, perl = F)) {
       list(name = 'AddTrig',
            period=bsts.nseasons,
@@ -849,19 +848,455 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
       list()
     }
     return(conf)
-    
+
   } else if (name == 'AddRegression') {
-    
+
     conf <- list(name = 'AddRegression')
     return(conf)
-    
+
   } else {
-    
+
     return(list(name=NA))
   }
-  
-  
+
+
 } ## end func
+
+ 
+# ##=======================================
+# ## Get BSTS State Space Component Template By Simulation Scenario Settings
+# ##---------------------------------------
+# getStateSpaceConfBySimScenario.orig <- function(name, scenario=NA, ## c('sd.high','sd.low')
+#                                            x.spikslab.prior=NULL, ## X  values for Boom::SpikeSlabPrior()
+#                                            y.spikslab.prior=NULL, ## Y  values for Boom::SpikeSlabPrior()
+#                                            ...) {
+#   scenario <- ifelse(is.na(scenario), 'sd.low', scenario)
+#   
+#   ## Named arguments
+#   args <- list(...)
+#   
+#   ## Default params
+#   # lags.hi <- 3
+#   # lags.lo <- 1
+#   lags.hi <- 3
+#   lags.lo <- 1
+#   ## Prior SD
+#   sig.hi <- .1
+#   sig.lo <- .01
+#   ## prior SD initial value
+#   sig.init.val.hi <- .05
+#   sig.init.val.lo <- .01
+#   ##
+#   init.state.prior.sig.hi <- 1
+#   init.state.prior.sig.lo <- 1
+#   ## Mean of prior distributions
+#   mu.hi <- .01
+#   mu.lo <- 0
+#   ## Autoregressive component
+#   ar.mu.hi <- .05
+#   ar.mu.lo <- .01
+#   ar.forc.sta <- FALSE
+#   ar.forc.pos <- FALSE
+#   ## Weight given to sigma.guess (interpretable as a prior observation count)
+#   samp.size.prop.hi <- 64
+#   samp.size.prop.lo <- 32
+#   ##
+#   # upper.limit.hi <- Inf
+#   upper.limit.hi <- Inf
+#   upper.limit.lo <- 1.2
+#   ## Spike and Slab priors on the AddAutoAr (Automatically selected Autoregressive lags)
+#   spikslab.init.val.hi <- .05
+#   spikslab.init.val.lo <- .01
+#   ##
+#   spikslab.disc.fac.hi <- .5
+#   spikslab.disc.fac.lo <- .25
+#   ##
+#   # spikslab.exp.mod.size.hi <- 3
+#   # spikslab.exp.mod.size.lo <- 2
+#   ##
+#   expected.r2.hi <- .8
+#   expected.r2.lo <- .5
+#   ## Latent factors (e.g., AddSharedLocalLevel() )
+#   n.latent.factors.hi <- 2
+#   n.latent.factors.lo <- 1
+#   ## SpikeSlabPrior
+#   diag.shrinkage.hi <- .5
+#   diag.shrinkage.lo <- 0 ## set=0 --> gives Zellner's G-prior @see spike.slab.prior {BoomSpikeSlab}
+#   ##
+#   bsts.nseasons <- 52  ## 12
+#   bsts.freq <- 1
+#   
+#   ##-------------------------------------------------
+#   ### MAIN CONFIGUATION SELECTION BY COMPONENT NAME
+#   ##-------------------------------------------------
+#   if ( name == 'AddAr') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {  ## sd.hi, sd.high
+#       list(name='AddAr', 
+#            lags = lags.hi, 
+#            sigma.prior =  SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, initial.value=sig.init.val.hi, upper.limit=upper.limit),  ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
+#         initial.state.prior = MvnPrior(mean = rep(sig.init.val.hi, lags.hi), variance = matrix(rep(sig.hi,lags.hi^2),nrow=lags.hi))#, ## or use a Boom::MvnPrior(mean, variance)
+#         # sdy = args$sdy
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) { ## sd.lo, sd.low
+#       list(name='AddAr', 
+#            lags = lags.lo, 
+#            sigma.prior =  SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, initial.value=sig.init.val.lo, upper.limit=upper.limit),  ## Boom::SdPrior(sigma.guess, sample.size = .01, initial.value = sigma.guess, fixed = FALSE, upper.limit = Inf)
+#            initial.state.prior = MvnPrior(mean = rep(sig.init.val.lo, lags.lo), variance = matrix(rep(sig.lo,lags.lo^2),nrow=lags.lo))#, ## or use a Boom::MvnPrior(mean, variance)
+#            # sdy = args$sdy
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   } else if (name == 'AddAutoAr') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name='AddAutoAr',
+#             lags = lags.hi, 
+#             prior = SpikeSlabArPrior(
+#               lags = lags.hi,
+#               prior.inclusion.probabilities = GeometricSequence(length=lags.hi, initial.value=1, discount.factor=spikslab.disc.fac.hi),
+#               prior.mean = rep(0, lags.hi),
+#               prior.sd = GeometricSequence(lags.hi, initial.value=1, discount.factor=spikslab.disc.fac.hi),
+#               sdy=.5,
+#               prior.df = 1,
+#               expected.r2 = .5,
+#               sigma.upper.limit = Inf,
+#               truncate = TRUE
+#               )#, ##bsts::SpikeSlabArPrior()
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name='AddAutoAr',
+#            lags = lags.lo, 
+#            prior = SpikeSlabArPrior(
+#              lags = lags.lo,
+#              prior.inclusion.probabilities = GeometricSequence(length=lags.lo, initial.value=1, discount.factor=spikslab.disc.fac.lo),
+#              prior.mean = rep(0, lags.lo),
+#              prior.sd = GeometricSequence(lags.lo, initial.value=1, discount.factor=spikslab.disc.fac.lo),
+#              sdy=.5,
+#              prior.df = 1,
+#              expected.r2 = .5,
+#              sigma.upper.limit = Inf,
+#              truncate = TRUE
+#            )#, ##bsts::SpikeSlabArPrior()
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   # } else if (name == 'AddHierarchicalRegressionHoliday') {
+#   #   
+#   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#   #     list(
+#   #       name='AddHierarchicalRegressionHoliday',
+#   #       holiday.list = args$holiday.list, 
+#   #       coefficient.mean.prior = args$coefficient.mean.prior, 
+#   #       coefficient.variance.prior = args$coefficient.variance.prior, 
+#   #       time0 = args$time0, 
+#   #       sdy = args$sdy
+#   #     )
+#   #   } else if (grepl('sd.lo', scenario, perl = F)) {
+#   #     
+#   #   } else {
+#   #     list()
+#   #   }
+#   #   return(conf)
+#     
+#   } else if (name == 'AddLocalLevel') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name='AddLocalLevel',
+#            sigma.prior = SdPrior(sigma.guess=sig.hi, sample.size=samp.size.prop.hi, upper.limit=upper.limit.hi, fixed = FALSE),
+#            # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.hi, mu.guess.weight = 1, sigma.guess = sig.hi, sigma.guess.weight = 1),
+#            initial.state.prior = NormalPrior(mu=mu.hi, sigma=init.state.prior.sig.hi, fixed = FALSE)#,
+#            # sdy = args$sdy,
+#            # initial.y = args$initial.y
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name='AddLocalLevel',
+#            sigma.prior = SdPrior(sigma.guess=sig.lo, sample.size=samp.size.prop.lo, upper.limit=upper.limit.lo, fixed = FALSE),
+#            # sigma.prior = NormalInverseGammaPrior(mu.guess = mu.lo, mu.guess.weight = 1, sigma.guess = sig.lo, sigma.guess.weight = 1),
+#            initial.state.prior = NormalPrior(mu=mu.lo, sigma=init.state.prior.sig.lo, fixed = FALSE)#,
+#            # sdy = args$sdy,
+#            # initial.y = args$initial.y
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   } else if (name == 'AddLocalLinearTrend') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(
+#         name='AddLocalLinearTrend',
+#         level.sigma.prior= SdPrior(sigma.guess =sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
+#         level.nu.prior= NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi), ### Inherits: DoubleModel(),
+#         slope.sigma.prior = SdPrior(sigma.guess = sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
+#         slope.nu.prior= NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi), ### Inherits: DoubleModel(),
+#         initial.level.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi),
+#         initial.slope.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi)
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(
+#         name='AddLocalLinearTrend',
+#         level.sigma.prior= SdPrior(sigma.guess =sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
+#         level.nu.prior= NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo), ### Inherits: DoubleModel(),
+#         slope.sigma.prior = SdPrior(sigma.guess = sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
+#         slope.nu.prior= NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo), ### Inherits: DoubleModel(),
+#         initial.level.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo),
+#         initial.slope.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo)
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+# 
+#     
+#   # } else if (name == 'AddMonthlyAnnualCycle') {
+#   #   
+#   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#   #     
+#   #   } else if (grepl('sd.lo', scenario, perl = F)) {
+#   #     list(
+#   #       name ='AddMonthlyAnnualCycle',
+#   #       # func =AddMonthlyAnnualCycle, 
+#   #       # state.space = NULL, 
+#   #       # y.pre.treat.NAs.post.treat = NULL, 
+#   #       date.of.first.observation = args$date.of.first.observation, 
+#   #       sigma.prior = args$sigma.prior, 
+#   #       initial.state.prior = args$initial.state.prior, 
+#   #       sdy = args$sdy
+#   #     )
+#   #   } else {
+#   #     list()
+#   #   }
+#   #   return(conf)
+# 
+#     
+#   # } else if (name == 'AddRandomWalkHoliday') {
+#   #   
+#   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#   #     
+#   #   } else if (grepl('sd.lo', scenario, perl = F)) {
+#   #     list(
+#   #       name = 'AddRandomWalkHoliday',
+#   #       # func = AddRandomWalkHoliday,
+#   #       # state.specification = NULL,
+#   #       # y = NULL,
+#   #       holiday = args$holiday,
+#   #       time0 = args$time0,
+#   #       sigma.prior = args$sigma.prior,
+#   #       initial.state.prior = args$initial.state.prior,
+#   #       sdy = args$sdy
+#   #     )
+#   #   } else {
+#   #     list()
+#   #   }
+#   #   return(conf)
+#    
+#     
+#   # } else if (name == 'AddRegressionHoliday') {
+#   #   
+#   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#   #     list(
+#   #       name = 'AddRegressionHoliday',
+#   #       # func = AddRegressionHoliday,
+#   #       # state.space = NULL, 
+#   #       # y.pre.treat.NAs.post.treat = NULL,
+#   #       holiday.list = args$holiday.list,
+#   #       time0 = args$time0,
+#   #       prior = args$prior,
+#   #       sdy = args$sdy
+#   #     )
+#   #   } else if (grepl('sd.lo', scenario, perl = F)) {
+#   #     
+#   #   } else {
+#   #     list()
+#   #   }
+#   #   return(conf)
+# 
+#   } else if (name == 'AddSeasonal') {
+# 
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(
+#         name = 'AddSeasonal',
+#         nseasons = bsts.nseasons,
+#         season.duration = bsts.freq,
+#         sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size =samp.size.prop.hi, upper.limit = upper.limit.hi)#,
+#         # initial.state.prior = args$initial.state.prior#,
+#         # sdy = args$sdy
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(
+#         name = 'AddSeasonal',
+#         nseasons = bsts.nseasons,
+#         season.duration = bsts.freq,
+#         sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size =samp.size.prop.lo, upper.limit = upper.limit.lo)#,
+#         # initial.state.prior = args$initial.state.prior#,
+#         # sdy = args$sdy
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+# 
+#     
+#   } else if (name %in% c('AddSemilocalLinearTrend','AddGeneralizedLocalLinearTrend')) {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name = 'AddSemilocalLinearTrend',
+#            level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, upper.limit = upper.limit.hi, fixed = FALSE),
+#            slope.mean.prior = NormalPrior(mu=mu.hi, sigma = sig.hi, fixed = FALSE),
+#            slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.hi, sigma = sig.hi, force.stationary = ar.forc.sta, force.positive = ar.forc.pos),
+#            slope.sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size = samp.size.prop.hi, upper.limit = upper.limit.hi, fixed = FALSE),
+#            initial.level.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, fixed = FALSE),
+#            initial.slope.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, fixed = FALSE)
+#         )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name = 'AddSemilocalLinearTrend',
+#            level.sigma.prior= SdPrior(sigma.guess=sig.lo, sample.size = samp.size.prop.lo, upper.limit = upper.limit.lo, fixed = FALSE),
+#            slope.mean.prior = NormalPrior(mu=mu.lo, sigma = sig.lo, fixed = FALSE),
+#            slope.ar1.prior = Ar1CoefficientPrior(mu = ar.mu.lo, sigma = sig.lo, force.stationary = ar.forc.sta, force.positive = ar.forc.pos),
+#            slope.sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size = samp.size.prop.lo, upper.limit = upper.limit.lo, fixed = FALSE),
+#            initial.level.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, fixed = FALSE),
+#            initial.slope.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, fixed = FALSE)
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   } else if (name == 'AddSharedLocalLevel') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name = 'AddSharedLocalLevel',
+#            nfactors = n.latent.factors.hi, 
+#            # coefficient.prior=SpikeSlabPrior(x = x.spikslab.prior,
+#            #                                  y = y.spikslab.prior,
+#            #                                  expected.r2 = expected.r2.hi,
+#            #                                  prior.df = sig.hi,
+#            #                                  expected.model.size = spikslab.exp.mod.size.hi,
+#            #                                  prior.information.weight = samp.size.prop.hi,
+#            #                                  diagonal.shrinkage = diag.shrinkage.hi,  ## setting=0 --> Zellner's G-prior
+#            #                                  # optional.coefficient.estimate = NULL,
+#            #                                  max.flips = -1,  ## <= 0 means all indicators will be sampled
+#            #                                  # mean.y = mean(y, na.rm = TRUE),
+#            #                                  # sdy = sd(as.numeric(y), na.rm = TRUE),
+#            #                                  # prior.inclusion.probabilities = NULL,
+#            #                                  sigma.upper.limit = upper.limit),
+#            initial.state.prior = MvnPrior(mean = rep(sig.init.val.hi, lags.hi), variance = matrix(rep(sig.hi, lags.hi^2),nrow=lags.hi))#, 
+#            # timestamps = args$timestamps, 
+#            # series.id = args$series.id, 
+#            # sdy = args$sdy
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name = 'AddSharedLocalLevel',
+#            nfactors = n.latent.factors.lo, 
+#            # coefficient.prior=SpikeSlabPrior(x = x.spikslab.prior,
+#            #                                  y = y.spikslab.prior,
+#            #                                  expected.r2 = expected.r2.lo,
+#            #                                  prior.df = sig.lo,
+#            #                                  expected.model.size = spikslab.exp.mod.size.lo,
+#            #                                  prior.information.weight = samp.size.prop.lo,
+#            #                                  diagonal.shrinkage = diag.shrinkage.lo,  ## setting=0 --> Zellner's G-prior
+#            #                                  # optional.coefficient.estimate = NULL,
+#            #                                  max.flips = -1,  ## <= 0 means all indicators will be sampled
+#            #                                  # mean.y = mean(y, na.rm = TRUE),
+#            #                                  # sdy = sd(as.numeric(y), na.rm = TRUE),
+#            #                                  # prior.inclusion.probabilities = NULL,
+#            #                                  sigma.upper.limit = upper.limit),
+#            initial.state.prior = MvnPrior(mean = rep(sig.init.val.lo, lags.lo), variance = matrix(rep(sig.lo, lags.lo^2),nrow=lags.lo))#, 
+#            # timestamps = args$timestamps, 
+#            # series.id = args$series.id, 
+#            # sdy = args$sdy
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   # } else if (name == 'AddStaticIntercept') {
+#   #   
+#   #   conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#   #     list(name = 'AddStaticIntercept',
+#   #          initial.state.prior = args$initial.state.prior
+#   #     )
+#   #   } else if (grepl('sd.lo', scenario, perl = F)) {
+#   #     
+#   #   } else {
+#   #     list()
+#   #   }
+#   #   return(conf)
+# 
+#     
+#   } else if (name == 'AddStudentLocalLinearTrend') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name = 'AddStudentLocalLinearTrend',
+#           level.sigma.prior= SdPrior(sigma.guess=sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
+#           level.nu.prior= LognormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi), ### Inherits: DoubleModel(),
+#           slope.sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size = samp.size.prop.hi, initial.value = sig.init.val.hi, upper.limit = upper.limit),
+#           slope.nu.prior= LognormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi), ### Inherits: DoubleModel(),
+#           initial.level.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi),
+#           initial.slope.prior = NormalPrior(mu = mu.hi, sigma = sig.hi, initial.value = sig.init.val.hi),
+#           save.weights = TRUE
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name = 'AddStudentLocalLinearTrend',
+#            level.sigma.prior= SdPrior(sigma.guess=sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
+#            level.nu.prior= LognormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo), ### Inherits: DoubleModel(),
+#            slope.sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size = samp.size.prop.lo, initial.value = sig.init.val.lo, upper.limit = upper.limit),
+#            slope.nu.prior= LognormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo), ### Inherits: DoubleModel(),
+#            initial.level.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo),
+#            initial.slope.prior = NormalPrior(mu = mu.lo, sigma = sig.lo, initial.value = sig.init.val.lo),
+#            save.weights = TRUE
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   } else if (name == 'AddTrig') {
+#     
+#     conf <- if (grepl('sd.hi', scenario, perl = F)) {
+#       list(name = 'AddTrig',
+#            period=bsts.nseasons,
+#            frequencies=bsts.freq,
+#            sigma.prior = SdPrior(sigma.guess =sig.hi, sample.size =samp.size.prop.hi, initial.value =sig.init.val.hi, upper.limit = upper.limit),
+#            # initial.state.prior=NormalPrior(mu=.1, sigma=1, initial.value = .1),
+#            # initial.state.prior = MvnDiagonalPrior(mean.vector = c(.1, .1), sd.vector = c(1, 1)),
+#            method='harmonic'
+#       )
+#     } else if (grepl('sd.lo', scenario, perl = F)) {
+#       list(name = 'AddTrig',
+#            period=bsts.nseasons,
+#            frequencies=bsts.freq,
+#            sigma.prior = SdPrior(sigma.guess =sig.lo, sample.size =samp.size.prop.lo, initial.value =sig.init.val.lo, upper.limit = upper.limit),
+#            # initial.state.prior=NormalPrior(mu=.1, sigma=1, initial.value = .1),
+#            # initial.state.prior = MvnDiagonalPrior(mean.vector = c(.1, .1), sd.vector = c(1, 1)),
+#            method='harmonic'
+#       )
+#     } else {
+#       list()
+#     }
+#     return(conf)
+#     
+#   } else if (name == 'AddRegression') {
+#     
+#     conf <- list(name = 'AddRegression')
+#     return(conf)
+#     
+#   } else {
+#     
+#     return(list(name=NA))
+#   }
+#   
+#   
+# } ## end func
 
 
 
@@ -1332,7 +1767,8 @@ getStateSpaceConfBySimScenario <- function(name, scenario=NA, ## c('sd.high','sd
 ## Plot BSTS State Components - all series compared against observed values
 ###
 plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA, 
-                               save.plot=FALSE, pd.ids=NA) {
+                               save.plot=FALSE, pd.ids=NA,
+                               return.val=FALSE, title.show=TRUE) {
   
   # save.plot <- !is.na(filename)
   
@@ -1441,7 +1877,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
   .vals <- c(y.orig, sc.means.all, pred.mean)  #sc.mins, sc.maxs
   .vals <- .vals[which(!is.null(.vals) & !is.nan(.vals) & !is.na(.vals))]
   .ylim <- range(.vals)
-  .ylim[2] <- .ylim[2] + (.1 * .ylim[2])
+  .ylim[2] <- .ylim[2]  * 1.2
   # .ylim <- c( min(.vals) - .25*diff(range(.vals)),  max(.vals) )
   
   .xlim <- range(pd.ids)
@@ -1456,12 +1892,14 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
   
   if(save.plot) {
     png(filename = filename, width = 10, height = 8, units = 'in', res = 400)
+    par(mar=c(2.5,2.5,2.5,1)) ##mfrow=c(nrow,ncol), 
   }
   ##----------- INSIDE PNG PLOT --------------------------------------
   # nrow <- ceiling( sqrt(ncomps) )
   # ncol <- ceiling(ncomps / nrow)
-  par(mar=c(2.5,2.5,2.5,1))  ##mfrow=c(nrow,ncol), 
-  title <- sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
+  title <- ifelse( ! title.show, "",
+    sprintf('%s (MAE = %.3f)', paste(components,collapse = ' + '), mae)
+  )
   plot(x=1:(intpd-1), y.orig, pch=16,
        ylab='Y', xlab='t', ylim=.ylim, xlim=.xlim, main=title)  ## ylim=.ylim
   lines(pred.mean, col='blue', lwd=1.9, ylim=.ylim) ## ylim=.ylim
@@ -1469,7 +1907,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
     lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim, xlim=.xlim)
   }
-  legend('topleft', legend=c('observed', 'predicted', components), 
+  legend('topleft', legend=c('observed', 'predicted', components), cex=0.75, 
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
@@ -1477,6 +1915,13 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
   ##-------------- END PNG PLOT ----------------------------------
   if (save.plot) {
     dev.off()
+  }
+
+  if(return.val) {
+    return(list(
+      mae=mae,
+      pred.mean=pred.mean
+    ))
   }
 
 }

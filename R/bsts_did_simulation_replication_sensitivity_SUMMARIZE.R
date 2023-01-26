@@ -434,9 +434,9 @@ p.bsts.did.err.shapes <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colo
   geom_density(alpha=.15) +
   geom_vline(xintercept=0,lty=3) +
   facet_grid(effect.type ~ cov.type) + theme_bw()
-ggsave(plot=p.bsts.did.err,
+ggsave(plot=p.bsts.did.err.shapes,
        filename = file.path(dir_ext,'bsts_did_compare_post_err_with_control_facet_grid_plot.png'),
-       units = 'in', height = 12, width=8, dpi=300)
+       units = 'in', height = 10, width=8, dpi=300)
 
 ck <- df.bsts.did %>% group_by(effect.type, cov.type, cov.has.ctrl) %>%
   summarize(
@@ -446,6 +446,19 @@ ck <- df.bsts.did %>% group_by(effect.type, cov.type, cov.has.ctrl) %>%
     err.post.me.skew = skewness(err.post.me, na.rm=T, type=2)
   )
 View(ck)
+
+
+
+(p.bsts.did.err.shapes <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
+  xlim(c(-1,1)) +
+  geom_histogram(alpha=.15, position='identity', binwidth = 0.1) +
+  geom_vline(xintercept=0,lty=3) +
+  facet_grid(effect.type ~ cov.type) + theme_bw())
+ggsave(plot=p.bsts.did.err,
+       filename = file.path(dir_ext,'bsts_did_compare_post_err_with_control_facet_grid_plot.png'),
+       units = 'in', height = 12, width=8, dpi=300)
+
+
 ######
 ggplot(df, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
   xlim(c(-1,1)) +
