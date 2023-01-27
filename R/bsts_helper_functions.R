@@ -1907,11 +1907,13 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
     lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim, xlim=.xlim)
   }
-  legend('topleft', legend=c('observed', 'fitted', components), cex=0.75, 
-         lty=c(NA, 1, 1:ncomps), 
-         pch=c(16, NA, rep(NA,ncomps)),
-         col=c('black', 'blue', 1:ncomps),
-         lwd=c(NA, 1.9, rep(1.5,ncomps)))
+  abline(v=intpd,lty=4,col='darkgray') ## show intervention in different style line
+  legend('topleft', legend=c('observed', 'fitted', components,'intervention'), 
+         cex=0.7, 
+         lty=c(NA, 1, 1:ncomps,4), 
+         pch=c(16, NA, rep(NA,ncomps),NA),
+         col=c('black', 'blue', 1:ncomps,'darkgray'),
+         lwd=c(NA, 1.9, rep(1.5,ncomps),1))
   ##-------------- END PNG PLOT ----------------------------------
   if (save.plot) {
     dev.off()
@@ -1925,7 +1927,6 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
   }
 
 }
-
 
 
 ##
