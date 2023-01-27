@@ -1907,7 +1907,7 @@ plotBstsStateComps <- function(bsts.model, intpd=NA, filename=NA,
     # plot(colMeans(sc[,i,]), type='l', main=component[i])
     lines(colMeans(sc[,i,]), type='l', col=i, lty=i, lwd=1.5, ylim=.ylim, xlim=.xlim)
   }
-  legend('topleft', legend=c('observed', 'fitted', components), cex=0.9, 
+  legend('topleft', legend=c('observed', 'fitted', components), cex=0.75, 
          lty=c(NA, 1, 1:ncomps), 
          pch=c(16, NA, rep(NA,ncomps)),
          col=c('black', 'blue', 1:ncomps),
@@ -2016,7 +2016,8 @@ heidel.diag.mod <- function (x, eps = 0.1, pvalue=0.05)
 }
 
 ###
-## POSTERIOR PREDICTIVE CHECKS
+## BSTS MODEL CHECKS: 
+##   POSTER PREDICTIVE DISTRIBUTION & STANDARDIZED RESIDUALS
 ###
 bstsPostPredChecks <- function(bsts.model, #main.title=NA,
                                filename=NA, 

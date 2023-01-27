@@ -405,7 +405,7 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
         ) %>%
         group_by(t) %>%
         summarize(
-          y_treatment = mean(y, na.rm=T)
+          y_observed = mean(y, na.rm=T)
         ) 
       # %>%
       #   mutate(t=t,y_outcome=mean, .keep='used')
@@ -626,18 +626,18 @@ runSimCompareBstsDiD <- function(simlist,     ## n, npds, intpd moved into simli
       # impact_amount <- CausalImpact(amount.impact,pre.period,post.period,alpha=0.1, model.args = list(niter = 5000))
       # summary(impact_amount)
       # plot(impact_amount)
-      # dat <- tsdfw[,c('y_treatment',
+      # dat <- tsdfw[,c('y_observed',
       #                 'y_control',
       #                 'c1_mean','c2_mean','c3_mean',
       #                 'c1_sd','c2_sd','c3_sd'
       # )]
       dat <- bsts.df
       ## Train on y pre-treatment but NA's post-treatment
-      y.pre.treat.NAs.post.treat <- c(dat$y_treatment[1:(intpd-1)], rep(NA,npds-intpd+1))
+      y.pre.treat.NAs.post.treat <- c(dat$y_observed[1:(intpd-1)], rep(NA,npds-intpd+1))
       ## Then use the post-treatment response for causal impact estimation
-      post.period.response <- dat$y_treatment[intpd:npds]
+      post.period.response <- dat$y_observed[intpd:npds]
       ## Covariates (predictors) - Matrix for "formula = y ~ predictors" argument
-      predictors <- dat[, ! names(dat) %in% 'y_treatment'] ## remove response; convert to matrix
+      predictors <- dat[, ! names(dat) %in% 'y_observed'] ## remove response; convert to matrix
       # ## Covariates (predictors) - Dataframe for "data" argument
       # predictors <- as.matrix(predictors) 
       

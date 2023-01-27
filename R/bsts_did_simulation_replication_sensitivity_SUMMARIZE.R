@@ -300,8 +300,8 @@ for (i in 1:length(runfiles)) {
     npds <- l$npds
     idx.pre <- 1:(intpd-1)
     idx.post <- intpd:npds
-    df.pre <- simdf[idx.pre, ]
-    df.post <- simdf[ -idx.pre, ]
+    df.pre <- simdf[simdf$t %in% idx.pre, ]
+    df.post <- simdf[simdf$t %in% idx.post, ]
     ##
     bsts.model <- l$compare$bsts[[ effect.type ]][[ 1 ]]$CausalImpact$model$bsts.model
     ##
@@ -360,53 +360,122 @@ for (i in 1:length(runfiles)) {
 }
 dim(df)
 View(df)
-write.csv(df, file=file.path(dir_ext, sprintf('bsts_runs_%s.csv',sim.id)), row.names = F)
-
-ggplot(df, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-.1,.1)) +
-  geom_density(alpha=.15) +
-  geom_vline(xintercept=0,lty=3) + theme_bw()
-ggplot(df, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-.1,.1)) +
-  geom_histogram(alpha=.15, binwidth = 0.01, position = 'identity') +
-  geom_vline(xintercept=0,lty=3) + theme_bw()
-###
-ggplot(df, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-1,1)) +
-  geom_density(alpha=.15) +
-  geom_vline(xintercept = 0, lty=3) + theme_bw()
-ggplot(df, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
-  xlim(c(-1,1)) +
-  geom_histogram(alpha=.15, binwidth = 0.1, position = 'identity') +
-  geom_vline(xintercept = 0, lty=3) + theme_bw()
+write.csv(df, file=file.path(dir_ext, sprintf('bsts_runs_%s_JOM-R1.csv',sim.id)), row.names = F)
 
 
 
-#####
-# df.bsts.did <- df %>% group_by(rand.seed, cov.has.control)
-cov.type.ctrl <- 'Has covariate with same DGP as Y (has a "control")'
-cov.type.no <- 'NO covariate with same DGP as Y (No "control")'
-df.bsts.did <- rbind(
-  data.frame(model='bsts',
-             err.post.me=df$bias.post.me[df$cov.has.control==1],
-             cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=df$effect.type),
-  data.frame(model='bsts',
-             err.post.me=df$bias.post.me[df$cov.has.control==0],
-             cov.has.ctrl=0, cov.type=cov.type.no, effect.type=df$effect.type),
-  data.frame(model='did',
-             err.post.me=df$did.post.me[df$cov.has.control==1],
-             cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=df$effect.type),
-  data.frame(model='did',
-             err.post.me=NA,
-             cov.has.ctrl=0, cov.type=cov.type.no, effect.type=df$effect.type)
-)
-df.bsts.did.s <- df.bsts.did %>%
-  group_by(cov.has.ctrl,model,effect.type) %>%
-  summarize(
-    mean=mean(err.post.me, na.rm=T),
-    sd=sd(err.post.me, na.rm=T)#,
-    # skew=skewness(err.post.me, na.rm=T, type=2)
-  )
+##==============================================================================
+# ## # FILTER TO MOSTLY CONVERGED RUNS
+# conv.tol <- 5/6
+
+reslist <- list()
+for (conv.tol in c(3/6, 4/6, 5/6, 6/6)) {
+  ###
+  (cnt <- df %>% group_by(cov.has.control, covariates.type, effect.type) %>%
+     filter(conv.check.prop >= conv.tol) %>%
+     summarize(
+       n=n()
+     ))
+  dfsub <- df[df$conv.check.prop >= conv.tol, ]
+  # n.dfsub <- length(unique(dfsub$rand.seed))
+  n.sub.0 <- cnt$n[cnt$cov.has.control==0][1]
+  n.sub.1 <- cnt$n[cnt$cov.has.control==1][1]
+  
+  
+  #####
+  # df.bsts.did <- df %>% group_by(rand.seed, cov.has.control)
+  cov.type.ctrl <- sprintf('HAS covariate with same DGP as Y (HAS "control")\nN = %s', n.sub.1)
+  cov.type.no <- sprintf('NO covariate with same DGP as Y (NO "control")\nN = %s', n.sub.0)
+  idx.ctrl.1 <- which(dfsub$cov.has.control==1)
+  idx.ctrl.0 <- which(dfsub$cov.has.control==0)
+  if (length(idx.ctrl.0)>0) {
+    df.bsts.did <- rbind(
+      data.frame(model='BCA',
+                 err.post.me=dfsub$bias.post.me[idx.ctrl.1],
+                 cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfsub$effect.type[idx.ctrl.1]),
+      data.frame(model='BCA',
+                 err.post.me=dfsub$bias.post.me[idx.ctrl.0],
+                 cov.has.ctrl=0, cov.type=cov.type.no, effect.type=dfsub$effect.type[idx.ctrl.0]),
+      data.frame(model='DiD',
+                 err.post.me=dfsub$did.post.me[idx.ctrl.1],
+                 cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfsub$effect.type[idx.ctrl.1]),
+      data.frame(model='DiD',
+                 err.post.me=NA,
+                 cov.has.ctrl=0, cov.type=cov.type.no, effect.type=dfsub$effect.type[idx.ctrl.0])
+    )
+  } else {
+    df.bsts.did <- rbind(
+      data.frame(model='BCA',
+                 err.post.me=dfsub$bias.post.me[idx.ctrl.1],
+                 cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfsub$effect.type[idx.ctrl.1]),
+      data.frame(model='DiD',
+                 err.post.me=dfsub$did.post.me[idx.ctrl.1],
+                 cov.has.ctrl=1, cov.type=cov.type.ctrl, effect.type=dfsub$effect.type[idx.ctrl.1])
+    )
+  }
+  
+  options(pillar.sigfig = 6)
+  (df.bsts.did.s <- df.bsts.did %>%
+      group_by(cov.has.ctrl,model,effect.type) %>%
+      summarize(
+        n=n(),
+        mean=mean(err.post.me, na.rm=T),
+        sd=sd(err.post.me, na.rm=T),
+        q1=quantile(err.post.me, probs = 1/4, na.rm=T),
+        q3=quantile(err.post.me, probs = 3/4, na.rm=T),
+        l95=quantile(err.post.me, probs = .025, na.rm=T),
+        u95=quantile(err.post.me, probs = .975, na.rm=T)
+        # skew=skewness(err.post.me, na.rm=T, type=2)
+      ))
+  reslist[[length(reslist)+1]] <- list(conv.tol=conv.tol, df.bsts.did.s=df.bsts.did.s)
+  ################
+  # df.bsts.did$covariate.type <- 'NO Control (No Covariate like Pre-Intervention Y)'
+  # df.bsts.did$covariate.type[df.bsts.did$cov.has.ctrl==1] <- 'HAS Control (Covariate like Pre-Intervention Y)'
+  # df.bsts.did$err.post.me[which(df.bsts.did$cov.has.ctrl==1 & df.bsts.did$model=='did')] <- NA
+  dens.adj <- 1 # 3/2
+  (p.bsts.did.err <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
+      xlim(c(-1,1)) + xlab('ATT Bias (Mean Difference: Estimated ATT - True ATT)') +
+      geom_density(alpha=.15, adjust=dens.adj) +
+      geom_vline(xintercept=0,lty=3) +
+      facet_wrap(. ~ cov.type)+ 
+      ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + 
+      theme_bw() + theme(legend.position = 'right'))
+  ggsave(plot=p.bsts.did.err,
+         filename = file.path(dir_sim,
+                              sprintf('bsts_did_compare_post_err_with_control_facet_DENSITY_plot_tol%s_densadj%s.png',
+                                      round(100*conv.tol),dens.adj)),
+         units = 'in', height = 6, width=9, dpi=300)
+  
+  (p.bsts.did.err2 <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
+      xlim(c(-1,1)) + xlab('ATT Bias (Mean Difference: Estimated ATT - True ATT)') +
+      geom_histogram(alpha=.15, binwidth = 0.1) +
+      geom_vline(xintercept=0,lty=3) +
+      facet_wrap(. ~ cov.type)+ 
+      ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + 
+      theme_bw() + theme(legend.position = 'right'))
+  ggsave(plot=p.bsts.did.err2,
+         filename = file.path(dir_sim,
+                              sprintf('bsts_did_compare_post_err_with_control_facet_HISTOGRAM_plot_tol%s.png',
+                                      round(100*conv.tol))),
+         units = 'in', height = 6, width=9, dpi=300)
+  
+  (p.bsts.did.err2 <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
+      xlim(c(-1,1)) + xlab('ATT Bias (Mean Difference: Estimated ATT - True ATT)') +
+      geom_histogram(alpha=.15, bins = n.sub.1) +
+      geom_vline(xintercept=0,lty=3) +
+      facet_wrap(. ~ cov.type)+ 
+      ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + 
+      theme_bw() + theme(legend.position = 'right'))
+  ggsave(plot=p.bsts.did.err2,
+         filename = file.path(dir_sim,
+                              sprintf('bsts_did_compare_post_err_with_control_facet_HISTOGRAM_EXACT_plot_tol%s.png',
+                                      round(100*conv.tol))),
+         units = 'in', height = 6, width=9, dpi=300)
+  ##=====================================================================
+}
+
+print(reslist)
+
 # # A tibble: 4 x 3
 # # Groups:   cov.has.ctrl [2]
 #   cov.has.ctrl model     mean
@@ -415,18 +484,54 @@ df.bsts.did.s <- df.bsts.did %>%
 # 2            0 did   NaN
 # 3            1 bsts    0.0183
 # 4            1 did     0.0189
-################
-# df.bsts.did$covariate.type <- 'NO Control (No Covariate like Pre-Intervention Y)'
-# df.bsts.did$covariate.type[df.bsts.did$cov.has.ctrl==1] <- 'HAS Control (Covariate like Pre-Intervention Y)'
-# df.bsts.did$err.post.me[which(df.bsts.did$cov.has.ctrl==1 & df.bsts.did$model=='did')] <- NA
-p.bsts.did.err <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
-  xlim(c(-1,1)) +
-  geom_density(alpha=.15) +
-  geom_vline(xintercept=0,lty=3) +
-  facet_wrap(. ~ cov.type) + theme_bw()
-ggsave(plot=p.bsts.did.err,
-       filename = file.path(dir_ext,'bsts_did_compare_post_err_with_control_facet_plot.png'),
-       units = 'in', height = 6, width=8, dpi=300)
+
+# # A tibble: 12 x 6
+# # Groups:   cov.has.ctrl, model [4]
+# cov.has.ctrl model effect.type     n        mean         sd
+# <dbl> <chr> <chr>       <int>       <dbl>      <dbl>
+#   1            0 BCA   constant       28  -0.0269473  0.443711 
+#   2            0 BCA   geometric      28  -0.0269490  0.443709 
+#   3            0 BCA   quadratic      28  -0.0269471  0.443710 
+#   4            0 DiD   constant       28 NaN         NA        
+#   5            0 DiD   geometric      28 NaN         NA        
+#   6            0 DiD   quadratic      28 NaN         NA        
+#   7            1 BCA   constant       31   0.0237435  0.0636921
+#   8            1 BCA   geometric      31   0.0237425  0.0636924
+#   9            1 BCA   quadratic      31   0.0237428  0.0636922
+#  10            1 DiD   constant       31   0.0133897  0.167513 
+#  11            1 DiD   geometric      31   0.0133880  0.167514 
+#  12            1 DiD   quadratic      31   0.0133896  0.167514 
+
+
+# ggplot(dfsub, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-.1,.1)) +
+#   geom_density(alpha=.15) +
+#   geom_vline(xintercept=0,lty=3) + 
+#   ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol)) + theme_bw()
+# ggplot(dfsub, aes(x=err.pre.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-.1,.1)) +
+#   geom_histogram(alpha=.15, binwidth = 0.01, position = 'identity') +
+#   geom_vline(xintercept=0,lty=3)+ 
+#   ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + theme_bw()
+# ###
+# ggplot(dfsub, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-1,1)) +
+#   geom_density(alpha=.15) +
+#   geom_vline(xintercept = 0, lty=3)+ 
+#   ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + theme_bw()
+# ggplot(dfsub, aes(x=bias.post.me, fill=factor(cov.has.control), colour=factor(cov.has.control))) +
+#   xlim(c(-1,1)) +
+#   geom_histogram(alpha=.15, binwidth = 0.1, position = 'identity') +
+#   geom_vline(xintercept = 0, lty=3)+ 
+#   ggtitle(sprintf('MCMC Convergence Tol.=%.3f',conv.tol))  + theme_bw()
+
+
+
+
+
+
+
+
 
 
 p.bsts.did.err.shapes <- ggplot(df.bsts.did, aes(x=err.post.me, fill=model, colour=model)) +
