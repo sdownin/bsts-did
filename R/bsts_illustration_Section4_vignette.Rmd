@@ -29,7 +29,7 @@ library(BoomSpikeSlab)
 library(e1071)
 library(forecast)  ## # library(sarima); library(qualV)
 ## reproducibility
-rand.seed <- 134245 ## 9598677
+rand.seed <- 9598677 ##134245 
 
 set.seed(rand.seed)  
 
@@ -53,7 +53,7 @@ source(file.path(dir_r,'bsts_did_comparison_functions.R'))
 knitr::opts_knit$set(root.dir = dir_proj)
 
 ## MAIN SIM SETTINGS
-n <- 100  ## number of actors (i.e., number of time series)
+n <- 200  ## number of actors (i.e., number of time series)
 npds <- 520
 intpd <- round( npds * .6 )
 effect.type <- 'quadratic' ##  c('constant','geometric','quadratic') 
@@ -263,17 +263,18 @@ structural time series (BSTS) model
 [Section 1](#Section1), and (2) using the BSTS model as a
 counterfactual for causal inference [Section 2](#Section2).
 
-* [**Section 1**](#Section1) includes complexity of the Bayesian approach. The basic structure of a BSTS model is local trend (state space) + seasonality (state space) + regression. Each component has several ways to define, and prior settings are slightly different. Thus, we aim to show step-by-step process of adding different components in [Section 1](#Section1) accompanied by checking resulting BSTS models, setting up Bayesian priors,and adding regression component (Spike and slab priors included). This part requires the `bsts` package in R: [https://cran.r-project.org/web/packages/bsts/bsts.pdf](https://cran.r-project.org/web/packages/bsts/bsts.pdf). 
+* [**Section 1**](#Section1) covers the complexity of the Bayesian approach. The basic structure of a BSTS model is local trend (state space) + seasonality (state space) + regression. Each component has several ways to be defined, and prior settings are slightly different. Thus, we aim to show a step-by-step process of adding different components in [Section 1](#Section1) accompanied by checking resulting BSTS model diagnostics, setting up Bayesian priors,and adding regression component (Spike and slab priors included). This part requires the `bsts` package in R: [https://cran.r-project.org/web/packages/bsts/bsts.pdf](https://cran.r-project.org/web/packages/bsts/bsts.pdf). 
 * [**Section 2**](#Section2) shows how to assess causal effects using the BSTS model from [Section 1](#Section1) as a counterfactual, and is a straightforward process using the `CausalImpact` R package: [https://google.github.io/CausalImpact/CausalImpact.html](https://google.github.io/CausalImpact/CausalImpact.html)  
 
 
 # 0. Simulated Data
 
-First load the data simulated from a data generating process (DGP) with 
+First, load the data simulated from a data generating process (DGP) with the 
+following features: 
 
-- a random walk with small step size in the trend (i.e., local level standard deviation [SD] = 0.01), 
-- weekly seasonality with frequency of 1 per cycle (i.e., 52 weeks = 1 year), and 
-- a positive linear trend over time.  
+- local trend involving a random walk of small step sizes (i.e., Gaussian noise standard deviation `sd=0.01` in the local level stochastic process), 
+- weekly seasonality with a frequency of one per cycle (i.e., 52 weeks = 1 year), and 
+- positive linear trend (i.e., upward linear trajectory over time, on average)
 
 This data set includes the outcome series `y_observed`, and nine 
 covariate series, `c1-c9`, from which the BSTS models that have regression
@@ -356,7 +357,7 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post)
 ## Set BSTS MCMC iterations
-bsts.niter <- 1e4 ## suggest on the order of 1k-10k at least
+bsts.niter <- 5000 ## suggest on the order of 1k-10k at least
 ```
 Then, fit the BSTS model by calling the `bsts()` function to run MCMC estimation 
 for `bsts.niter` draws from the stationary distribution of the Markov chain, which  
@@ -426,7 +427,7 @@ and incorporate it into the BSTS model that will be used as the
 counterfactual for causal inference with the `CasualImpact()` function in
 [Section 2](#Section2). 
 
-## 1.2. State-Space Specification: Local Trend + Seasonality
+## 1.2. Seasonality:  State Space = Local Trend + Seasonality
 
 To account for seasonality in the time series data generating process, 
 we add a seasonal component to the state space defined by the number of seasons and the duration of each season. For instance, we use 52 periods with duration =1 to produce the state contribution of seasonal cycles (e.g., weekly periods each year). As a comparison, for daily data, 
@@ -487,7 +488,7 @@ prior parameter tuning represents an important step for researchers
 to incorporate information from theory and context into their empirical
 analyses--coherently within a Bayesian framework. 
 
-## 1.3. Bayesian Priors: Parameter Tuning
+## 1.3. Bayesian Priors:  Parameter Tuning
 
 Setting up Bayesian priors is notorious for its complication. 
 The conventional wisdom is to exploit information of the observed outcome. 
@@ -576,7 +577,7 @@ covariates with information about (i.e., correlation with) the outcome
 of interest and therefore improve the representativeness of the 
 counterfactual series.
 
-## 1.4. Covariate Information: Local Trend + Seasonality + Regression {#Section1-4}
+## 1.4. Regression:  State Space = Local Trend + Seasonality + Regression {#Section1-4}
 
 ### 1.4.1. Regression `formula` in BSTS function
 
@@ -647,7 +648,7 @@ size of the regression component of the model:
 First, the simplest method is to set the `expected.model.size` attribute 
 (of the `SpikeSlabPrior`) by passing the `expected.model.size` argument 
 into the `bsts()` function directly.
-```{r, out.width="100%", fig.align="center", fig.dim=c(6, 11)}
+```{r, out.width="100%", fig.align="center", fig.dim=c(6, 9)}
 st.sp5 <- st.sp4  ## copy previous state space config to new model
 #=================
 # Option 1. Specify expected model size (internally creates SpikeSlabPrior)
@@ -656,12 +657,12 @@ st.sp5 <- st.sp4  ## copy previous state space config to new model
 bsts.fit5 <- bsts(y.pre.treat.NAs.post ~ .,
                  state.specification = st.sp5,
                  data = predictors,
-                 expected.model.size = 5,  ## argument passed to SpikeSlabPrior
+                 expected.model.size = 6,  ## argument passed to SpikeSlabPrior
                  niter = bsts.niter,
                  seed = rand.seed, ping=0)
 summary(bsts.fit5)
 par(mfrow=c(2,1))
-plot(bsts.fit5, 'coefficients', main='Expected Size = 5')
+plot(bsts.fit5, 'coefficients', main='Expected Size = 6')
 plot(bsts.fit4, 'coefficients', main='Expected Size = 3')
 ```
 Second, the user can create a `SpikeSlabPrior` object to pass into the `bsts()`
@@ -738,7 +739,7 @@ check7 <- plotBstsStateComps(bsts.fit7, intpd = intpd, return.val = T)
 ```
 The MAE of this model is now `r round(check7$mae, 3)`.
 
-## 1.5. Local Trends Comparison: Level vs. Linear Short-Term and Long(er)-Term
+## 1.5. Local Trends Comparison: Level vs. Linear, Short(er)-Term vs. Long(er)-Term
 
 Besides the default state space containing only a local level component, 
 we can evaluate different state space configurations, such as those
@@ -807,7 +808,7 @@ The MAE of this model is now `r round(check8$mae, 3)`.
 
 The semilocal linear trend component in the BSTS model state space is 
 useful for longer-term forecasts wherein the linear trend persists longer, 
-so tighter prediction bounds are reasonable over longer post-intervention 
+so tighter prediction bounds are reasonable over a longer post-intervention 
 window. 
 ```{r, out.width="100%", fig.align="center", fig.dim=c(6, 4.2)}
 ## Initiate empty state space configuration list
@@ -821,7 +822,7 @@ st.sp9 <- AddSemilocalLinearTrend(st.sp9, y.pre.treat.NAs.post,
     fixed = F),
   slope.mean.prior=NormalPrior(
     mu = 0, 
-    sigma = .001 * y.sd), 
+    sigma = .01 * y.sd), 
   slope.ar1.prior=Ar1CoefficientPrior(
     mu = 0, 
     sigma = .001 * y.sd, 
@@ -831,8 +832,8 @@ st.sp9 <- AddSemilocalLinearTrend(st.sp9, y.pre.treat.NAs.post,
     sigma.guess=.0001 * y.sd, 
     sample.size=round( 0.1 * (intpd-1))),
   initial.level.prior=NormalPrior(
-    mu = 0,
-    sigma = .001 * y.sd, 
+    mu = 1, ##adjusted
+    sigma = .01 * y.sd, ##adjusted
     fixed = F),
   initial.slope.prior=NormalPrior(
     mu = 0, 
@@ -878,13 +879,6 @@ plotBstsStateComps(bsts.fit9, intpd=intpd, pd.ids=1:520, title.show=F)##10 cycle
 
 ## 1.6. MCMC Diagnostics: Checking Convergence and Fit {#Section1-6}
 
-To check the convergence of the model estimation procedure and inspect 
-the model's state space component contributions, we wrap a custom 
-function created for this analysis, `bstsPostPredChecks()`, 
-inside a formatting function, `getBstsDiagnosticPlots()`. Calling this on
-several candidate BSTS models `bsts.fit`, `bsts.fit2`,
-`bsts.fit8`, `bsts.fit9`, allows for comparison. 
-
 Draws from the posterior distribution of the Markov chain(s)--once
 converged at the stationary distribution--are used to estimate the 
 model prediction at each time period though 
@@ -895,16 +889,27 @@ the stationary distribution to sample the posterior predictive distribution.
 Thus, the estimates may be unstable and/or biased, so users must assess 
 convergence of the MCMC chains. 
 
-```
-TODO: There are several ways to check the convergence of MCMC including the trace plots, Heidelberger-Welch tests, and Geweke diagnostic tests. We may evalue autocorrelation using ACF/PACF autocorrelation plots and Durbin-Watson tests. Precision was estimated from mean absolute 1-step prediction errors and range. 
-```
+There are several ways to check the convergence 
+of MCMC including the trace plots, Heidelberger-Welch tests, and Geweke 
+diagnostic tests. Additionally, the researcher may evalue autocorrelation 
+using the autocorrelation function (ACF) plots, among other tests.
 
-Similarly, there is need to assess how the fitted model fits the observed data, 
+Similarly, there is need to assess how the estimated model fits the observed data, 
 in terms of how well new samples simulated from the fitted model create 
-simulated distribution(s) that resemble the observed value(s). For this purpose, 
-we examine MCMC convergence trace figures and plot model fit 
+simulated distribution(s) that resemble the observed value(s). 
+
+For this purpose, we examine MCMC convergence trace figures and plot model fit 
 checks for the posterior predictive distribution of the outcome
-(Y, top row panels) and the standardized residuals (bottom row panels). 
+(Y, top row panels) and the standardized residuals (bottom row panels). Here the
+residuals are the 1-step prediction errors during the pre-intervention (training)
+window. 
+
+To check the convergence of the model estimation procedure and inspect 
+the model's state space component contributions, we wrap a custom 
+function created for this analysis, `bstsPostPredChecks()`, 
+inside a formatting function, `getBstsDiagnosticPlots()`. Calling this on
+several candidate BSTS models `bsts.fit`, `bsts.fit2`,
+`bsts.fit8`, `bsts.fit9`, allows for comparison. 
 ```{r, out.width="100%", fig.align="center", fig.dim=c(12, 8)}  
 ###
 ## Define a funciton to call all of our plotting, 
@@ -919,25 +924,39 @@ getBstsDiagnosticPlots <- function(bsts.fit, return.val=F) {
     return(checks)
 }
 ```
-In the first column, the trace of the Markov chain (mean of draws per period) 
-is shown for the posterior predictive distribution of the outcome (Y). 
+Following recent empirical progress in applying Bayesian structural time series
+for dyamic causal inference, we adapt the diagnostics panel below from 
+Menchetti & Bojinov (2022) to cover the following scope of diagnostic checks: 
+
+- Column 1 (left) addresses MCMC convergence along two dimensions 
+(posterior predictive distribution chain, and standardized residual chain) 
+- Columns 2-3 (middle, right) address model fit or problems, 
+conditional on convergence established in the first column. 
+
+Regarding MCMC convergence, the first column shows the trace plots
+of the Markov chain (i.e., mean of ATT for each draw) for the 
+posterior predictive distribution of the outcome (Y). 
 For model fit, the observed and predicted values of Y are compared (top-center), 
 where tighter alignment indicates better fit. 
 
-Additionally, using the maximum value of Y as an auxiliary statistic, 
-the Bayesian p-val presents the proportion 
-of maximum Y values (from MCMC) that are larger than the observed largest 
-value of Y. Smaller values of Bayesian p-val indicate worse fit, which offers a 
-similar interpretation to the frequentist null hypothesis statistical test 
-(NHST) under a null assumption of a well fitting model. 
+Three MCMC convergence diagnostics are used to assess convergence of the Markov
+chains for each of the two traces (posterior predictive distribution and
+strandardized residuals). 
+
+1. *Geweke's Convergence Test* (see `coda::geweke.diag()`) assess convergence of the MCMC chain with the Geweke Z-score based on equality of means of the fist and last portions of the chain (defaults: 0.1 and 0.5).  If the chain has reached the stationary distribution, the two measures are equal and the low Z-score would not reject the null hypothesis of convergence.
+2. *Heidelberg & Welch's Stationary Test* (see `coda::heidel.diag()`) evaluates the null hypothesis that the samples come from the same stationary distribution according to the Cramer-von-Mises (CMV) statistic.
+3. *Heidelberg & Welch's Halfwidth Ratio Test* (see `coda::heidel.diag()`) calcuates a 95% interval for the mean of the Markov chain, using the portion of the chain that possed the H&W stationary test above. If the ratio of interval halfwidth-to-mean is not less than some tolerance (default `tol=0.1`), then the sample chain length is not long enough to estimate the mean with sufficient accuracy, suggesting the need for more MCMC iterations. 
+
+Additionally, it is necessary to assess model fit and residual assumptions.
+We use the maximum value of Y as an auxiliary statistic for computing 
+a Bayesian p-val (Menchetti & Bojinov, 2022), which represents the proportion 
+of the maximum Y values (from MCMC iterations) that are larger than the 
+observed largest value of Y. Smaller values of Bayesian p-val indicate worse 
+fit, which offers a similar interpretation to the frequentist null 
+hypothesis statistical test (NHST) under a null assumption of a well fitting model. 
 Values of Bayesian p-val >= alpha (conventionally 0.05) would therefore not reject the 
 null of good fit, whereas Bayesian p-val < alpha indicates problem(s) of fit to 
 be addressed (e.g., by increasing MCMC iterations, or respecifying the state space).
-
-```
-##TODO: ADD explantion about THE MCMC CONVERGENCE CHECKS: Geweke, H&W 
-stationarity CMV and halfwidth-mean ratio check
-```
 \newpage
 ```{r, out.width="100%", fig.align="center", fig.dim=c(12, 8)}
 ## Baseline (Trend = local level)
@@ -959,34 +978,40 @@ getBstsDiagnosticPlots(bsts.fit8)
 getBstsDiagnosticPlots(bsts.fit9)
 ```
 
-
-Note how each transition between diagnostic panels contrasted here
+Each transition between diagnostic panels contrasted here
 (from `bsts.fit` to `bsts.fit2`, from `bsts.fit2` to `bsts.fit8`, 
-and `bsts.fit8` to `bsts.fit9` ) exhibits 
-incremental improvement in the following visually discernible ways that also 
-relate to quantifiable fit improvement (i.e., decreased MAE)
+and `bsts.fit8` to `bsts.fit9` ) should exhibit (assuming adequate priors
+and enough MCMC iterations) improvement in the following visually 
+discernible ways, which also relate to quantifiable fit improvement 
+(i.e., decreased MAE). 
 
 1. Adding seasonality in `bsts.fit2` begins to address the baseline model's
 overly narrow prediction distribution 
 2. Changing trend to local linear trend, and including regression, in `bsts.fit8` scales the predicted SD to the observed SD; however, the predictions are shifted (overestimated) and the standardized one-step
-ahead prediction errors now exhibit non-normality and worsened autocorrelation. 
+ahead prediction errors exhibit non-normality and autocorrelation. 
 3. Changing trend to semilocal linear trend (and still including regression) in 
-`bsts.fit9` simultaneously (a) fixes the bias in the predicted distribution
-(realigned with observed distribution) and fixes the (b) non-normality
-and (c) autocorrelation problems in the standardized one-step ahead prediction 
-(i.e., forecast) error. 
+`bsts.fit9` should (a) fix the bias in the predicted distribution
+(realigned with observed distribution), and address the (b) non-normality
+and (c) autocorrelation problems in the residual chain.
 
-With all convergence checks passed, and model diagnostics that can be 
-quantitatively and qualitatively characterized as well fitting, 
-we now have a BSTS model ready to serve as the counterfactual
+If the trace plots and convergence tests show that convergence is not reached 
+for a given number of MCMC iterations, it is advised to 
+repeat the analysis with a larger value of `bsts.niter`. If convergence is 
+reached but issues of model fit or residual assumption violations persist, 
+then respecifying the state space for the BSTS model may be necessary 
+(hint: revisit parameter tuning, check alternative trend components, etc.).
+
+With all diagnostic checks passed by the fitted BSTS model--that is, 
+equipped with a quantitative and qualitative diagnosis of convergence and 
+fit -- now the BSTS model is ready to serve as the counterfactual
 for dynamic causal inference.
 
 
 # 2. Dynamic Causal Inference: BSTS as Counterfactual {#Section2}
 
-The preferred fitted bsts model `bsts.fit9` (i.e., the model with the least 
-pre-intervention, one-step-ahead cumulative absolute prediction error) 
-can now be passed into the `CausalImpact()`function. 
+The preferred fitted bsts model `bsts.fit9` (i.e., the model with the most 
+suitable combination of performance [low MAE] and diagnostics 
+[convergence and fit]) can now be passed into the `CausalImpact()`function. 
 This will use `bsts.fit9`, which was fitted on the pre-intervention 
 data, in order to forecast (i.e., predict outside of the pre-intervention
 sample time window) the counterfactual series (i.e., the hypothetical 
@@ -1060,8 +1085,8 @@ restbl$`(sig.)` <- apply(restbl[,c('point.effect.lower','point.effect.upper')],
 rescols <- c('event.time','point.effect','(sig.)',
              'point.effect.lower', 'point.effect.upper')
 restbl <- restbl[,rescols]
-knitr::kable(restbl[(intpd-1):(intpd+26), ], n = 28, digits = 4, 
-             caption = 'Pointwise ATT Estimates of BCA')
+knitr::kable(restbl[(intpd-1):(intpd+20), ], n = 22, digits = 4, 
+             caption = 'Pointwise ATT Estimates from BCA')
 ```
 
 The same process can then be followed to return the cumulative effect estimates 
@@ -1075,8 +1100,8 @@ cumutbl$`(sig.)` <- apply(cumutbl[,c('cum.effect.lower','cum.effect.upper')],
 cumucols <- c('event.time','cum.effect','(sig.)',
              'cum.effect.lower', 'cum.effect.upper')
 cumutbl <- cumutbl[,cumucols]
-knitr::kable(cumutbl[(intpd-1):(intpd+26), ], n = 28, digits = 4,
-             caption = 'Cumulative ATT Estimates of BCA')
+knitr::kable(cumutbl[(intpd-1):(intpd+20), ], n = 22, digits = 4,
+             caption = 'Cumulative ATT Estimates from BCA')
 ```
 This concludes the vignette illustrating how to use BSTS as the predictive model
 in a Bayesian counterfactual approach to dynamic causal inference. 
