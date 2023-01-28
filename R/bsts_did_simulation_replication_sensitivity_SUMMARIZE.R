@@ -476,6 +476,11 @@ for (conv.tol in c(3/6, 4/6, 5/6, 6/6)) {
 
 print(reslist)
 
+write.csv(reslist[[2]]$df.bsts.did.s, 
+          file = file.path(dir_sim,
+                           sprintf('bsts_did_compare_bias_mean_SD_table_tol%s.csv',
+                                   round(100*conv.tol))))
+
 # # A tibble: 4 x 3
 # # Groups:   cov.has.ctrl [2]
 #   cov.has.ctrl model     mean
