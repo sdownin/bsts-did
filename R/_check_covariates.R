@@ -282,7 +282,7 @@ for (d in 1:length(ns)) {
 ##---------------- RUN SIM GENERATE DATA SET -----------------------
 
 ##
-effect.types = c('geometric','constant') ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
+effect.types = c('quadratic')  ## c('quadratic','geometric','constant')  ##cov.cols.need.fill.bool  ## constant','geometric
 ## ID for the simulation (to search/filter all simulation figures, RDS files, etc.)
 sim.id <- round(10*as.numeric(Sys.time()))
 

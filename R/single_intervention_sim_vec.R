@@ -510,7 +510,7 @@ runSimSingleIntervention <- function(
     c1 <- rep(NA, n)
     c2 <- rep(NA, n)
     c3 <- rep(NA, n)
-    
+
     # ## RANDOM WALKW WITH DRIFT (noise in the local level)
     # # c1 <- rpois(n, lambda = noise.level*0.8) + 1
     # # c1.tm1.drifted.mean <- rnorm(n, c1.tm1, sd = noise.level * 0.1 )
