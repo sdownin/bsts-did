@@ -7,11 +7,11 @@
 *.xls*
 *.doc*
 *.Rhist*
-*cconma_purchase_data.csv*
-*png*
-*ppt*
-*csv*
-*tmp*
+*.cconma_purchase_data.csv*
+*.png*
+*.ppt*
+*.csv*
+*.tmp*
 
 /The\ value\ of*
 .Rproj.user
@@ -19,3 +19,4 @@
 bsts_vs_did_conceptual_fig*
 
 rp_entities_*
+
