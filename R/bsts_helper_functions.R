@@ -2226,7 +2226,7 @@ bstsPostPredChecks <- function(bsts.model, #main.title=NA,
                             gd.result,gd.z,gd.p,
                             hd.st.result, hd.st.cmv, hd.st.p,
                             hd.hw.result, abs(hd.hw/hd.hw.mean), hd.hw.eps)
-  mtext(text = mtext.residual, side = 3, line=-4.5, outer = F)
+  mtext(text = mtext.residual, side = 3, line=-4.5, outer = F, cex=0.8)
   ##
   checklist$ck.residual <- list(
     geweke = list(check=(gd.p >= conv.alpha), z=gd.z, p=gd.p),
