@@ -83,7 +83,7 @@ legend('topleft',legend=c('observed','intervention'), pch=c(1,NA),lty=c(NA,2))
 ```
 
 
-\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/outcome_plot-1} 
+\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/outcome_plot-1} 
 \newline
 The question of interest for research and practice is whether there
 is a significant effect caused by the intervention at time point
@@ -140,7 +140,7 @@ st.sp <- list()
 ## Add local level to trend component of state space
 st.sp <- AddLocalLevel(st.sp, y.pre.treat.NAs.post)
 ## Set BSTS MCMC iterations
-bsts.niter <- 20000 ## suggest on the order of 1k-10k at least
+bsts.niter <- 200 ## suggest on the order of 1k-10k at least
 ```
 Then, fit the BSTS model by calling the `bsts()` function to run MCMC estimation 
 for `bsts.niter` draws from the stationary distribution of the Markov chain, which  
@@ -156,25 +156,25 @@ bsts.fit <- bsts(y.pre.treat.NAs.post,
 ```
 
 ```
-## =-=-=-=-= Iteration 0 Sat Jan 28 14:36:02 2023
+## =-=-=-=-= Iteration 0 Sat Jan 28 14:58:43 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 2000 Sat Jan 28 14:36:08 2023
+## =-=-=-=-= Iteration 20 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 4000 Sat Jan 28 14:36:15 2023
+## =-=-=-=-= Iteration 40 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 6000 Sat Jan 28 14:36:21 2023
+## =-=-=-=-= Iteration 60 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 8000 Sat Jan 28 14:36:28 2023
+## =-=-=-=-= Iteration 80 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 10000 Sat Jan 28 14:36:35 2023
+## =-=-=-=-= Iteration 100 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 12000 Sat Jan 28 14:36:42 2023
+## =-=-=-=-= Iteration 120 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 14000 Sat Jan 28 14:36:49 2023
+## =-=-=-=-= Iteration 140 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 16000 Sat Jan 28 14:36:55 2023
+## =-=-=-=-= Iteration 160 Sat Jan 28 14:58:44 2023
 ##  =-=-=-=-=
-## =-=-=-=-= Iteration 18000 Sat Jan 28 14:37:02 2023
+## =-=-=-=-= Iteration 180 Sat Jan 28 14:58:45 2023
 ##  =-=-=-=-=
 ```
 Visualizing the model's behavior can help build intuition about 
@@ -204,13 +204,13 @@ getBstsSummaryPlots(bsts.fit)
 
 ```
 ## $residual.sd
-## [1] 0.3719633
+## [1] 0.3768937
 ## 
 ## $prediction.sd
-## [1] 0.5399319
+## [1] 0.5398463
 ## 
 ## $rsquare
-## [1] 0.9426817
+## [1] 0.9411521
 ## 
 ## $relative.gof
 ## [1] NA
@@ -218,11 +218,11 @@ getBstsSummaryPlots(bsts.fit)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-5-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-5-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-5-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-5-2} \end{center}
 There appears to be a seasonal component to the time series, which is currently
 being captured by the trend. However, this would be a poor model to use as a 
 counterfactual because it does not capture how seasonality continues
@@ -244,7 +244,7 @@ check <- plotBstsStateComps(bsts.fit, intpd=intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-6-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-6-1} \end{center}
 This model appears to match the data with the trend only. 
 However, this is merely accurate for short (e.g., one-step ahead) predictions 
 within the training window. In terms of capturing the structure of the time 
@@ -286,13 +286,13 @@ getBstsSummaryPlots(bsts.fit2)
 
 ```
 ## $residual.sd
-## [1] 0.5019961
+## [1] 0.4995245
 ## 
 ## $prediction.sd
-## [1] 0.5812206
+## [1] 0.581718
 ## 
 ## $rsquare
-## [1] 0.8956017
+## [1] 0.8966271
 ## 
 ## $relative.gof
 ## [1] NA
@@ -300,11 +300,11 @@ getBstsSummaryPlots(bsts.fit2)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-2} \end{center}
 
 ```r
 check2 <- plotBstsStateComps(bsts.fit2, intpd=intpd, return.val = T)
@@ -312,13 +312,13 @@ check2 <- plotBstsStateComps(bsts.fit2, intpd=intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-7-3} \end{center}
 Following BSTS (and other forecasting) conventions, 
 it is common to use a model performance metric, 
 such as the one-step ahead prediction (forecast) error within sample
 during the pre-intervention (or training) window. We might expect that the augmented
 state space should improve the model performance (e.g., in terms of 
-decreased MAE). However, the MAE of this model is now 0.571.
+decreased MAE). However, the MAE of this model is now 0.569.
 
 Here we have a seasonal component separate from the trend (which includes 
 only the local level at this point). Now the state space of the fitted model 
@@ -416,13 +416,13 @@ getBstsSummaryPlots(bsts.fit3)
 
 ```
 ## $residual.sd
-## [1] 0.4999274
+## [1] 0.4976422
 ## 
 ## $prediction.sd
-## [1] 0.5940472
+## [1] 0.5903305
 ## 
 ## $rsquare
-## [1] 0.8964603
+## [1] 0.8974047
 ## 
 ## $relative.gof
 ## [1] NA
@@ -430,11 +430,11 @@ getBstsSummaryPlots(bsts.fit3)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-2} \end{center}
 
 ```r
 check3 <- plotBstsStateComps(bsts.fit3, intpd=intpd, return.val = T) 
@@ -442,8 +442,8 @@ check3 <- plotBstsStateComps(bsts.fit3, intpd=intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-3} \end{center}
-The MAE of this model is now 0.569.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-8-3} \end{center}
+The MAE of this model is now 0.567.
 
 This model does not appear to improve (in terms of MAE),
 but the model now has seasonal structure, in addition to the local level
@@ -518,54 +518,54 @@ getBstsSummaryPlots(bsts.fit4)
 
 ```
 ## $residual.sd
-## [1] 0.5195958
+## [1] 0.4991445
 ## 
 ## $prediction.sd
-## [1] 0.5282357
+## [1] 0.5838873
 ## 
 ## $rsquare
-## [1] 0.888153
+## [1] 0.8967843
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   1.000   2.000   2.000   2.245   2.000   5.000 
+##  0.0000  1.0000  1.0000  0.8982  1.0000  2.0000 
 ## 
 ## $coefficients
-##                      mean          sd    mean.inc     sd.inc    inc.prob
-## cov1         0.9753295450 0.138724600  0.97532955  0.1387246 1.000000000
-## cov3         1.2309463798 0.395031506  1.28769432  0.3002753 0.955930582
-## cov2         0.3588999405 1.294566034  3.53727914  2.2971966 0.101462148
-## cov4         0.4162640825 1.833746562  6.02019873  3.8608841 0.069144575
-## cov5         0.3722364576 1.709603354  5.72876214  3.7824690 0.064976770
-## cov6         0.8896374517 6.230773462 21.66511438 22.2731486 0.041063132
-## cov8         0.0015190548 0.021535605  0.20586006  0.1448287 0.007379065
-## cov7        -0.0004666853 0.010668883 -0.14848709  0.1206271 0.003142935
-## cov9        -0.0001100650 0.006073688 -0.05034096  0.1216769 0.002186390
-## (Intercept)  0.0000000000 0.000000000  0.00000000  0.0000000 0.000000000
+##                      mean           sd    mean.inc      sd.inc    inc.prob
+## cov5         2.2931603036  4.142207451  8.14803767  3.62970151 0.281437126
+## cov4         1.6665100232  3.416565314  7.32387300  3.13316944 0.227544910
+## cov6         7.4448125579 19.815602382 42.87185163 27.47426336 0.173652695
+## cov3         0.0348657237  0.115328734  0.30645136  0.18657603 0.113772455
+## cov2        -0.0207215441  0.358426788 -0.38449976  1.58379003 0.053892216
+## cov1         0.0008115065  0.014431605  0.02258693  0.07952607 0.035928144
+## cov9        -0.0003017008  0.003898833 -0.05038403  0.00000000 0.005988024
+## cov7         0.0005707255  0.007375399  0.09531116  0.00000000 0.005988024
+## cov8         0.0000000000  0.000000000  0.00000000  0.00000000 0.000000000
+## (Intercept)  0.0000000000  0.000000000  0.00000000  0.00000000 0.000000000
 ```
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-2} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-3} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-4} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-4} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-5} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-5} \end{center}
 
 ```r
 check4 <- plotBstsStateComps(bsts.fit4, intpd=intpd, return.val = T)
@@ -573,8 +573,8 @@ check4 <- plotBstsStateComps(bsts.fit4, intpd=intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-6} \end{center}
-The MAE of this model is now 0.522.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-9-6} \end{center}
+The MAE of this model is now 0.567.
 
 ### 1.4.2.  Variable Selection: Spike-and-Slab Priors
 
@@ -616,33 +616,33 @@ summary(bsts.fit5)
 
 ```
 ## $residual.sd
-## [1] 0.5181526
+## [1] 0.5058727
 ## 
 ## $prediction.sd
-## [1] 0.5273901
+## [1] 0.5647206
 ## 
 ## $rsquare
-## [1] 0.8887735
+## [1] 0.893983
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   1.000   2.000   3.000   2.627   3.000   6.000 
+##   0.000   1.000   1.000   1.503   2.000   4.000 
 ## 
 ## $coefficients
-##                      mean         sd      mean.inc     sd.inc    inc.prob
-## cov1         1.007425e+00 0.15251318  1.0074248036  0.1525132 1.000000000
-## cov3         1.176266e+00 0.38112665  1.2099417544  0.3296494 0.972167800
-## cov2         7.612210e-01 1.81256193  3.2513486014  2.4365940 0.234124697
-## cov4         7.475207e-01 2.68068432  5.2733635302  5.1802981 0.141754062
-## cov5         6.718038e-01 2.44832990  4.9421295155  4.7958271 0.135934079
-## cov6         8.657187e-01 9.56200109  9.1107839404 29.7924241 0.095021321
-## cov8         4.938142e-03 0.03850237  0.2121200779  0.1406285 0.023279935
-## cov7        -1.498062e-03 0.02038681 -0.1011571029  0.1343593 0.014809266
-## cov9         2.885282e-06 0.01406012  0.0002980428  0.1433235 0.009680765
-## (Intercept)  0.000000e+00 0.00000000  0.0000000000  0.0000000 0.000000000
+##                    mean          sd    mean.inc     sd.inc   inc.prob
+## cov3         0.52459194  0.42410042  0.71808897  0.3265812 0.73053892
+## cov2         0.63995379  1.92175105  2.37493961  3.1175355 0.26946108
+## cov1        -0.01104471  0.07750426 -0.06360227  0.1793049 0.17365269
+## cov6         4.25873450 15.21192722 37.43203484 28.6935093 0.11377246
+## cov4         0.71120179  3.37298566  6.25108940  8.2684509 0.11377246
+## cov5         0.43971761  2.65780633  4.89552271  7.7708737 0.08982036
+## cov8         0.00305984  0.02941997  0.25549664  0.1211827 0.01197605
+## cov9         0.00000000  0.00000000  0.00000000  0.0000000 0.00000000
+## cov7         0.00000000  0.00000000  0.00000000  0.0000000 0.00000000
+## (Intercept)  0.00000000  0.00000000  0.00000000  0.0000000 0.00000000
 ```
 
 ```r
@@ -653,7 +653,7 @@ plot(bsts.fit4, 'coefficients', main='Expected Size = 3')
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-10-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-10-1} \end{center}
 Second, the user can create a `SpikeSlabPrior` object to pass into the `bsts()`
 function. One way to do this is by using the `expected.model.size` argument 
 of `SpikeSlabPrior()`. This allows you to set the expected model size in a 
@@ -691,54 +691,54 @@ getBstsSummaryPlots(bsts.fit6)
 
 ```
 ## $residual.sd
-## [1] 0.5207803
+## [1] 0.4966362
 ## 
 ## $prediction.sd
-## [1] 0.5278149
+## [1] 0.5649397
 ## 
 ## $rsquare
-## [1] 0.8876425
+## [1] 0.8978191
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   1.000   2.000   2.000   2.479   3.000   6.000 
+##   1.000   1.000   1.000   1.519   2.000   5.000 
 ## 
 ## $coefficients
-##                      mean         sd     mean.inc     sd.inc    inc.prob
-## cov1         9.732026e-01 0.13334447  0.973202623  0.1333445 1.000000000
-## cov3         1.173971e+00 0.39800695  1.219292202  0.3305486 0.962830089
-## cov4         7.107568e-01 2.43009624  4.991737979  4.4844734 0.142386638
-## cov5         6.202194e-01 2.20529476  4.778246763  4.1958727 0.129800623
-## cov2         3.175413e-01 1.21896313  3.120898341  2.4201563 0.101746751
-## cov6         1.143080e+00 9.41737104 11.659142223 27.9712843 0.098041522
-## cov8         4.691033e-03 0.03832799  0.208254938  0.1512595 0.022525437
-## cov7        -1.739209e-03 0.02114147 -0.138834633  0.1293141 0.012527201
-## cov9        -6.334528e-05 0.01501309 -0.006816834  0.1560837 0.009292478
-## (Intercept)  0.000000e+00 0.00000000  0.000000000  0.0000000 0.000000000
+##                      mean          sd   mean.inc      sd.inc    inc.prob
+## cov3         0.6077633084 0.331656729  0.6748783  0.27684645 0.900552486
+## cov1        -0.0380157296 0.141094742 -0.1495836  0.25014258 0.254143646
+## cov2         0.4454722951 1.555109728  3.5056733  2.92761489 0.127071823
+## cov4         0.3216657789 1.402144377  4.1586790  3.16816989 0.077348066
+## cov5         0.1830146101 0.857191510  2.7604704  2.06441777 0.066298343
+## cov6         0.3776655725 3.605753802  8.5446836 15.95523295 0.044198895
+## cov8         0.0050506581 0.034144330  0.1828338  0.10877323 0.027624309
+## cov7        -0.0024266850 0.020703780 -0.1464100  0.08341039 0.016574586
+## cov9        -0.0007169068 0.009644995 -0.1297601  0.00000000 0.005524862
+## (Intercept)  0.0000000000 0.000000000  0.0000000  0.00000000 0.000000000
 ```
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-2} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-3} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-4} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-4} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-5} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-5} \end{center}
 
 ```r
 check6 <- plotBstsStateComps(bsts.fit6, intpd = intpd, return.val = T)
@@ -746,8 +746,8 @@ check6 <- plotBstsStateComps(bsts.fit6, intpd = intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-6} \end{center}
-The MAE of this model is now 0.52.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-11-6} \end{center}
+The MAE of this model is now 0.549.
 
 Finally, the other way to create a `SpikeSlabPrior` object to pass
 into the `bsts()`function is by specifying prior inclusion probabilities
@@ -785,54 +785,54 @@ getBstsSummaryPlots(bsts.fit7)
 
 ```
 ## $residual.sd
-## [1] 0.5180697
+## [1] 0.5024276
 ## 
 ## $prediction.sd
-## [1] 0.5296952
+## [1] 0.5703497
 ## 
 ## $rsquare
-## [1] 0.8888091
+## [1] 0.8954221
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   1.000   2.000   3.000   2.637   3.000   5.000 
+##   1.000   1.000   2.000   2.005   3.000   4.000 
 ## 
 ## $coefficients
 ##                      mean          sd    mean.inc     sd.inc    inc.prob
-## cov1         1.072135e+00 0.156727369  1.07213507  0.1567274 1.000000000
-## cov3         1.083393e+00 0.511960090  1.24252877  0.3207206 0.871926289
-## cov2         1.723502e+00 2.593264156  2.58786113  2.8037407 0.665994817
-## cov4         2.197912e-01 1.674745508  6.44708413  6.4954135 0.034091563
-## cov5         1.600202e-01 1.416302738  4.94439578  6.1958665 0.032363950
-## cov6         8.830626e-02 5.311974146  4.14442751 36.2070746 0.021307227
-## cov8         1.436469e-03 0.020718048  0.21690686  0.1350284 0.006622517
-## cov7        -3.174659e-04 0.008554872 -0.10601531  0.1161564 0.002994529
-## cov9        -6.932641e-05 0.006181123 -0.03883397  0.1433814 0.001785200
-## (Intercept)  0.000000e+00 0.000000000  0.00000000  0.0000000 0.000000000
+## cov1         0.3912775424 0.179951921  0.40461655  0.1675259 0.967032967
+## cov2         0.9596318979 2.904413440  1.58775459  3.6057335 0.604395604
+## cov3         0.3256057355 0.488124900  0.92594131  0.3461832 0.351648352
+## cov6         0.5926489797 6.153024610 13.48276429 27.9342410 0.043956044
+## cov4         0.3127586955 1.902085012  9.48701376  5.1502845 0.032967033
+## cov9        -0.0003870325 0.005221354 -0.07043992  0.0000000 0.005494505
+## cov8         0.0000000000 0.000000000  0.00000000  0.0000000 0.000000000
+## cov7         0.0000000000 0.000000000  0.00000000  0.0000000 0.000000000
+## cov5         0.0000000000 0.000000000  0.00000000  0.0000000 0.000000000
+## (Intercept)  0.0000000000 0.000000000  0.00000000  0.0000000 0.000000000
 ```
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-2} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-3} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-4} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-4} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-5} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-5} \end{center}
 
 ```r
 check7 <- plotBstsStateComps(bsts.fit7, intpd = intpd, return.val = T)
@@ -840,8 +840,8 @@ check7 <- plotBstsStateComps(bsts.fit7, intpd = intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-6} \end{center}
-The MAE of this model is now 0.524.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-12-6} \end{center}
+The MAE of this model is now 0.558.
 
 ## 1.5. Local Trends Comparison: Level vs. Linear, Short(er)- vs. Long(er)-Term
 
@@ -907,54 +907,54 @@ getBstsSummaryPlots(bsts.fit8)
 
 ```
 ## $residual.sd
-## [1] 0.5178625
+## [1] 0.5180204
 ## 
 ## $prediction.sd
-## [1] 0.5339383
+## [1] 0.5520123
 ## 
 ## $rsquare
-## [1] 0.888898
+## [1] 0.8888302
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##    1.00    2.00    2.00    2.27    3.00    5.00 
+##   1.000   1.000   2.000   1.591   2.000   3.000 
 ## 
 ## $coefficients
-##                      mean          sd    mean.inc     sd.inc    inc.prob
-## cov1         9.758745e-01 0.226660718  0.97658202  0.2252139 0.999275475
-## cov3         1.159828e+00 0.403626598  1.23458133  0.2848174 0.939450396
-## cov2         7.209200e-01 1.917013243  4.51258069  2.4277023 0.159757802
-## cov5         3.736564e-01 1.782726036  6.17635788  4.0871327 0.060497852
-## cov4         3.880946e-01 1.885076738  6.55520199  4.4281898 0.059204057
-## cov6         8.510297e-01 6.331723976 21.75191270 23.8907451 0.039124360
-## cov8         1.530412e-03 0.022035109  0.21905300  0.1483519 0.006986493
-## cov7        -4.121795e-04 0.011002828 -0.11712566  0.1450473 0.003519122
-## cov9         3.069840e-07 0.007839286  0.00013795  0.1681426 0.002225327
-## (Intercept)  0.000000e+00 0.000000000  0.00000000  0.0000000 0.000000000
+##                     mean          sd   mean.inc      sd.inc    inc.prob
+## cov3         1.299304388  0.44157176  1.2993044  0.44157176 1.000000000
+## cov2         0.857570517  2.05563453  5.1111203  1.84711061 0.167785235
+## cov6         5.427879387 14.33667496 35.1632186 17.01788019 0.154362416
+## cov5         0.991884190  2.59849354  7.0376545  2.30013119 0.140939597
+## cov4         0.624424940  2.26523180  8.4581196  1.74891741 0.073825503
+## cov1         0.010175736  0.05156756  0.2526974  0.07191086 0.040268456
+## cov9        -0.001203903  0.01469551 -0.1793815  0.00000000 0.006711409
+## cov8         0.002250653  0.02747272  0.3353472  0.00000000 0.006711409
+## cov7         0.000000000  0.00000000  0.0000000  0.00000000 0.000000000
+## (Intercept)  0.000000000  0.00000000  0.0000000  0.00000000 0.000000000
 ```
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-2} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-3} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-4} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-4} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-5} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-5} \end{center}
 
 ```r
 check8 <- plotBstsStateComps(bsts.fit8, intpd = intpd, return.val = T)
@@ -962,8 +962,8 @@ check8 <- plotBstsStateComps(bsts.fit8, intpd = intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-6} \end{center}
-The MAE of this model is now 0.523.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-13-6} \end{center}
+The MAE of this model is now 0.545.
 
 ### 1.5.2. Semilocal Linear Trend (Trend with Level and Slope with AR(1) Drift)
 
@@ -1028,54 +1028,54 @@ getBstsSummaryPlots(bsts.fit9)
 
 ```
 ## $residual.sd
-## [1] 0.524066
+## [1] 0.5192231
 ## 
 ## $prediction.sd
-## [1] 0.5220736
+## [1] 0.5232126
 ## 
 ## $rsquare
-## [1] 0.8862203
+## [1] 0.8883134
 ## 
 ## $relative.gof
 ## [1] NA
 ## 
 ## $size
 ##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-##   1.000   2.000   2.000   2.251   2.000   5.000 
+##   2.000   2.000   2.000   2.455   3.000   4.000 
 ## 
 ## $coefficients
-##                      mean          sd     mean.inc     sd.inc    inc.prob
-## cov1         9.385674e-01 0.110863842  0.938567372  0.1108638 1.000000000
-## cov3         1.360719e+00 0.386764019  1.407067328  0.2991045 0.967060473
-## cov4         5.044711e-01 2.009092922  6.009132131  3.8742137 0.083950741
-## cov5         4.213957e-01 1.731802976  5.327721892  3.4328238 0.079094914
-## cov2         1.535399e-01 0.764390177  2.364774135  1.9422877 0.064927913
-## cov6         6.533820e-01 5.631199886 15.575131054 22.8928577 0.041950340
-## cov8         1.764073e-03 0.023267476  0.231836312  0.1338782 0.007609131
-## cov7        -4.781569e-04 0.011786578 -0.116483683  0.1434560 0.004104926
-## cov9         6.395659e-06 0.006494619  0.002839104  0.1383494 0.002252703
-## (Intercept)  0.000000e+00 0.000000000  0.000000000  0.0000000 0.000000000
+##                     mean           sd     mean.inc     sd.inc    inc.prob
+## cov3        1.269078e+00 0.3591098920  1.269077904 0.35910989 1.000000000
+## cov1        9.507625e-01 0.0942565084  0.950762503 0.09425651 1.000000000
+## cov4        1.018083e+00 2.1985885807  5.057575679 1.88183390 0.201298701
+## cov5        7.691033e-01 2.1548895746  5.640090770 2.58393079 0.136363636
+## cov2        2.011587e-01 0.8344036541  3.097843910 1.36578511 0.064935065
+## cov6        8.595982e-01 4.2054778398 18.911161112 7.26099871 0.045454545
+## cov9        4.434925e-05 0.0005503598  0.006829785 0.00000000 0.006493506
+## cov8        0.000000e+00 0.0000000000  0.000000000 0.00000000 0.000000000
+## cov7        0.000000e+00 0.0000000000  0.000000000 0.00000000 0.000000000
+## (Intercept) 0.000000e+00 0.0000000000  0.000000000 0.00000000 0.000000000
 ```
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-1} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-2} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-2} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-3} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-3} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-4} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-4} \end{center}
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-5} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-5} \end{center}
 
 ```r
 check9 <- plotBstsStateComps(bsts.fit9, intpd = intpd, return.val = T)
@@ -1083,8 +1083,8 @@ check9 <- plotBstsStateComps(bsts.fit9, intpd = intpd, return.val = T)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-6} \end{center}
-The MAE of this model is now 0.515.
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-14-6} \end{center}
+The MAE of this model is now 0.516.
 
 Zooming into the first 104 periods shows how the BSTS model learns the structure
 of the time series through the first couple of cycles that train the 
@@ -1100,7 +1100,7 @@ plotBstsStateComps(bsts.fit9, intpd=intpd, pd.ids=1:520, title.show=F)##10 cycle
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-15-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-15-1} \end{center}
 
 ## 1.6. MCMC Diagnostics: Checking Convergence and Fit {#Section1-6}
 
@@ -1187,19 +1187,19 @@ getBstsDiagnosticPlots(bsts.fit)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-17-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-17-1} \end{center}
 
 ```
 ## MCMC Convergence Diagnostics:
 ## 
 ## Posterior Predictive:-----
-## Geweke: PASS (z=0.74, p=0.46)
-## H&W Stationarity: PASS (CMV=0.11, p=0.55)
-## H&W Halfwidth: PASS (hw/mean=0.02 < eps=0.10)
+## Geweke: PASS (z=0.20, p=0.84)
+## H&W Stationarity: PASS (CMV=0.05, p=0.86)
+## H&W Halfwidth: FAIL (hw/mean=0.17 < eps=0.10)
 ## Std. Residuals:-----
-## Geweke: PASS (z=1.26, p=0.21)
-## H&W Stationarity: PASS (CMV=0.08, p=0.67)
-## H&W Halfwidth: PASS (hw/mean=0.00 < eps=0.10)
+## Geweke: FAIL (z=7.39, p=0.00)
+## H&W Stationarity: PASS (CMV=11605.93, p=0.71)
+## H&W Halfwidth: FAIL (hw/mean=1.30 < eps=0.10)
 ```
 \newpage
 
@@ -1210,19 +1210,19 @@ getBstsDiagnosticPlots(bsts.fit2)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-18-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-18-1} \end{center}
 
 ```
 ## MCMC Convergence Diagnostics:
 ## 
 ## Posterior Predictive:-----
-## Geweke: PASS (z=0.86, p=0.39)
-## H&W Stationarity: PASS (CMV=0.04, p=0.92)
-## H&W Halfwidth: PASS (hw/mean=0.00 < eps=0.10)
+## Geweke: PASS (z=1.37, p=0.17)
+## H&W Stationarity: PASS (CMV=0.07, p=0.76)
+## H&W Halfwidth: PASS (hw/mean=0.03 < eps=0.10)
 ## Std. Residuals:-----
-## Geweke: PASS (z=0.06, p=0.95)
-## H&W Stationarity: PASS (CMV=0.06, p=0.83)
-## H&W Halfwidth: PASS (hw/mean=0.02 < eps=0.10)
+## Geweke: FAIL (z=3.15, p=0.00)
+## H&W Stationarity: PASS (CMV=0.08, p=0.71)
+## H&W Halfwidth: PASS (hw/mean=0.04 < eps=0.10)
 ```
 \newpage
 
@@ -1233,19 +1233,19 @@ getBstsDiagnosticPlots(bsts.fit8)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-19-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-19-1} \end{center}
 
 ```
 ## MCMC Convergence Diagnostics:
 ## 
 ## Posterior Predictive:-----
-## Geweke: PASS (z=0.14, p=0.89)
-## H&W Stationarity: PASS (CMV=0.04, p=0.92)
-## H&W Halfwidth: PASS (hw/mean=0.06 < eps=0.10)
+## Geweke: PASS (z=1.72, p=0.09)
+## H&W Stationarity: PASS (CMV=0.17, p=0.35)
+## H&W Halfwidth: PASS (hw/mean=0.02 < eps=0.10)
 ## Std. Residuals:-----
-## Geweke: PASS (z=0.22, p=0.82)
-## H&W Stationarity: PASS (CMV=0.06, p=0.83)
-## H&W Halfwidth: FAIL (hw/mean=0.25 < eps=0.10)
+## Geweke: PASS (z=0.25, p=0.80)
+## H&W Stationarity: PASS (CMV=0.11, p=0.56)
+## H&W Halfwidth: FAIL (hw/mean=0.10 < eps=0.10)
 ```
 \newpage
 
@@ -1256,19 +1256,19 @@ getBstsDiagnosticPlots(bsts.fit9)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-20-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-20-1} \end{center}
 
 ```
 ## MCMC Convergence Diagnostics:
 ## 
 ## Posterior Predictive:-----
-## Geweke: PASS (z=0.21, p=0.83)
-## H&W Stationarity: PASS (CMV=0.09, p=0.64)
-## H&W Halfwidth: PASS (hw/mean=0.04 < eps=0.10)
+## Geweke: FAIL (z=3.34, p=0.00)
+## H&W Stationarity: PASS (CMV=0.36, p=0.09)
+## H&W Halfwidth: PASS (hw/mean=0.00 < eps=0.10)
 ## Std. Residuals:-----
-## Geweke: PASS (z=0.53, p=0.59)
-## H&W Stationarity: PASS (CMV=0.14, p=0.43)
-## H&W Halfwidth: PASS (hw/mean=0.03 < eps=0.10)
+## Geweke: PASS (z=1.50, p=0.13)
+## H&W Stationarity: PASS (CMV=0.13, p=0.46)
+## H&W Halfwidth: FAIL (hw/mean=0.42 < eps=0.10)
 ```
 
 Each transition between diagnostic panels contrasted here
@@ -1280,7 +1280,7 @@ discernible ways, which also relate to quantifiable fit improvement
 
 1. Adding seasonality in `bsts.fit2` begins to address the baseline model's
 overly narrow prediction distribution 
-2. Changing trend to local linear trend, and including regression, in `bsts.fit8` scales the predicted SD to the observed SD; however, the predictions are shifted (overestimated) and the standardized one-step
+2. Changing trend to local linear trend, and including regression, in `bsts.fit8` scales the predicted SD to the observed SD; however, the predictions are shifted slighlty (overestimated) and the standardized one-step
 ahead prediction errors exhibit non-normality and autocorrelation. 
 3. Changing trend to semilocal linear trend (and still including seasonality + 
 regression) in `bsts.fit9` generally shows multifaceted improvements: (i) fixes the bias in the predicted distribution (realigned with observed distribution), and addresses the (ii) non-normality and (iii) autocorrelation problems in the residual chain. 
@@ -1346,19 +1346,19 @@ summary(impact8)
 ```
 ## Posterior inference {CausalImpact}
 ## 
-##                          Average       Cumulative      
-## Actual                   7.6           1584.1          
-## Prediction (s.d.)        6.7 (0.32)    1402.0 (67.62)  
-## 95% CI                   [6.1, 7.3]    [1266.6, 1532.9]
-##                                                        
-## Absolute effect (s.d.)   0.87 (0.32)   182.12 (67.62)  
-## 95% CI                   [0.25, 1.5]   [51.22, 317.5]  
-##                                                        
-## Relative effect (s.d.)   13% (4.8%)    13% (4.8%)      
-## 95% CI                   [3.7%, 23%]   [3.7%, 23%]     
+##                          Average       Cumulative    
+## Actual                   7.6           1584.1        
+## Prediction (s.d.)        6.6 (0.37)    1389.8 (77.31)
+## 95% CI                   [6, 7.4]      [1256, 1543.6]
+##                                                      
+## Absolute effect (s.d.)   0.93 (0.37)   194.29 (77.31)
+## 95% CI                   [0.19, 1.6]   [40.58, 327.8]
+##                                                      
+## Relative effect (s.d.)   14% (5.6%)    14% (5.6%)    
+## 95% CI                   [2.9%, 24%]   [2.9%, 24%]   
 ## 
-## Posterior tail-area probability p:   0.00383
-## Posterior prob. of a causal effect:  99.61706%
+## Posterior tail-area probability p:   0.01333
+## Posterior prob. of a causal effect:  98.667%
 ## 
 ## For more details, type: summary(impact, "report")
 ```
@@ -1372,17 +1372,17 @@ summary(impact9)
 ## 
 ##                          Average       Cumulative      
 ## Actual                   7.6           1584.1          
-## Prediction (s.d.)        6.7 (0.12)    1394.2 (24.96)  
-## 95% CI                   [6.4, 6.9]    [1338.1, 1438.1]
+## Prediction (s.d.)        6.7 (0.13)    1391.7 (26.15)  
+## 95% CI                   [6.4, 6.9]    [1328.1, 1440.9]
 ##                                                        
-## Absolute effect (s.d.)   0.91 (0.12)   189.91 (24.96)  
-## 95% CI                   [0.7, 1.2]    [146.1, 246.0]  
+## Absolute effect (s.d.)   0.92 (0.13)   192.47 (26.15)  
+## 95% CI                   [0.69, 1.2]   [143.24, 256.1] 
 ##                                                        
-## Relative effect (s.d.)   14% (1.8%)    14% (1.8%)      
+## Relative effect (s.d.)   14% (1.9%)    14% (1.9%)      
 ## 95% CI                   [10%, 18%]    [10%, 18%]      
 ## 
-## Posterior tail-area probability p:   5e-05
-## Posterior prob. of a causal effect:  99.99499%
+## Posterior tail-area probability p:   0.00645
+## Posterior prob. of a causal effect:  99.35484%
 ## 
 ## For more details, type: summary(impact, "report")
 ```
@@ -1397,11 +1397,11 @@ In paragraph formatting, the reports would look as follows:
 
 **Model 8: Local Linear Trend**
 
-> <br /><br />  <br /><br />  During the post-intervention period, the response variable had an average value of approx. 7.58. By contrast, in the absence of an intervention, we would have expected an average response of 6.71. The 95% interval of this counterfactual prediction is [6.06, 7.33]. Subtracting this prediction from the observed response yields an estimate of the causal effect the intervention had on the response variable. This effect is 0.87 with a 95% interval of [0.25, 1.52]. For a discussion of the significance of this effect, see below.<br /><br />  <br /><br />  Summing up the individual data points during the post-intervention period (which can only sometimes be meaningfully interpreted), the response variable had an overall value of 1.58K. By contrast, had the intervention not taken place, we would have expected a sum of 1.40K. The 95% interval of this prediction is [1.27K, 1.53K].<br /><br />  <br /><br />  The above results are given in terms of absolute numbers. In relative terms, the response variable showed an increase of +13%. The 95% interval of this percentage is [+4%, +23%].<br /><br />  <br /><br />  This means that the positive effect observed during the intervention period is statistically significant and unlikely to be due to random fluctuations. It should be noted, however, that the question of whether this increase also bears substantive significance can only be answered by comparing the absolute effect (0.87) to the original goal of the underlying intervention.<br /><br />  <br /><br />  The probability of obtaining this effect by chance is very small (Bayesian one-sided tail-area probability p = 0.004). This means the causal effect can be considered statistically significant.
+> <br /><br />  <br /><br />  During the post-intervention period, the response variable had an average value of approx. 7.58. By contrast, in the absence of an intervention, we would have expected an average response of 6.65. The 95% interval of this counterfactual prediction is [6.01, 7.39]. Subtracting this prediction from the observed response yields an estimate of the causal effect the intervention had on the response variable. This effect is 0.93 with a 95% interval of [0.19, 1.57]. For a discussion of the significance of this effect, see below.<br /><br />  <br /><br />  Summing up the individual data points during the post-intervention period (which can only sometimes be meaningfully interpreted), the response variable had an overall value of 1.58K. By contrast, had the intervention not taken place, we would have expected a sum of 1.39K. The 95% interval of this prediction is [1.26K, 1.54K].<br /><br />  <br /><br />  The above results are given in terms of absolute numbers. In relative terms, the response variable showed an increase of +14%. The 95% interval of this percentage is [+3%, +24%].<br /><br />  <br /><br />  This means that the positive effect observed during the intervention period is statistically significant and unlikely to be due to random fluctuations. It should be noted, however, that the question of whether this increase also bears substantive significance can only be answered by comparing the absolute effect (0.93) to the original goal of the underlying intervention.<br /><br />  <br /><br />  The probability of obtaining this effect by chance is very small (Bayesian one-sided tail-area probability p = 0.013). This means the causal effect can be considered statistically significant.
 
 **Model 9: Semilocal Linear Trend [Preferred]**
 
-> <br /><br />  <br /><br />  During the post-intervention period, the response variable had an average value of approx. 7.58. By contrast, in the absence of an intervention, we would have expected an average response of 6.67. The 95% interval of this counterfactual prediction is [6.40, 6.88]. Subtracting this prediction from the observed response yields an estimate of the causal effect the intervention had on the response variable. This effect is 0.91 with a 95% interval of [0.70, 1.18]. For a discussion of the significance of this effect, see below.<br /><br />  <br /><br />  Summing up the individual data points during the post-intervention period (which can only sometimes be meaningfully interpreted), the response variable had an overall value of 1.58K. By contrast, had the intervention not taken place, we would have expected a sum of 1.39K. The 95% interval of this prediction is [1.34K, 1.44K].<br /><br />  <br /><br />  The above results are given in terms of absolute numbers. In relative terms, the response variable showed an increase of +14%. The 95% interval of this percentage is [+10%, +18%].<br /><br />  <br /><br />  This means that the positive effect observed during the intervention period is statistically significant and unlikely to be due to random fluctuations. It should be noted, however, that the question of whether this increase also bears substantive significance can only be answered by comparing the absolute effect (0.91) to the original goal of the underlying intervention.<br /><br />  <br /><br />  The probability of obtaining this effect by chance is very small (Bayesian one-sided tail-area probability p = 0). This means the causal effect can be considered statistically significant.
+> <br /><br />  <br /><br />  During the post-intervention period, the response variable had an average value of approx. 7.58. By contrast, in the absence of an intervention, we would have expected an average response of 6.66. The 95% interval of this counterfactual prediction is [6.35, 6.89]. Subtracting this prediction from the observed response yields an estimate of the causal effect the intervention had on the response variable. This effect is 0.92 with a 95% interval of [0.69, 1.23]. For a discussion of the significance of this effect, see below.<br /><br />  <br /><br />  Summing up the individual data points during the post-intervention period (which can only sometimes be meaningfully interpreted), the response variable had an overall value of 1.58K. By contrast, had the intervention not taken place, we would have expected a sum of 1.39K. The 95% interval of this prediction is [1.33K, 1.44K].<br /><br />  <br /><br />  The above results are given in terms of absolute numbers. In relative terms, the response variable showed an increase of +14%. The 95% interval of this percentage is [+10%, +18%].<br /><br />  <br /><br />  This means that the positive effect observed during the intervention period is statistically significant and unlikely to be due to random fluctuations. It should be noted, however, that the question of whether this increase also bears substantive significance can only be answered by comparing the absolute effect (0.92) to the original goal of the underlying intervention.<br /><br />  <br /><br />  The probability of obtaining this effect by chance is very small (Bayesian one-sided tail-area probability p = 0.006). This means the causal effect can be considered statistically significant.
 
 Then plotting the causal impact figures (original, pointwise, cumulative) is
 useful for visually assessing the onset and decay structure of the 
@@ -1425,7 +1425,7 @@ plot(impact8)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-22-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-22-1} \end{center}
 \newpage
 
 ```r
@@ -1434,7 +1434,7 @@ plot(impact9)
 
 
 
-\begin{center}\includegraphics[width=1\linewidth]{bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-23-1} \end{center}
+\begin{center}\includegraphics[width=1\linewidth]{__DEBUG__bsts_illustration_Section4_vignette_data-csv_R1_files/figure-latex/unnamed-chunk-23-1} \end{center}
 Finally, we can print the results table of pointwise estimates of the 
 average treatment effect on the treated (ATT), along 
 with 95% Bayesian credible intervals (i.e., 95% posterior distribution interval).
@@ -1463,28 +1463,28 @@ Table: Pointwise ATT Estimates from BCA
 
 | event.time| point.effect|(sig.) | point.effect.lower| point.effect.upper|
 |----------:|------------:|:------|------------------:|------------------:|
-|         -1|       0.2930|       |            -0.8109|             1.3985|
-|          0|       0.0544|       |            -1.0689|             1.1911|
-|          1|       0.2576|       |            -0.8500|             1.3627|
-|          2|       0.1300|       |            -1.0011|             1.2652|
-|          3|       0.0445|       |            -1.0770|             1.1654|
-|          4|      -0.1207|       |            -1.2491|             1.0101|
-|          5|       0.6101|       |            -0.5293|             1.7414|
-|          6|       0.8613|       |            -0.2541|             1.9793|
-|          7|      -0.3925|       |            -1.5156|             0.7335|
-|          8|       1.0546|       |            -0.0645|             2.1578|
-|          9|      -0.9606|       |            -2.1002|             0.1745|
-|         10|       1.1822|*      |             0.0679|             2.3070|
-|         11|      -0.5178|       |            -1.6532|             0.6150|
-|         12|       0.0574|       |            -1.0697|             1.1850|
-|         13|       1.3605|*      |             0.2511|             2.4780|
-|         14|      -0.6665|       |            -1.8148|             0.4732|
-|         15|       0.9866|       |            -0.1448|             2.1298|
-|         16|       1.7144|*      |             0.5834|             2.8510|
-|         17|       0.8641|       |            -0.2777|             2.0447|
-|         18|       1.1613|*      |             0.0308|             2.2852|
-|         19|      -0.2777|       |            -1.3995|             0.8554|
-|         20|      -0.0450|       |            -1.1684|             1.0737|
+|         -1|       0.3058|       |            -0.6211|             1.4109|
+|          0|       0.0770|       |            -1.1952|             1.1243|
+|          1|       0.2629|       |            -0.9424|             1.4688|
+|          2|       0.1418|       |            -1.0907|             1.0672|
+|          3|       0.0436|       |            -0.9956|             0.9392|
+|          4|      -0.1031|       |            -1.0524|             0.8915|
+|          5|       0.6123|       |            -0.5151|             1.6384|
+|          6|       0.8806|       |            -0.0790|             1.9538|
+|          7|      -0.3677|       |            -1.4743|             0.9219|
+|          8|       1.0350|       |            -0.1934|             2.0893|
+|          9|      -0.9399|       |            -2.0360|             0.0503|
+|         10|       1.1860|       |            -0.1230|             2.3082|
+|         11|      -0.5096|       |            -1.7559|             0.5981|
+|         12|       0.0475|       |            -1.0300|             1.2055|
+|         13|       1.3457|*      |             0.2401|             2.6005|
+|         14|      -0.6073|       |            -1.5695|             0.5451|
+|         15|       0.9648|       |            -0.1134|             1.8282|
+|         16|       1.7068|*      |             0.6699|             2.8705|
+|         17|       0.9508|       |            -0.0895|             1.9549|
+|         18|       1.1626|*      |             0.0138|             2.3163|
+|         19|      -0.2871|       |            -1.4504|             0.7035|
+|         20|      -0.0223|       |            -1.0101|             1.0367|
 
 The same process can then be followed to return the cumulative effect estimates 
 for each post-intervention period along with their credible intervals. 
@@ -1508,27 +1508,27 @@ Table: Cumulative ATT Estimates from BCA
 | event.time| cum.effect|(sig.) | cum.effect.lower| cum.effect.upper|
 |----------:|----------:|:------|----------------:|----------------:|
 |         -1|     0.0000|       |           0.0000|           0.0000|
-|          0|     0.0544|       |          -1.0689|           1.1911|
-|          1|     0.3120|       |          -1.2705|           1.8963|
-|          2|     0.4420|       |          -1.5199|           2.4164|
-|          3|     0.4865|       |          -1.7522|           2.7714|
-|          4|     0.3657|       |          -2.1573|           2.9084|
-|          5|     0.9758|       |          -1.7764|           3.8226|
-|          6|     1.8372|       |          -1.1729|           4.8866|
-|          7|     1.4447|       |          -1.7973|           4.7725|
-|          8|     2.4993|       |          -0.9551|           6.0126|
-|          9|     1.5387|       |          -2.1658|           5.2622|
-|         10|     2.7209|       |          -1.1904|           6.6523|
-|         11|     2.2030|       |          -1.9359|           6.3416|
-|         12|     2.2604|       |          -2.0379|           6.5884|
-|         13|     3.6209|       |          -0.9016|           8.1209|
-|         14|     2.9544|       |          -1.7400|           7.6660|
-|         15|     3.9409|       |          -0.8930|           8.8468|
-|         16|     5.6553|*      |           0.6342|          10.7532|
-|         17|     6.5194|*      |           1.3240|          11.8398|
-|         18|     7.6807|*      |           2.2788|          13.2095|
-|         19|     7.4030|*      |           1.8605|          13.1262|
-|         20|     7.3580|*      |           1.6484|          13.2879|
+|          0|     0.0770|       |          -1.1952|           1.1243|
+|          1|     0.3399|       |          -1.2413|           1.8424|
+|          2|     0.4817|       |          -1.4603|           2.4550|
+|          3|     0.5253|       |          -1.8019|           2.6432|
+|          4|     0.4223|       |          -2.1715|           2.7244|
+|          5|     1.0346|       |          -1.3487|           3.7741|
+|          6|     1.9152|       |          -0.9311|           4.9450|
+|          7|     1.5474|       |          -1.2846|           4.9799|
+|          8|     2.5825|       |          -0.7785|           5.9150|
+|          9|     1.6426|       |          -2.2611|           5.0320|
+|         10|     2.8286|       |          -1.6283|           6.4596|
+|         11|     2.3190|       |          -2.2491|           6.1403|
+|         12|     2.3665|       |          -2.0723|           6.1448|
+|         13|     3.7122|       |          -1.1916|           7.6024|
+|         14|     3.1049|       |          -1.6536|           7.4760|
+|         15|     4.0698|       |          -0.8468|           8.7444|
+|         16|     5.7766|*      |           0.3393|          10.8347|
+|         17|     6.7273|*      |           0.5512|          11.6827|
+|         18|     7.8899|*      |           1.7157|          13.1500|
+|         19|     7.6028|*      |           1.4678|          13.1419|
+|         20|     7.5805|*      |           1.1615|          13.6034|
 These results of BCA for dynamic causal inference are valuable because they
 enable researchers and practitioners to move beyond just asking whether 
 or not a causal effect existed. Instead, this approach begins to enable 
